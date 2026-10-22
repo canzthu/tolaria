@@ -1,7 +1,8 @@
-let endpoint: string | null = null
+type NativeQaSender = (event: unknown) => void
+let layoutSender: NativeQaSender | null = null
 
 export function setNativeQaSinkUrl(value: string | null) {
-  endpoint = localCollectorUrl(value)
+  layoutSender = createNativeQaSender(value)
 }
 
 function localCollectorUrl(value: string | null): string | null {
@@ -15,14 +16,22 @@ function localCollectorUrl(value: string | null): string | null {
 }
 
 export function postNativeQaEvent(event: unknown) {
-  if (!endpoint) return
-  void fetch(endpoint, {
-    body: JSON.stringify(event),
-    headers: { 'content-type': 'application/json' },
-    method: 'POST',
-    redirect: 'error',
-    credentials: 'omit',
-  }).catch(() => undefined)
+  layoutSender?.(event)
+}
+
+/** Async proofs retain their authorized collector independently of layout lifecycle. */
+export function createNativeQaSender(value: string | null): NativeQaSender | null {
+  const destination = localCollectorUrl(value)
+  if (!destination) return null
+  return event => {
+    void fetch(destination, {
+      body: JSON.stringify(event),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      redirect: 'error',
+      credentials: 'omit',
+    }).catch(() => undefined)
+  }
 }
 
 export function logNativeQaProof(line: string) {

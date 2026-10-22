@@ -537,6 +537,9 @@ not a replacement for the per-root disk queue or a multi-file disk transaction.
 `nativeQaSink.ts` carries layout measurements and known persistence proofs to the
 simulator harness over loopback, so standalone QA does not depend on JavaScript
 console messages appearing in the iOS unified log.
+Async write-recovery runs capture an independently validated loopback sender;
+layout sink clearing or replacement cannot redirect or discard their proofs.
+Recovery also checks the native QA capability before creating disposable fixtures.
 
 ## Tablet Panel Motion
 

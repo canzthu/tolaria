@@ -4,7 +4,8 @@ import { expoWorkspaceFileSystem } from '../workspace/expoWorkspaceFileSystem'
 import { withSavedWorkspace } from '../workspace/git/workspaceWriteQueue'
 import { runSavedVaultOperation } from '../workspace/git/savedVaultOperation'
 import { createWorkspaceSyncEditors } from '../workspace/workspaceSyncEditors'
-import { postNativeQaEvent, setNativeQaSinkUrl } from './nativeQaSink'
+import { createNativeQaSender } from './nativeQaSink'
+import { nativeStorageQaEnabled } from './nativeStorageQaCapability'
 import { nativeEntryRecoveryChecks } from './nativeEntryRecoveryProbe'
 import { nativeBatchRecoveryChecks } from './nativeBatchRecoveryProbe'
 
@@ -13,6 +14,7 @@ type NativePhase = 'prepare' | 'prepare-conflict' | 'inspect' | 'cleanup' | 'edi
 type VerificationPhase = 'recover' | 'conflict'
 type ProbePhase = Exclude<NativePhase, 'inspect' | 'edit-completed'> | VerificationPhase
 type ProbeModule = {
+  nativeStorageQAEnabled?: boolean
   runTextRecoveryProbe: (phase: NativePhase) => Promise<Inspection>
   saveWorkspaceText: (root: string, path: string, content: string, identifier: string) => Promise<void>
 }
@@ -21,18 +23,31 @@ let running = false
 /** Cross-launch fixtures are confined to the native module's dedicated QA cache. */
 export async function runNativeWriteRecoveryProbe(endpoint: string, phase: string) {
   if (running) return
+  const postProof = recoveryProofSender(endpoint)
+  if (!postProof) return
   running = true
-  setNativeQaSinkUrl(new URL('/proof', endpoint).toString())
   try {
-    const module = requireOptionalNativeModule<ProbeModule>('TolariaWorkspaceAccess')
-    if (!module?.runTextRecoveryProbe) throw new Error('nativeTextRecoveryUnavailable')
+    const module = recoveryProbeModule()
     const checks = await recoveryChecks(module, phase)
-    postNativeQaEvent({ phase, passed: Object.values(checks).every(Boolean), checks })
+    postProof({ phase, passed: Object.values(checks).every(Boolean), checks })
   } catch (error) {
-    postNativeQaEvent({ phase, passed: false, error: error instanceof Error ? error.message : 'unknown' })
+    postProof({ phase, passed: false, error: error instanceof Error ? error.message : 'unknown' })
   } finally {
     running = false
   }
+}
+
+function recoveryProbeModule() {
+  const module = requireOptionalNativeModule<ProbeModule>('TolariaWorkspaceAccess')
+  const development = typeof __DEV__ !== 'undefined' && __DEV__
+  if (!nativeStorageQaEnabled(development, module?.nativeStorageQAEnabled)
+    || !module?.runTextRecoveryProbe) throw new Error('nativeTextRecoveryUnavailable')
+  return module
+}
+
+function recoveryProofSender(endpoint: string) {
+  try { return createNativeQaSender(new URL('/proof', endpoint).toString()) }
+  catch { return null }
 }
 
 function recoveryChecks(module: ProbeModule, phase: string) {
