@@ -2,6 +2,7 @@ import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { WebSocket as NodeWebSocket } from 'ws'
 import { closeVaultServer, createVaultServer } from '../../../apps/server/src/server.ts'
 import { LocalDiskStore } from '../../../apps/server/src/store.ts'
 import type { Vault } from '../../../apps/server/src/vault.ts'
@@ -39,7 +40,7 @@ beforeEach(async () => {
   backend = createRemoteVaultBackend({
     baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     token: TOKEN,
-    createSocket: (url) => new WebSocket(url) as unknown as SocketLike,
+    createSocket: (url) => new NodeWebSocket(url) as unknown as SocketLike,
   })
   opened = []
 })

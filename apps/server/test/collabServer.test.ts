@@ -68,7 +68,7 @@ async function joinNote(path: string, access: 'read' | 'write' = 'write'): Promi
     doc: new Y.Doc(),
     openSocket: async () => {
       const issued = (await (await ticket({ docId, access })).json()) as CollabTicketResponse
-      return new WebSocket(socketUrl(issued.path, `?ticket=${issued.ticket}`)) as unknown as SocketLike
+      return new NodeWebSocket(socketUrl(issued.path, `?ticket=${issued.ticket}`)) as unknown as SocketLike
     },
   })
   providers.push(provider)
@@ -107,6 +107,7 @@ afterEach(async () => {
   for (const provider of providers) provider.destroy()
   await closeVaultServer(server)
   await vault.idle()
+  await settle(20)
   await fixture.cleanup()
 })
 
@@ -234,6 +235,7 @@ describe('the collaboration channel over websockets', () => {
     const socket = new NodeWebSocket(socketUrl(`/v1/collab/docs/${docId}`), { headers: { authorization: `Bearer ${TOKEN}` } })
     socket.on('error', () => {})
     socket.terminate()
+    await settle()
 
     expect(codec.read((await joinNote(NOTE)).doc)).toContain('# Alpha')
   })
