@@ -262,6 +262,7 @@
   "settings.theme.label": "Tema",
   "settings.theme.light": "Ljust",
   "settings.theme.dark": "Mörkt",
+  "settings.theme.hybrid": "Hybrid",
   "settings.theme.system": "System",
   "settings.language.title": "Språk",
   "settings.language.description": "Välj visningsspråk för Tolarias gränssnitt. System följer macOS när det språket stöds, med engelska som reserv.",

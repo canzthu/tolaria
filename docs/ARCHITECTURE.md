@@ -708,6 +708,8 @@ The app uses internal app-owned light and dark themes with an optional System pr
 2. **Editor theme** (`src/theme.json`): BlockNote-specific typography. Flattened to CSS vars by `useEditorTheme`; editor colors resolve through the same semantic app variables.
 3. **Theme runtime**: Applies resolved `light` / `dark` values to `data-theme` and the shadcn-compatible `.dark` class before React consumers render, with a localStorage mirror to avoid startup flash when dark mode or System-on-dark is selected. Settings and command-palette theme actions both write the same installation-local `settings.theme_mode` value; `system` subscribes to `prefers-color-scheme` changes at runtime while explicit Light/Dark remain overrides.
 
+Hybrid keeps the document theme light and scopes the existing dark theme tokens plus `.dark` utilities to `.app__sidebar`. UI overlays are rendered outside that subtree and follow the content theme, including popovers and context menus opened from the sidebar. The native window background follows the selected appearance so the transparent macOS title bar blends into the dark sidebar in Hybrid.
+
 The Settings panel keeps its dialog frame and scroll container mounted while persisted settings updates flow back from `useSettings`. Incoming settings refresh the draft in place, so immediately persisted controls reflect stored values without resetting the panel position.
 
 ## Localization

@@ -262,6 +262,7 @@
   "settings.theme.label": "Tema",
   "settings.theme.light": "Terang",
   "settings.theme.dark": "Gelap",
+  "settings.theme.hybrid": "Hibrida",
   "settings.theme.system": "Sistem",
   "settings.language.title": "Bahasa",
   "settings.language.description": "Pilih bahasa tampilan untuk antarmuka Tolaria. Sistem mengikuti macOS jika bahasa tersebut didukung, dengan bahasa Inggris sebagai cadangan.",

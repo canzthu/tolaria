@@ -262,6 +262,7 @@
   "settings.theme.label": "主題",
   "settings.theme.light": "淺色",
   "settings.theme.dark": "深色",
+  "settings.theme.hybrid": "混合",
   "settings.theme.system": "系統",
   "settings.language.title": "語言",
   "settings.language.description": "選擇 Tolaria 介面的顯示語言。系統選項會在支援時跟隨 macOS，否則回退到英文。",

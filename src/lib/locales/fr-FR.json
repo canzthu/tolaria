@@ -262,6 +262,7 @@
   "settings.theme.label": "Thème",
   "settings.theme.light": "Clair",
   "settings.theme.dark": "Sombre",
+  "settings.theme.hybrid": "Hybride",
   "settings.theme.system": "Système",
   "settings.language.title": "Langue",
   "settings.language.description": "Choisissez la langue d'affichage de Tolaria Chrome. Le système suit macOS lorsque cette langue est prise en charge, l'anglais étant la langue de secours.",

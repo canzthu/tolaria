@@ -262,6 +262,7 @@
   "settings.theme.label": "Téma",
   "settings.theme.light": "Svetlý",
   "settings.theme.dark": "Tmavý",
+  "settings.theme.hybrid": "Hybridné",
   "settings.theme.system": "Systém",
   "settings.language.title": "Jazyk",
   "settings.language.description": "Vyberte jazyk zobrazenia pre Tolaria chrome. Systém sa riadi systémom macOS, ak je daný jazyk podporovaný, pričom záložným jazykom je angličtina.",

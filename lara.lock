@@ -264,6 +264,7 @@ files:
     settings.theme.label: d721757161f7f70c5b0949fdb6ec2c30
     settings.theme.light: 9914a0ce04a7b7b6a8e39bec55064b82
     settings.theme.dark: a18366b217ebf811ad1886e4f4f865b2
+    settings.theme.hybrid: fb1b6e23a3767d2a31ef7899e6dd3f1e
     settings.theme.system: a45da96d0bf6575970f2d27af22be28a
     settings.language.title: 4994a8ffeba4ac3140beb89e8d41f174
     settings.language.description: e2bb9b523067fdc32a494b1d6fd97906

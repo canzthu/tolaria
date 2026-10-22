@@ -262,6 +262,7 @@
   "settings.theme.label": "Chủ đề",
   "settings.theme.light": "Sáng",
   "settings.theme.dark": "Tối",
+  "settings.theme.hybrid": "Lai",
   "settings.theme.system": "Hệ thống",
   "settings.language.title": "Ngôn ngữ",
   "settings.language.description": "Chọn ngôn ngữ hiển thị cho phần khung Tolaria. Hệ thống sẽ theo macOS nếu ngôn ngữ đó được hỗ trợ, còn tiếng Anh là phương án dự phòng.",

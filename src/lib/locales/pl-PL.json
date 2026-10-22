@@ -262,6 +262,7 @@
   "settings.theme.label": "Motyw",
   "settings.theme.light": "Jasny",
   "settings.theme.dark": "Ciemny",
+  "settings.theme.hybrid": "Hybrydowy",
   "settings.theme.system": "System",
   "settings.language.title": "Język",
   "settings.language.description": "Wybierz język wyświetlania interfejsu Tolaria. Systemowy używa języka macOS, gdy jest obsługiwany, z angielskim jako językiem zapasowym.",

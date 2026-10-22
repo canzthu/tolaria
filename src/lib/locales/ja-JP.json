@@ -262,6 +262,7 @@
   "settings.theme.label": "テーマ",
   "settings.theme.light": "ライト",
   "settings.theme.dark": "ダーク",
+  "settings.theme.hybrid": "ハイブリッド",
   "settings.theme.system": "システム",
   "settings.language.title": "言語",
   "settings.language.description": "Tolaria Chromeの表示言語を選択します。システムは、対応言語がサポートされている場合はmacOSに従い、サポートされていない場合は英語が使用されます。",

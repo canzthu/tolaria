@@ -246,6 +246,7 @@
   "settings.theme.label": "Tema",
   "settings.theme.light": "Svietlaja",
   "settings.theme.dark": "Ciomnaja",
+  "settings.theme.hybrid": "Hibrydny",
   "settings.theme.system": "Sistemnaja",
   "settings.language.title": "Mova",
   "settings.language.description": "Abiarycie movu interfiejsu. ”Sistemnaja” vykarystoŭvaje nalady AS, anhlijskaja vykarystoŭvajecca jak reziervovaja.",

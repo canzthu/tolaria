@@ -7,7 +7,7 @@ import {
   writeStoredThemeMode,
   type ThemeMode,
 } from '../lib/themeMode'
-import { syncAppIconThemeMode } from '../lib/appIconTheme'
+import { syncAppIconThemeMode, syncNativeWindowBackground } from '../lib/appIconTheme'
 
 function resolveRuntimeThemeMode(themeMode: ThemeMode | null | undefined): ThemeMode {
   if (themeMode) return themeMode
@@ -30,6 +30,7 @@ function applySelectedThemeMode(themeMode: ThemeMode): void {
   const resolvedMode = applyThemeSelectionToDocument(document, themeMode, currentMatchMedia())
   writeThemeModeMirror(themeMode)
   void syncAppIconThemeMode(resolvedMode)
+  void syncNativeWindowBackground(themeMode)
 }
 
 function getSystemThemeMediaQueryList(): MediaQueryList | null {

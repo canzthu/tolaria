@@ -262,6 +262,7 @@
   "settings.theme.label": "Theme",
   "settings.theme.light": "Light",
   "settings.theme.dark": "Dark",
+  "settings.theme.hybrid": "Hybrid",
   "settings.theme.system": "System",
   "settings.language.title": "Language",
   "settings.language.description": "Choose the display language for Tolaria chrome. System follows macOS when that language is supported, with English as the fallback.",

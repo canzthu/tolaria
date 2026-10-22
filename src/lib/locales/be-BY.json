@@ -262,6 +262,7 @@
   "settings.theme.label": "Тэма",
   "settings.theme.light": "Светлая",
   "settings.theme.dark": "Цёмная",
+  "settings.theme.hybrid": "Гібрыдны",
   "settings.theme.system": "Сістэмная",
   "settings.language.title": "Мова",
   "settings.language.description": "Абярыце мову інтэрфейсу. \"Сістэмная\" выкарыстоўвае налады АС, англійская выкарыстоўваецца як рэзервовая.",

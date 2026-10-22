@@ -845,12 +845,9 @@ function ThemeModeControl({
       aria-label={t('settings.theme.label')}
       data-testid="settings-theme-mode"
     >
-      <ThemeModeButton label={t('settings.theme.light')} selected={value === 'light'} value="light" onSelect={onChange}>
-        <Sun size={14} />
-      </ThemeModeButton>
-      <ThemeModeButton label={t('settings.theme.dark')} selected={value === 'dark'} value="dark" onSelect={onChange}>
-        <Moon size={14} />
-      </ThemeModeButton>
+      <ThemeModeButton label={t('settings.theme.light')} selected={value === 'light'} value="light" onSelect={onChange}><Sun size={14} /></ThemeModeButton>
+      <ThemeModeButton label={t('settings.theme.dark')} selected={value === 'dark'} value="dark" onSelect={onChange}><Moon size={14} /></ThemeModeButton>
+      <ThemeModeButton label={t('settings.theme.hybrid')} selected={value === 'hybrid'} value="hybrid" onSelect={onChange}><Moon size={14} /></ThemeModeButton>
       <ThemeModeButton
         label={t('settings.theme.system')}
         selected={value === 'system'}
