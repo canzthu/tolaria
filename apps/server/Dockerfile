@@ -8,20 +8,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Copy workspace configuration and patches
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY patches ./patches
-
-# Copy source code needed for the server
-COPY apps/server ./apps/server
-COPY packages/protocol ./packages/protocol
-COPY packages/markdown-yjs ./packages/markdown-yjs
-
-# Create stub workspace packages with minimal package.json for pnpm workspace validation
-RUN mkdir -p apps/mobile apps/web mcp-server && \
-    echo '{"name":"@tolaria/mobile","version":"0.0.0","private":true}' > apps/mobile/package.json && \
-    echo '{"name":"@tolaria/web","version":"0.0.0","private":true}' > apps/web/package.json && \
-    echo '{"name":"tolaria-mcp-server","version":"0.0.0"}' > mcp-server/package.json
+# Copy entire repository (filtered by .dockerignore)
+# This includes all workspace packages and source code
+COPY . .
 
 # Enable pnpm and install dependencies
 RUN corepack enable && \
