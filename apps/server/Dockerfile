@@ -14,7 +14,7 @@ COPY patches ./patches
 
 # Modify pnpm-workspace.yaml to only reference root (no workspace packages)
 # This prevents pnpm from looking for apps/* workspaces we haven't copied
-RUN sed -i 's/packages:.*/packages: []/' pnpm-workspace.yaml
+RUN sed -i '/^packages:/,/^[^ ]/{/^packages:/!{/^[^ ]/!d}}; s/^packages:.*/packages: []/' pnpm-workspace.yaml
 
 # Copy source code
 COPY apps/server ./apps/server
