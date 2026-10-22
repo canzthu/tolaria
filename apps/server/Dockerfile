@@ -17,14 +17,11 @@ COPY apps/server ./apps/server
 COPY packages/protocol ./packages/protocol
 COPY packages/markdown-yjs ./packages/markdown-yjs
 
-# Create stub directories for other workspace packages to satisfy pnpm workspace validation
-# These are not needed at runtime but pnpm expects them to exist
-RUN mkdir -p apps/mobile apps/web mcp-server
-
 # Enable pnpm and install dependencies
+# Use --ignore-workspace to avoid workspace validation since we only copied a subset of packages
 RUN corepack enable && \
     corepack prepare pnpm@10.33.0 --activate && \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --ignore-workspace
 
 # Production stage: minimal runtime image
 FROM node:22-bookworm-slim
