@@ -700,6 +700,64 @@ jobs:
           path: test-results/performance-summary.json
           destination: performance-summary.json
 
+  server-docker-build:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Build server Docker image
+          command: |
+            set -euo pipefail
+            cd apps/server
+            docker build -t tolaria-server:test .
+      - run:
+          name: Container smoke test
+          command: |
+            set -euo pipefail
+            # Create test remote
+            test_remote="$(mktemp -d)"
+            cd "$test_remote"
+            git init --bare -b main
+            temp_work="$(mktemp -d)"
+            cd "$temp_work"
+            git clone "$test_remote" .
+            echo "# Test Vault" > README.md
+            git add .
+            git config user.name "Test"
+            git config user.email "test@test.invalid"
+            git commit -m "Initial commit"
+            git push origin main
+            
+            # Start container
+            container_id=$(docker run -d \
+              -e TOLARIA_SERVER_TOKEN=test-token-1234567890 \
+              -e TOLARIA_VAULT_REMOTE_URL="$test_remote" \
+              -e TOLARIA_SERVER_ALLOW_NON_LOOPBACK=1 \
+              -p 8787:8787 \
+              tolaria-server:test)
+            
+            # Wait for readiness
+            for i in {1..30}; do
+              if curl -f http://localhost:8787/healthz 2>/dev/null; then
+                echo "Server ready"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "Server failed to become ready"
+                docker logs "$container_id"
+                exit 1
+              fi
+              sleep 1
+            done
+            
+            # Test SIGTERM handling
+            docker kill --signal=SIGTERM "$container_id"
+            docker wait "$container_id"
+            
+            echo "Container smoke test passed"
+
   linux-build-verification:
     machine:
       image: ubuntu-2204:current
@@ -1638,6 +1696,12 @@ workflows:
           filters:
             branches:
               only: main
+            tags:
+              ignore: /.*/
+      - server-docker-build:
+          filters:
+            branches:
+              ignore: gh-pages
             tags:
               ignore: /.*/
       - linux-build-verification:

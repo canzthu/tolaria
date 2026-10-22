@@ -18,6 +18,8 @@ import { searchVault } from './search.ts'
 export interface VaultOptions extends RepoOptions {
   now?: () => Date
   log?: (message: string) => void
+  /** Debounce delay in ms before pushing commits. 0 disables debounced push. */
+  pushDebounceMs?: number
 }
 
 /** Revision of a file's content: its git blob id. */
@@ -106,6 +108,8 @@ function parseTreeRecord(record: string): FileEntry | null {
   return { path: record.slice(tab + 1), size: Number(size), etag }
 }
 
+const DEFAULT_PUSH_DEBOUNCE_MS = 2000
+
 /**
  * One vault = one git working clone owned by this process. Every mutation runs under a
  * single lock as: fetch + integrate upstream, change files, commit, push.
@@ -115,13 +119,18 @@ export class Vault {
   private readonly sync: GitSync
   private readonly now: () => Date
   private readonly listeners: ChangeListener[] = []
+  private readonly log: (message: string) => void
+  private readonly pushDebounceMs: number
+  private pushTimer: NodeJS.Timeout | null = null
   private queue: Promise<unknown> = Promise.resolve()
 
   private constructor(repo: GitRepo, options: VaultOptions) {
     this.repo = repo
     this.now = options.now ?? (() => new Date())
+    this.log = options.log ?? (() => {})
+    this.pushDebounceMs = options.pushDebounceMs ?? DEFAULT_PUSH_DEBOUNCE_MS
     this.sync = new GitSync(repo, {
-      log: options.log ?? (() => {}),
+      log: this.log,
       conflictPath: (path) => this.conflictPath(path),
       onChanges: (changes) => this.emit(changes),
     })
@@ -188,6 +197,7 @@ export class Vault {
     const stored = await this.store(path, bytes, precondition)
     const committed = performance.now()
 
+    this.schedulePush()
     this.sync.relocated.clear()
     const pushed = await this.sync.push()
     // Someone pushed the same file between our fetch and our push: upstream keeps the path.
@@ -247,6 +257,45 @@ export class Vault {
   /** Resolves once every queued operation has finished. */
   async idle(): Promise<void> {
     await this.queue
+  }
+
+  /** Commits any staged changes and pushes with retry. Logs failures. Used on shutdown. */
+  async flushAndPush(): Promise<void> {
+    return this.locked(async () => {
+      this.cancelPushTimer()
+      await this.repo.commitStaged('Server shutdown: flush pending changes')
+      const pushed = await this.sync.push()
+      if (!pushed) {
+        const ahead = await this.repo.run(['rev-list', '--count', `${this.repo.upstream}..HEAD`])
+        const unpushedCount = ahead.stdout.trim()
+        this.log(`WARNING: failed to push ${unpushedCount} commit(s) on shutdown; they remain local only`)
+      }
+    })
+  }
+
+  private schedulePush(): void {
+    if (this.pushDebounceMs === 0) return
+    this.cancelPushTimer()
+    this.pushTimer = setTimeout(() => {
+      this.pushTimer = null
+      this.backgroundPush()
+    }, this.pushDebounceMs)
+  }
+
+  private cancelPushTimer(): void {
+    if (this.pushTimer !== null) {
+      clearTimeout(this.pushTimer)
+      this.pushTimer = null
+    }
+  }
+
+  private backgroundPush(): void {
+    this.locked(async () => {
+      const pushed = await this.sync.push()
+      if (!pushed) this.log('background push failed; will retry on next commit')
+    }).catch((error: unknown) => {
+      this.log(`background push error: ${error instanceof Error ? error.message : String(error)}`)
+    })
   }
 
   /** Writes and commits the bytes where the precondition allows: the path or a conflict copy. */

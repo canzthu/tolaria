@@ -20,6 +20,8 @@ export interface ServerOptions {
   log?: (message: string) => void
   /** Settings of the collaboration channel; `false` leaves it reserved and unserved. */
   collab?: CollabOptions | false
+  /** Called when the server is ready to serve requests. */
+  onReady?: () => void
 }
 
 export interface CollabOptions {
@@ -31,6 +33,8 @@ export interface CollabOptions {
 const DEFAULT_LINGER_MS = 30_000
 /** What to do before the HTTP server of a vault stops, by server. */
 const SHUTDOWN = new WeakMap<Server, () => Promise<void>>()
+/** Whether the server is ready to serve requests (vault and index initialized). */
+const READY = new WeakMap<Server, boolean>()
 
 const HEALTH_PATH = '/healthz'
 
@@ -44,10 +48,15 @@ function checkAccess(request: IncomingMessage, token: string): void {
   }
 }
 
-async function answer(request: IncomingMessage, services: Services, options: ServerOptions): Promise<Reply> {
+async function answer(request: IncomingMessage, services: Services, options: ServerOptions, server: Server): Promise<Reply> {
   // The base only gives relative request targets something to resolve against.
   const url = new URL(request.url ?? '/', 'http://vault.invalid')
-  if (url.pathname === HEALTH_PATH) return { status: 200, body: { status: 'ok' } }
+  if (url.pathname === HEALTH_PATH) {
+    const ready = READY.get(server) ?? false
+    return ready
+      ? { status: 200, body: { status: 'ok' } }
+      : { status: 503, body: { status: 'not_ready', message: 'vault is initializing' } }
+  }
   checkAccess(request, options.token)
   return route(
     {
@@ -81,11 +90,18 @@ export async function createVaultServer(options: ServerOptions): Promise<Server>
   const services: Services = { vault, docs, collab: tickets !== undefined, tickets }
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    answer(request, services, options)
+    answer(request, services, options, server)
       .catch((error: unknown) => failure(error, log))
       .then((reply) => send(response, reply))
   })
-  if (tickets) serveCollab(server, { options, docs, tickets, log })
+  READY.set(server, true)
+  options.onReady?.()
+  if (tickets) {
+    serveCollab(server, { options, docs, tickets, log })
+  } else {
+    // Set up shutdown handler even without collab
+    setupShutdown(server, { vault, log })
+  }
   return server
 }
 
@@ -108,15 +124,29 @@ function serveCollab(server: Server, { options, docs, tickets, log }: CollabPart
     lingerMs: settings.lingerMs ?? DEFAULT_LINGER_MS,
   })
   const sockets = attachCollab(server, { hub, tickets, docs, token, log, maxMessageBytes: options.maxBodyBytes })
+  setupShutdown(server, { vault, hub, sockets, log })
+}
+
+function setupShutdown(
+  server: Server,
+  { vault, hub, sockets, log }: { vault: Vault; hub?: CollabHub; sockets?: { close(): void }; log: (msg: string) => void }
+): void {
   SHUTDOWN.set(server, async () => {
-    await hub.close()
-    sockets.close()
+    if (hub && sockets) {
+      log('shutdown: flushing open documents')
+      await hub.close()
+      sockets.close()
+    }
+    log('shutdown: committing and pushing')
+    await vault.flushAndPush()
+    log('shutdown: complete')
   })
 }
 
-/** Stops a vault server: open documents are written to their files first. */
+/** Stops a vault server: open documents are written to their files first, then committed and pushed. */
 export async function closeVaultServer(server: Server): Promise<void> {
-  await SHUTDOWN.get(server)?.()
+  const shutdown = SHUTDOWN.get(server)
+  if (shutdown) await shutdown()
   server.close()
   server.closeAllConnections()
 }
