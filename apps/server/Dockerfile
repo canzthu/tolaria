@@ -17,11 +17,16 @@ COPY apps/server ./apps/server
 COPY packages/protocol ./packages/protocol
 COPY packages/markdown-yjs ./packages/markdown-yjs
 
+# Create stub workspace packages with minimal package.json for pnpm workspace validation
+RUN mkdir -p apps/mobile apps/web mcp-server && \
+    echo '{"name":"@tolaria/mobile","version":"0.0.0","private":true}' > apps/mobile/package.json && \
+    echo '{"name":"@tolaria/web","version":"0.0.0","private":true}' > apps/web/package.json && \
+    echo '{"name":"tolaria-mcp-server","version":"0.0.0"}' > mcp-server/package.json
+
 # Enable pnpm and install dependencies
-# Use --ignore-workspace to avoid workspace validation since we only copied a subset of packages
 RUN corepack enable && \
     corepack prepare pnpm@10.33.0 --activate && \
-    pnpm install --frozen-lockfile --ignore-workspace
+    pnpm install --frozen-lockfile
 
 # Production stage: minimal runtime image
 FROM node:22-bookworm-slim
