@@ -729,10 +729,15 @@ jobs:
             git commit -m "Initial commit"
             git push origin main
             
+            # The container cannot see host paths: mount the bare remote and give it to the
+            # image's `node` user (UID 1000) so git's safe.directory ownership check passes.
+            sudo chown -R 1000:1000 "$test_remote"
+
             # Start container
             container_id=$(docker run -d \
+              -v "$test_remote:/test-remote.git" \
               -e TOLARIA_SERVER_TOKEN=test-token-1234567890 \
-              -e TOLARIA_VAULT_REMOTE_URL="$test_remote" \
+              -e TOLARIA_VAULT_REMOTE_URL=/test-remote.git \
               -e TOLARIA_SERVER_ALLOW_NON_LOOPBACK=1 \
               -p 8787:8787 \
               tolaria-server:test)

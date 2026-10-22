@@ -25,25 +25,23 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -m -u 1000 -s /bin/bash tolaria
+# Run as the image's built-in non-root `node` user (UID 1000); adding another UID 1000 user fails
 
 WORKDIR /app
 
 # Copy built application and dependencies from build stage
-COPY --from=build --chown=tolaria:tolaria /app/node_modules ./node_modules
-COPY --from=build --chown=tolaria:tolaria /app/apps/server ./apps/server
-COPY --from=build --chown=tolaria:tolaria /app/packages ./packages
-COPY --from=build --chown=tolaria:tolaria /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
-
-# Enable pnpm
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/apps/server ./apps/server
+COPY --from=build --chown=node:node /app/packages ./packages
+# packages/markdown-yjs and packages/collab-client import shared code from the app's src/
+COPY --from=build --chown=node:node /app/src ./src
+COPY --from=build --chown=node:node /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 
 # Create data directory with correct ownership
-RUN mkdir -p /app/data && chown tolaria:tolaria /app/data
+RUN mkdir -p /app/data && chown node:node /app/data
 
 # Switch to non-root user
-USER tolaria
+USER node
 
 # Expose default port
 EXPOSE 8787
@@ -59,5 +57,5 @@ ENV TOLARIA_SERVER_DATA_DIR=/app/data \
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
     CMD node -e "require('http').get('http://localhost:8787/healthz', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"
 
-# Run the server
-CMD ["pnpm", "server"]
+# Run the server directly under node (same command as `pnpm server`), so node is PID 1 and gets SIGTERM
+CMD ["node", "--experimental-strip-types", "apps/server/scripts/run.ts", "apps/server/src/main.ts"]
