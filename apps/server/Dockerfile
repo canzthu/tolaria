@@ -12,14 +12,14 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
 
-# Modify pnpm-workspace.yaml to only reference root (no workspace packages)
-# This prevents pnpm from looking for apps/* workspaces we haven't copied
-RUN sed -i '/^packages:/,/^[^ ]/{/^packages:/!{/^[^ ]/!d}}; s/^packages:.*/packages: []/' pnpm-workspace.yaml
-
-# Copy source code
+# Copy source code needed for the server
 COPY apps/server ./apps/server
 COPY packages/protocol ./packages/protocol
 COPY packages/markdown-yjs ./packages/markdown-yjs
+
+# Create stub directories for other workspace packages to satisfy pnpm workspace validation
+# These are not needed at runtime but pnpm expects them to exist
+RUN mkdir -p apps/mobile apps/web mcp-server
 
 # Enable pnpm and install dependencies
 RUN corepack enable && \
