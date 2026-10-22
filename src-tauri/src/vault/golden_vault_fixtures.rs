@@ -58,7 +58,11 @@ struct NormalizedVaultEntry {
     favorite_index: Option<i64>,
     #[serde(rename = "wordCount")]
     word_count: u32,
-    #[serde(rename = "outgoingLinks", skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(
+        rename = "outgoingLinks",
+        skip_serializing_if = "Vec::is_empty",
+        default
+    )]
     outgoing_links: Vec<String>,
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     properties: HashMap<String, serde_json::Value>,
@@ -155,8 +159,8 @@ fn write_golden_fixture(
 fn verify_against_golden(vault_path: &Path, golden_path: &Path) -> Result<(), String> {
     let golden_json =
         fs::read_to_string(golden_path).map_err(|e| format!("Failed to read golden: {}", e))?;
-    let golden: Vec<NormalizedVaultEntry> = serde_json::from_str(&golden_json)
-        .map_err(|e| format!("Failed to parse golden: {}", e))?;
+    let golden: Vec<NormalizedVaultEntry> =
+        serde_json::from_str(&golden_json).map_err(|e| format!("Failed to parse golden: {}", e))?;
 
     let current = scan_vault_normalized(vault_path)?;
 
