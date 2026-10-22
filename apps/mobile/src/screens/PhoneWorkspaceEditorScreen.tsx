@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react'
+import { useCallback } from 'react'
 import { View } from 'react-native'
 import { probeProps } from '../qa/mobileLayoutProbe'
 import { useMobileStyles } from '../ui/theme/useMobileTheme'
@@ -7,14 +7,12 @@ import type { RegisterMobileEditorCommands } from '../workspace/mobileEditorComm
 import type { MobileNote } from '../workspace/mobileWorkspaceModel'
 import { TabletEditorPanel } from './TabletEditorPanel'
 import type { PhoneWorkspaceEditorOptions } from './phoneWorkspaceEditorOptions'
-import { PhoneCommandPaletteButton, PhoneTopBar } from './PhoneWorkspaceChrome'
+import { PhoneTopBar } from './PhoneWorkspaceChrome'
 import { createThemeStyles } from './phoneWorkspaceStyles'
 import type { PhoneWorkspaceStateViewProps, PhoneWorkspaceController, PhoneTableOfContentsTargetRequest } from './phoneWorkspaceScreenSupport'
 
 type PhoneEditorBodyProps = {
   controller: PhoneWorkspaceController
-  leading?: ReactNode
-  trailing?: ReactNode
   notes: MobileNote[]
   onNavigateWikilink: (target: string) => void
   onRegisterEditorCommands?: RegisterMobileEditorCommands
@@ -26,8 +24,6 @@ type PhoneEditorBodyProps = {
 function PhoneEditorBody(props: PhoneEditorBodyProps) {
   const {
     controller,
-    leading,
-    trailing,
     notes,
     onNavigateWikilink,
     onRegisterEditorCommands,
@@ -43,8 +39,6 @@ function PhoneEditorBody(props: PhoneEditorBodyProps) {
       blocks={controller.editorBlocks}
       bullets={controller.editorBullets}
       compact
-      leading={leading}
-      trailing={trailing}
       initialEditing={sourceModeRequested || options.initialEditorEditing}
       initialEditingMode={sourceModeRequested ? 'source' : options.initialEditorEditingMode}
       layoutProbe={options.layoutProbe}
@@ -99,7 +93,6 @@ export function PhoneEditorScreen(props: PhoneWorkspaceStateViewProps) {
     controller,
     options,
     openList,
-    openCommandPalette,
     onRegisterEditorCommands,
     phoneLayoutProbe,
     sourceModeRequest,
@@ -114,7 +107,6 @@ export function PhoneEditorScreen(props: PhoneWorkspaceStateViewProps) {
       {!controller.selectedNote && <PhoneTopBar title="" onBack={openList} />}
       <PhoneEditorBody
         controller={controller}
-        trailing={<PhoneCommandPaletteButton onPress={openCommandPalette} />}
         notes={suggestionNotes}
         onNavigateWikilink={handleNavigateWikilink}
         onRegisterEditorCommands={onRegisterEditorCommands}

@@ -31,7 +31,6 @@ vi.mock('../../ui/MobilePanelSafeArea', () => ({ MobilePanelSafeArea: ({ childre
 vi.mock('../ui/text', () => ({ Text: ({ children }: { children: ReactNode }) => createElement('span', null, children) }))
 vi.mock('./MobileWorkspaceSidebar', () => ({ MobileWorkspaceSidebar: panels.sidebar }))
 vi.mock('./MobileNoteListPanel', () => ({ MobileNoteListPanel: panels.list }))
-vi.mock('../../screens/PhoneWorkspaceChrome', () => ({ PhoneCommandPaletteButton: () => null }))
 vi.mock('../../qa/nativeStartupPresentation', () => ({ recordNativeStartupPreviewLayout: vi.fn() }))
 
 const preview: WorkspaceSnapshotPreview = { kind: 'provisional', notes: [], allNotes: [], typeDefinitions: {},

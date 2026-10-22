@@ -10,7 +10,7 @@ import { noteFilename, noteWritePath } from '../workspace/mobileWorkspacePathRew
 import { mobileWorkspaceHasNoVault } from '../workspace/mobileWorkspaceEmptyState'
 import { PhoneScreenLayer } from './PhoneScreenLayer'
 import { PhoneEditorScreen } from './PhoneWorkspaceEditorScreen'
-import { PhoneCommandPaletteButton, PhoneTopBar } from './PhoneWorkspaceChrome'
+import { PhoneTopBar } from './PhoneWorkspaceChrome'
 import { createThemeStyles } from './phoneWorkspaceStyles'
 import type { PhoneWorkspaceStateViewProps, PhoneWorkspaceController } from './phoneWorkspaceScreenSupport'
 import { phoneWorkspaceSidebarDrawerWidth } from './phoneWorkspaceTransitions'
@@ -21,7 +21,6 @@ import { usePhoneViewportWidth } from './usePhoneViewportWidth'
 function PhoneNoteListScreen({
   controller,
   options,
-  openCommandPalette,
   openEditor,
   phoneLayoutProbe,
 }: PhoneWorkspaceStateViewProps) {
@@ -37,7 +36,6 @@ function PhoneNoteListScreen({
         emptyVault={mobileWorkspaceHasNoVault(controller.snapshot)}
         fullWidth
         layoutProbe={options.layoutProbe}
-        leading={<PhoneCommandPaletteButton onPress={openCommandPalette} />}
         neighborhood={controller.noteListNeighborhood}
         noteListFilter={controller.noteListFilter}
         noteListFilterCounts={controller.noteListFilterCounts}
@@ -105,7 +103,7 @@ function PhoneSidebarDrawer(props: PhoneWorkspaceStateViewProps) {
 
 function PhonePropertiesScreen(props: PhoneWorkspaceStateViewProps) {
   const {
-    controller, options, openEditor, openSourceEditor, openCommandPalette,
+    controller, options, openEditor, openSourceEditor,
     openList, phoneLayoutProbe,
   } = props
   const { styles } = useMobileStyles(createThemeStyles)
@@ -121,9 +119,7 @@ function PhonePropertiesScreen(props: PhoneWorkspaceStateViewProps) {
 
   return (
     <View {...probeProps(phoneLayoutProbe, 'phone.properties.screen')} style={styles.screen} testID="phone-properties-screen">
-      <PhoneTopBar title={title} onBack={returnToEditor}>
-        <PhoneCommandPaletteButton onPress={openCommandPalette} />
-      </PhoneTopBar>
+      <PhoneTopBar title={title} onBack={returnToEditor} />
       <MobilePropertiesPanel
         compact
         fullWidth

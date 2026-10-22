@@ -14,7 +14,6 @@ const fixedStyles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  topBarActions: { minWidth: 32, alignItems: 'flex-end' },
   topBarTitle: { flex: 1, fontWeight: '600' },
 })
 
