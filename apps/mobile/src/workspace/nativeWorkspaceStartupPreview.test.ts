@@ -141,6 +141,23 @@ it('bounds cache waiting without cancelling authoritative source preparation, an
   } finally { vi.useRealTimers() }
 })
 
+it('does not discard a valid cache on a slow device when startup explicitly prioritizes cache IO', async () => {
+  vi.useFakeTimers()
+  try {
+    const f = fixture()
+    const cache = deferred<WorkspaceSnapshotPreview>()
+    f.dependencies.readPreview.mockReturnValue(cache.promise)
+    const reading = readNativeWorkspaceStartupPreview(f.selection, undefined, f.dependencies, true)
+    let settled = false
+    void reading.then(() => { settled = true })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(settled).toBe(false)
+    cache.resolve(f.preview)
+    expect(await reading).toBe(f.preview)
+    expect(vi.getTimerCount()).toBe(0)
+  } finally { vi.useRealTimers() }
+})
+
 function deferred<T>() {
   let resolve: (value: T) => void = () => undefined
   const promise = new Promise<T>(yes => { resolve = yes })

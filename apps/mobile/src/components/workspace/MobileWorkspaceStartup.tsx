@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Dimensions, Platform, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Dimensions, Platform, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { MobileWorkspaceSidebar } from './MobileWorkspaceSidebar'
 import { MobileNoteListPanel } from './MobileNoteListPanel'
 import { MobilePanelSafeArea } from '../../ui/MobilePanelSafeArea'
@@ -8,8 +8,7 @@ import { useMobileStyles } from '../../ui/theme/useMobileTheme'
 import type { MobileColors } from '../../ui/theme/mobilePalette'
 import type { MobileMetrics } from '../../ui/mobileMetrics'
 import { tabletScreenModeForWindow } from '../../screens/tabletWorkspaceScreenMode'
-import { mobileText } from '../../i18n/mobileText'
-import { Text } from '../ui/text'
+import { MobileVaultDisplayContext } from '../../workspace/MobileVaultContext'
 import type { WorkspaceSnapshotPreview } from '../../workspace/workspaceSnapshotPreview'
 import { recordNativeStartupPreviewLayout } from '../../qa/nativeStartupPresentation'
 import { initialSidebarSelection, notesForSidebarSelection, noteListFilterCountsForSelection,
@@ -25,13 +24,15 @@ export function MobileWorkspaceStartup({ children, preview, pending, hasActiveWo
   hasActiveWorkspace: boolean
   onSelectNote?: (noteId: string) => void
 }) {
-  if (!preview || !pending || hasActiveWorkspace) return children
-  return <StartupPanels preview={preview} onSelectNote={onSelectNote} />
+  if (!preview || hasActiveWorkspace) return children
+  return <MobileVaultDisplayContext.Provider value={{ source: 'native', rootUri: preview.source?.vaultPath }}>
+    <StartupPanels preview={preview} pending={pending} onSelectNote={onSelectNote} />
+  </MobileVaultDisplayContext.Provider>
 }
 
 const ignorePreviewAction = () => undefined
 
-function StartupPanels({ preview, onSelectNote }: { preview: WorkspaceSnapshotPreview; onSelectNote: (noteId: string) => void }) {
+function StartupPanels({ preview, pending, onSelectNote }: { preview: WorkspaceSnapshotPreview; pending: boolean; onSelectNote: (noteId: string) => void }) {
   const tablet = useMobileDeviceLayout() === 'tablet'
   const { width, height } = useWindowDimensions()
   const screen = Dimensions.get('screen')
@@ -41,7 +42,7 @@ function StartupPanels({ preview, onSelectNote }: { preview: WorkspaceSnapshotPr
   const navigation = useStartupNavigation(preview)
   const showSidebar = tablet && mode.defaultSidebarVisible
   return <View style={styles.root} testID="workspace-startup-preview" onLayout={recordNativeStartupPreviewLayout}
-    accessibilityState={{ busy: true }}>
+    accessibilityState={{ busy: pending }}>
     <View style={styles.cached} testID="workspace-startup-cached-panels">
       {showSidebar && <StartupSidebar preview={preview} navigation={navigation} />}
       <View style={tablet ? styles.noteList : styles.phoneList}><MobilePanelSafeArea>
@@ -69,16 +70,12 @@ type CachedNoteListProps = { preview: WorkspaceSnapshotPreview; tablet: boolean;
 
 function CachedNoteList(props: CachedNoteListProps) {
   const { preview, tablet, compact, navigation, onSelectNote } = props
-  const { styles, mobileColors } = useMobileStyles(createThemeStyles)
   const analytics = useMobileAnalytics()
   return <MobileNoteListPanel compact={compact} fullWidth={!tablet} notes={navigation.notes} selectedNoteId={preview.selectedNoteId ?? null}
     subtitle={preview.noteListSubtitle} title={navigation.selection.label} typeDefinitions={preview.typeDefinitions}
     displayPropertyKeys={noteListPropertiesForSelection(preview, navigation.selection)} propertyDisplayModes={preview.vaultConfig?.propertyDisplayModes}
     showCreateAction={false} noteListFilter={navigation.filter} noteListFilterVisible={shouldShowNoteListFilter(navigation.selection)}
     noteListFilterCounts={noteListFilterCountsForSelection(preview, navigation.selection)} onNoteListFilterChange={navigation.setFilter}
-    toolbarTrailing={<View style={styles.progressLabel} accessibilityRole="progressbar" accessibilityLabel={mobileText('status.vault.reloading')}>
-      <ActivityIndicator color={mobileColors.textMuted} />
-      <Text numberOfLines={1} style={styles.label}>{mobileText('status.vault.reloading')}</Text></View>}
     onOpenCreateNote={ignorePreviewAction} onOpenSearch={ignorePreviewAction} onSelectNote={noteId => {
       analytics.capture({ name: 'mobile_startup_preview_used' })
       onSelectNote(noteId)
@@ -100,9 +97,6 @@ function createThemeStyles(mobileColors: MobileColors, metrics: MobileMetrics) {
     noteList: { width: metrics.panel.noteListWidth },
     phoneList: { flex: 1, minWidth: 0 },
     editor: { flex: 1, minWidth: 0 },
-    progressLabel: { flexDirection: 'row', alignItems: 'center', gap: metrics.space.sm,
-      maxWidth: metrics.size(160) },
-    label: { color: mobileColors.textMuted, fontSize: metrics.type.caption, flexShrink: 1 },
   })
   return { styles, mobileColors }
 }

@@ -23,15 +23,15 @@ const nativeAccess: PreviewAccess = {
 
 /** Best-effort presentation before indexing; its deadline never cancels authoritative work. */
 export function readNativeWorkspaceStartupPreview(selection: NativeWorkspaceSelection | null,
-  signal?: AbortSignal, access: PreviewAccess = nativeAccess): Promise<WorkspaceSnapshotPreview | null> {
+  signal?: AbortSignal, access: PreviewAccess = nativeAccess, prioritizeCache = false): Promise<WorkspaceSnapshotPreview | null> {
   if (!selection || signal?.aborted) return Promise.resolve(null)
   return new Promise(resolve => {
-    const completion = previewCompletion(resolve, signal)
+    const completion = previewCompletion(resolve, signal, prioritizeCache)
     void readAuthorizedPreview(selection, completion.signal, access).then(completion.finish, completion.abort)
   })
 }
 
-function previewCompletion(resolve: (preview: WorkspaceSnapshotPreview | null) => void, signal?: AbortSignal) {
+function previewCompletion(resolve: (preview: WorkspaceSnapshotPreview | null) => void, signal?: AbortSignal, prioritizeCache = false) {
   const controller = new AbortController()
   let finished = false
   const finish = (preview: WorkspaceSnapshotPreview | null) => {
@@ -43,7 +43,7 @@ function previewCompletion(resolve: (preview: WorkspaceSnapshotPreview | null) =
     resolve(preview)
   }
   const abort = () => finish(null)
-  const timer = setTimeout(abort, 250)
+  const timer = prioritizeCache ? undefined : setTimeout(abort, 250)
   signal?.addEventListener('abort', abort, { once: true })
   return { signal: controller.signal, finish, abort }
 }

@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
-import { act, createElement } from 'react'
+import { act, createElement, useContext, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MobileVaultProvider } from './MobileVaultProvider'
+import { NativeWorkspaceContext } from './NativeWorkspaceContext'
 
-const state = vi.hoisted(() => ({ failed: false, busy: false, retry: vi.fn(), catalogRetry: vi.fn() }))
+const state = vi.hoisted(() => ({ failed: false, busy: false, pending: false, retry: vi.fn(), catalogRetry: vi.fn() }))
 vi.mock('./git/useMobileVaults', () => ({ useMobileVaults: () => ({
   active: { selection: { vaultRootUri: 'file:///owned' }, git: null },
   refreshFailed: state.failed, retryWorkspace: state.retry, busy: state.busy, revision: 0,
+  restorePending: state.pending,
   catalog: { pending: false, error: null, retry: state.catalogRetry, vaults: [], localVaults: [] },
   syncHistory: { record: {}, ready: true }, notices: {},
 }) }))
@@ -26,6 +28,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   state.failed = false
   state.busy = false
+  state.pending = false
   container = document.createElement('div')
   root = createRoot(container)
 })
@@ -34,21 +37,41 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-it('unmounts stale editable content on preparation failure and retries the active workspace, not catalog restoration', async () => {
+it('keeps an active workspace visible during preparation failure and retry', async () => {
   await render()
   expect(container.textContent).toBe('Fresh workspace')
   state.failed = true
   await render()
-  expect(container.textContent).toBe('Retry')
-  await act(async () => container.querySelector('button')?.click())
-  expect(state.retry).toHaveBeenCalledOnce()
+  expect(container.textContent).toBe('Fresh workspace')
+  expect(state.retry).not.toHaveBeenCalled()
   expect(state.catalogRetry).not.toHaveBeenCalled()
   state.busy = true
   await render()
-  expect(container.textContent).toBe('Retry')
+  expect(container.textContent).toBe('Fresh workspace')
   state.failed = false
   await render()
   expect(container.textContent).toBe('Fresh workspace')
+})
+
+it('never renders the full-screen reload state or remounts an existing editor on pending lifecycle changes', async () => {
+  let mounts = 0
+  function Workspace() {
+    const workspace = useContext(NativeWorkspaceContext)
+    useEffect(() => { mounts++ }, [])
+    return workspace.restorePending ? createElement('div', { 'data-testid': 'dev-vault-status' }, 'Reloading vault from disk')
+      : createElement('textarea', { defaultValue: 'Retained draft' })
+  }
+  const child = createElement(Workspace)
+  await act(async () => root.render(createElement(MobileVaultProvider, null, child)))
+  for (const lifecycle of ['startup', 'foreground', 'post-sync', 'vault-switch']) {
+    state.pending = true
+    await act(async () => root.render(createElement(MobileVaultProvider, null, child)))
+    expect(container.querySelector('[data-testid="dev-vault-status"]'), lifecycle).toBeNull()
+    expect(container.querySelector('textarea')?.value).toBe('Retained draft')
+    state.pending = false
+    await act(async () => root.render(createElement(MobileVaultProvider, null, child)))
+  }
+  expect(mounts).toBe(1)
 })
 
 async function render() {

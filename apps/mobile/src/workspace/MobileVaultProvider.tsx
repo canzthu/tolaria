@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { MobileWorkspaceLoadFailure } from '../components/vaults/MobileWorkspaceLoadFailure'
 import { NativeWorkspaceContext } from './NativeWorkspaceContext'
 import { MobileVaultControlsContext, MobileVaultPickerContext } from './MobileVaultContext'
@@ -9,30 +9,21 @@ import { MobileSettingsSheet } from '../settings/MobileSettingsSheet'
 import { MobileVaultNotice } from '../components/vaults/MobileVaultNotice'
 import { MobileWorkspaceStartup } from '../components/workspace/MobileWorkspaceStartup'
 import { useMobileSettings } from '../settings/useMobileSettings'
+import { initialWorkspacePending, vaultControls, workspaceRecovery } from './mobileVaultPresentation'
 
 export function MobileVaultProvider({ children }: { children: ReactNode }) {
   const manager = useMobileVaults()
   const preferences = useMobileSettings()
   const { active, open, restorePending, revision, editors } = manager
   const recovery = workspaceRecovery(manager)
+  useCachedFailureNotice(manager)
+  const blockingRestore = initialWorkspacePending(manager)
   // Sync progress must not make the workspace re-index a large vault.
-  const workspace = useMemo(() => ({ selection: active.selection, open, restorePending }), [active.selection, open, restorePending])
+  const workspace = useMemo(() => ({ selection: active.selection, open,
+    restorePending: blockingRestore }), [active.selection, open, blockingRestore])
   const pending = manager.syncHistory.record.pendingPaths
   const pendingNotePaths = useMemo(() => new Set((pending ?? []).map(change => change.path)), [pending])
-  const controls = {
-    rootUri: active.selection?.vaultRootUri,
-    git: Boolean(active.git),
-    linked: manager.linked,
-    busy: manager.busy,
-    status: manager.status,
-    lastSuccessAt: manager.syncHistory.record.lastSuccessAt,
-    lastFailureAt: manager.syncHistory.record.lastFailureAt,
-    phase: manager.phase,
-    pendingNotePaths,
-    historyAvailable: manager.syncHistory.ready && !manager.syncHistory.failed,
-    open,
-    sync: manager.sync,
-  }
+  const controls = vaultControls(manager, pendingNotePaths)
   const picker = vaultPicker(manager, preferences.open)
   return <MobileVaultPickerContext.Provider value={picker}><WorkspaceSyncEditorsContext.Provider value={editors}>
     <NativeWorkspaceContext.Provider value={workspace}>
@@ -54,9 +45,10 @@ export function MobileVaultProvider({ children }: { children: ReactNode }) {
   </WorkspaceSyncEditorsContext.Provider></MobileVaultPickerContext.Provider>
 }
 
-function workspaceRecovery(manager: ReturnType<typeof useMobileVaults>) {
-  if (manager.refreshFailed) return { reason: 'selection' as const, retry: manager.retryWorkspace }
-  if (!manager.active.selection && !manager.catalog.pending) return { reason: manager.catalog.error, retry: manager.catalog.retry }
+function useCachedFailureNotice(manager: ReturnType<typeof useMobileVaults>) {
+  const show = manager.notices.show
+  const failed = Boolean(manager.catalog.error && manager.catalog.preview)
+  useEffect(() => { if (failed) show('local') }, [failed, show])
 }
 
 function vaultPicker(manager: ReturnType<typeof useMobileVaults>, manage: () => void) {

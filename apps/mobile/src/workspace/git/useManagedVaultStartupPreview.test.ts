@@ -40,28 +40,28 @@ it('publishes metadata while preparation is pending, then removes it before publ
   expect(catalog.current).toMatchObject({ pending: false, restored: { selection, git: null }, preview: null })
 })
 
-it('starts cache lookup first but publishes fresh preparation without waiting for optional metadata', async () => {
+it('publishes cached navigation before indexing can occupy the shared native async queue', async () => {
   const cached = deferred<WorkspaceSnapshotPreview>()
   source.preview.mockReturnValue(cached.promise)
-  source.prepare.mockResolvedValue(selection)
+  const prepared = deferred<NativeWorkspaceSelection>()
+  source.prepare.mockReturnValue(prepared.promise)
   const catalog = await mountCatalog()
-  expect(source.prepare).toHaveBeenCalledWith(selection, expect.any(AbortSignal))
-  expect(source.preview.mock.invocationCallOrder[0]).toBeLessThan(source.prepare.mock.invocationCallOrder[0])
-  expect(catalog.current).toMatchObject({ pending: false, restored: { selection }, preview: null })
-  expect(source.preview.mock.calls[0][1].aborted).toBe(true)
+  expect(source.prepare).not.toHaveBeenCalled()
   await act(async () => cached.resolve(preview))
+  expect(source.prepare).toHaveBeenCalledWith(selection, expect.any(AbortSignal))
+  expect(catalog.current).toMatchObject({ pending: true, restored: null, preview })
+  await act(async () => prepared.resolve(selection))
   expect(catalog.current).toMatchObject({ pending: false, restored: { selection }, preview: null })
 })
 
-it('reports preparation failure without waiting for a late cache result', async () => {
+it('retains available cached navigation when subsequent preparation fails', async () => {
   const cached = deferred<WorkspaceSnapshotPreview>()
   source.preview.mockReturnValue(cached.promise)
   source.prepare.mockRejectedValue(new Error('indexUnavailable'))
   const catalog = await mountCatalog()
-  expect(catalog.current).toMatchObject({ pending: false, error: 'selection', restored: null, preview: null })
-  expect(source.preview.mock.calls[0][1].aborted).toBe(true)
+  expect(source.prepare).not.toHaveBeenCalled()
   await act(async () => cached.resolve(preview))
-  expect(catalog.current).toMatchObject({ pending: false, error: 'selection', restored: null, preview: null })
+  expect(catalog.current).toMatchObject({ pending: false, error: 'selection', restored: null, preview })
 })
 
 it('still waits for fresh preparation on a cache miss', async () => {
@@ -100,13 +100,13 @@ it('ignores unknown cached selections and never changes an active selection thro
   expect(catalog.current.restored?.selection).toBe(selection)
 })
 
-it('clears provisional metadata and preserves selection error reporting when preparation fails', async () => {
+it('retains provisional metadata and selection error reporting when preparation fails', async () => {
   const prepared = deferred<NativeWorkspaceSelection>()
   source.prepare.mockReturnValue(prepared.promise)
   const catalog = await mountCatalog()
   expect(catalog.current.preview).toBe(preview)
   await act(async () => prepared.reject(new Error('recoverFailed')))
-  expect(catalog.current).toMatchObject({ pending: false, error: 'selection', preview: null, restored: null })
+  expect(catalog.current).toMatchObject({ pending: false, error: 'selection', preview, restored: null })
 })
 
 it('cancels concurrent preparation and presentation on unmount', async () => {
@@ -118,7 +118,7 @@ it('cancels concurrent preparation and presentation on unmount', async () => {
   await catalog.unmount()
   expect(signal.aborted).toBe(true)
   await act(async () => cached.resolve(preview))
-  expect(source.prepare).toHaveBeenCalledExactlyOnceWith(selection, signal)
+  expect(source.prepare).not.toHaveBeenCalled()
 })
 
 it('reports an unreadable catalog without reading any selected vault', async () => {

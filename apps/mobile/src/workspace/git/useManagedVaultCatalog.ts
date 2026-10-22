@@ -26,7 +26,7 @@ export function useManagedVaultCatalog() {
       error: previous.error === 'catalog' ? null : previous.error }))
   }, [])
   const retry = useCallback(() => {
-    setState(previous => ({ ...previous, pending: true, error: null, preview: null }))
+    setState(previous => ({ ...previous, pending: true, error: null }))
     setAttempt(value => value + 1)
   }, [])
   const selectPreviewNote = useCallback((noteId: string) => {
@@ -57,10 +57,10 @@ function restoreCatalogState(update: UpdateCatalog) {
     stage = 'selection'
     const restored = await restoreCatalogSelection(catalog)
     if (!active) return
-    // Queue preview authorization first, without making fresh preparation wait on cache IO.
-    void readNativeWorkspaceStartupPreview(restored.selection, cancellation.signal).catch(() => null).then(preview => {
-      if (active && !cancellation.signal.aborted) update(previous => ({ ...previous, preview }))
-    })
+    // Existing binaries share one Expo async queue: cache IO must precede indexing.
+    const preview = await readNativeWorkspaceStartupPreview(restored.selection, cancellation.signal, undefined, true).catch(() => null)
+    if (!active) return
+    update(previous => ({ ...previous, preview: preview ?? previous.preview }))
     const selection = await prepareNativeWorkspace(restored.selection, cancellation.signal)
     if (active) {
       cancellation.abort()
@@ -75,7 +75,7 @@ function restoreCatalogState(update: UpdateCatalog) {
 }
 
 function finishCatalogRestoration(active: boolean, update: UpdateCatalog, error: CatalogState['error'] = null) {
-  if (active) update(previous => ({ ...previous, preview: null, pending: false, error }))
+  if (active) update(previous => ({ ...previous, preview: error ? previous.preview : null, pending: false, error }))
 }
 
 function catalogLists(catalog: ManagedGitVaultCatalog) {

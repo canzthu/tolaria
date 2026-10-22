@@ -59,7 +59,8 @@ it('allows cached-list browsing without mounting an editable workspace', async (
   expect(render.node.querySelector('[data-testid="workspace-startup-cached-panels"]')?.getAttribute('data-pointer')).not.toBe('none')
   expect(render.node.querySelector('[data-testid="workspace-startup-cached-panels"]')?.getAttribute('data-hidden')).not.toBe('true')
   expect(panels.list).toHaveBeenCalledWith(expect.objectContaining({ fullWidth: true, compact: true, showCreateAction: false,
-    notes: preview.notes, toolbarTrailing: expect.anything() }), undefined)
+    notes: preview.notes }), undefined)
+  expect(panels.list.mock.lastCall?.[0].toolbarTrailing).toBeUndefined()
   expect(panels.sidebar).not.toHaveBeenCalled()
   const list = panels.list.mock.lastCall?.[0]
   list.onSelectNote('chosen.md')
@@ -115,13 +116,21 @@ it('retains the initial primary-list property display and title rather than inve
 
 it.each([
   { cached: null, pending: true, active: false },
-  { cached: preview, pending: false, active: false },
   { cached: preview, pending: true, active: true },
 ])('never substitutes cached presentation outside initial loading: %j', async ({ cached, pending, active }) => {
   const render = createHarness()
   await render.update(cached, pending, active)
   expect(render.node.textContent).toBe('editable child')
   expect(panels.list).not.toHaveBeenCalled()
+})
+
+it('keeps cached panels visible after a failed reload without a full-screen status or busy announcement', async () => {
+  const render = createHarness('Reloading vault from disk')
+  await render.update(preview, true, false)
+  await render.update(preview, false, false)
+  expect(render.node.querySelector('[data-testid="workspace-startup-preview"]')).not.toBeNull()
+  expect(render.node.querySelector('[aria-busy="true"]')).toBeNull()
+  expect(render.node.textContent).not.toContain('Reloading vault')
 })
 
 it('does not remount an existing editor when a late preview or pending-state update arrives', async () => {
