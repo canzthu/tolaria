@@ -710,8 +710,7 @@ jobs:
           name: Build server Docker image
           command: |
             set -euo pipefail
-            cd apps/server
-            docker build -t tolaria-server:test .
+            docker build -f apps/server/Dockerfile -t tolaria-server:test .
       - run:
           name: Container smoke test
           command: |

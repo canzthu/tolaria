@@ -8,21 +8,16 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Copy package files for dependency installation
+# Copy workspace configuration and source code
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/server/package.json ./apps/server/
-COPY packages/protocol/package.json ./packages/protocol/
-COPY packages/markdown-yjs/package.json ./packages/markdown-yjs/
+COPY apps/server ./apps/server
+COPY packages/protocol ./packages/protocol
+COPY packages/markdown-yjs ./packages/markdown-yjs
 
 # Enable pnpm and install dependencies
 RUN corepack enable && \
     corepack prepare pnpm@10.33.0 --activate && \
-    pnpm install --frozen-lockfile --filter @tolaria/server...
-
-# Copy source code
-COPY apps/server ./apps/server
-COPY packages/protocol ./packages/protocol
-COPY packages/markdown-yjs ./packages/markdown-yjs
+    pnpm install --frozen-lockfile
 
 # Production stage: minimal runtime image
 FROM node:22-bookworm-slim
