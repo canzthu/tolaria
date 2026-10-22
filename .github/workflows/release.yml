@@ -318,7 +318,29 @@ jobs:
               awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{f=0;next} !f' "$note" > "_site/$note"
             done
           fi
-          gh api -H "Accept: application/vnd.github.html+json" repos/${{ github.repository }}/releases --paginate > _site/releases.json
+          fetch_releases() {
+            local attempt=1
+            local releases_file="_site/releases.json"
+            local temporary_file="${releases_file}.tmp"
+
+            while [ "$attempt" -le 4 ]; do
+              if gh api "repos/${{ github.repository }}/releases?per_page=100" --paginate > "$temporary_file"; then
+                mv "$temporary_file" "$releases_file"
+                return 0
+              fi
+
+              if [ "$attempt" -eq 4 ]; then
+                echo "::warning::GitHub releases API failed after 4 attempts; publishing pages without release history"
+                echo '[]' > "$releases_file"
+                rm -f "$temporary_file"
+                return 0
+              fi
+
+              sleep $((attempt * 2))
+              attempt=$((attempt + 1))
+            done
+          }
+          fetch_releases
           STABLE_TAG=$(gh release list --repo ${{ github.repository }} --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')
 
           gh release download --repo ${{ github.repository }} "${{ needs.version.outputs.tag }}" --pattern "alpha-latest.json" --output _site/alpha/latest.json || echo '{}' > _site/alpha/latest.json
