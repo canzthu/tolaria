@@ -73,13 +73,55 @@ const TooltipContent = React.forwardRef<
 		const zoom = getRootZoom();
 		if (zoom === 1) return;
 
-		// Radix positions the tooltip in zoomed coordinate space (because documentElement
-		// has zoom applied). Adjust the position to logical viewport coordinates.
-		const currentLeft = Number.parseFloat(content.style.left || "0");
-		const currentTop = Number.parseFloat(content.style.top || "0");
+		// Radix positions tooltips using getBoundingClientRect(), which returns coordinates
+		// in the zoomed viewport space when CSS zoom is applied to documentElement.
+		// We need to adjust these coordinates to logical (unzoomed) viewport space.
+		const observer = new MutationObserver(() => {
+			const styleLeft = content.style.left;
+			const styleTop = content.style.top;
+			
+			if (!styleLeft || !styleTop) return;
 
-		content.style.left = `${currentLeft / zoom}px`;
-		content.style.top = `${currentTop / zoom}px`;
+			const currentLeft = Number.parseFloat(styleLeft);
+			const currentTop = Number.parseFloat(styleTop);
+
+			if (!Number.isFinite(currentLeft) || !Number.isFinite(currentTop)) return;
+
+			// Only adjust once - check if we've already adjusted by seeing if the value
+			// is what we expect after adjustment
+			const expectedLeft = currentLeft / zoom;
+			const expectedTop = currentTop / zoom;
+			
+			// If values are already adjusted (within 0.5px), don't adjust again
+			if (
+				Math.abs(currentLeft - expectedLeft) < 0.5 &&
+				Math.abs(currentTop - expectedTop) < 0.5
+			) {
+				return;
+			}
+
+			content.style.left = `${expectedLeft}px`;
+			content.style.top = `${expectedTop}px`;
+		});
+
+		observer.observe(content, {
+			attributes: true,
+			attributeFilter: ["style"],
+		});
+
+		// Initial adjustment
+		const styleLeft = content.style.left;
+		const styleTop = content.style.top;
+		if (styleLeft && styleTop) {
+			const currentLeft = Number.parseFloat(styleLeft);
+			const currentTop = Number.parseFloat(styleTop);
+			if (Number.isFinite(currentLeft) && Number.isFinite(currentTop)) {
+				content.style.left = `${currentLeft / zoom}px`;
+				content.style.top = `${currentTop / zoom}px`;
+			}
+		}
+
+		return () => observer.disconnect();
 	});
 
 	return (
@@ -97,8 +139,7 @@ const TooltipContent = React.forwardRef<
 				sideOffset={sideOffset}
 				collisionPadding={collisionPadding}
 				className="z-50 origin-(--radix-tooltip-content-transform-origin)"
-				// Radix positions both the content and arrow in viewport pixels. Keep
-				// that coordinate space unzoomed; scale only the visual body below.
+				// Keep content wrapper unzoomed for correct positioning
 				style={{ zoom: 1 }}
 				{...props}
 			>
@@ -107,6 +148,7 @@ const TooltipContent = React.forwardRef<
 						"bg-foreground text-background w-fit max-w-[min(calc(var(--radix-tooltip-content-available-width,22rem)/var(--tolaria-overlay-zoom-factor,1)),22rem)] rounded-md px-3 py-1.5 text-xs text-balance",
 						className,
 					)}
+					// Apply zoom to inner content for correct visual size
 					style={{ zoom: "var(--tolaria-overlay-zoom-factor, 1)", ...style }}
 				>
 					{children}
