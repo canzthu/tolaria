@@ -1,7 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig, mergeConfig, type Plugin, type UserConfig } from 'vite'
 import desktopConfig from '../../vite.config'
-import { yjsAlias } from '../server/yjsResolution.ts'
 import {
   isApiRequestPath,
   webPreviewAllowedHosts,
@@ -55,8 +54,6 @@ function sharedShellConfig(): UserConfig {
 export default defineConfig(mergeConfig(sharedShellConfig(), {
   root: REPO_ROOT,
   plugins: [staticWebApiGuard()],
-  // One copy of Yjs for the page and for BlockNote; see apps/server/yjsResolution.ts.
-  resolve: { alias: [yjsAlias()] },
   build: {
     rollupOptions: { input: WEB_PAGES },
     outDir: WEB_OUT_DIR,
