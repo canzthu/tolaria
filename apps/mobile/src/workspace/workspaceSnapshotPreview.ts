@@ -1,9 +1,10 @@
 import type { MobileNote, MobileTypeDefinition, MobileWorkspaceSnapshot } from './mobileWorkspaceModel'
 import { absoluteDate, relativeDate } from './localVaultPresentation'
 import type { SnapshotCacheStorage } from './workspaceSnapshotCache'
-import { readWorkspaceSnapshotEnvelope, type WorkspaceSnapshotIdentity } from './workspaceSnapshotEnvelope'
+import { readWorkspacePresentationEnvelope, type WorkspaceSnapshotIdentity } from './workspaceSnapshotEnvelope'
 import { workspaceSnapshotStorage } from './workspaceSnapshotStorage'
 import { mapWorkspaceItems } from './cooperativeWorkspaceItems'
+import { normalizeMobileVaultConfig } from './mobileVaultConfig'
 
 type PreviewNote = Omit<MobileNote, 'rawContent' | 'editorBlocks' | 'editorBullets'>
 type PreviewType = Omit<MobileTypeDefinition, 'rawContent' | 'template'>
@@ -19,9 +20,9 @@ export async function readWorkspaceSnapshotPreview(identity: WorkspaceSnapshotId
   try {
     const key = await storage.digest(identity.vaultPath)
     requireActivePreview(signal)
-    const record = await readWorkspaceSnapshotEnvelope(storage, key, identity, signal)
+    const record = await readWorkspacePresentationEnvelope(storage, key, identity, signal)
     requireActivePreview(signal)
-    return record ? await previewMetadata(record.snapshot, signal) : null
+    return record ? await previewMetadata({ ...record.snapshot, vaultConfig: normalizeMobileVaultConfig(identity.vaultConfig) }, signal) : null
   } catch { return null }
 }
 

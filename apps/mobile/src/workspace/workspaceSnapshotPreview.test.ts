@@ -41,7 +41,6 @@ const identityChanges: [string, (next: ReturnType<typeof identity>, disk: Return
   ['alias', next => { next.vaultAlias = 'other-alias' }],
   ['label', next => { next.vaultLabel = 'Other label' }],
   ['revision', (_next, disk) => { disk.revision = '1.0:124' }],
-  ['config', next => { next.vaultConfig = { defaultNoteWidth: 'wide' } }],
   ['limit', next => { next.maxNotes = 1 }],
 ]
 const corruptions: [string, (record: StoredRecord) => string][] = [
@@ -96,12 +95,36 @@ it.each(identityChanges)('declines a different presentation identity: %s', async
   expect(disk.write).not.toHaveBeenCalled()
 })
 
+it('keeps source-free navigation across config changes without accepting an editable cache hit', async () => {
+  const { disk, input, snapshot } = await fixture()
+  const changed = { ...input, vaultConfig: { defaultNoteWidth: 'wide' as const } }
+  const preview = await readWorkspaceSnapshotPreview(identity(changed), disk)
+  if (!preview) throw new Error('Preview missing')
+  expect(preview.kind).toBe('provisional')
+  expect(preview.source).toEqual(snapshot.source)
+  expect(preview.allNotes.length).toBe(snapshot.allNotes?.length)
+  expect(preview.vaultConfig).toMatchObject({ defaultNoteWidth: 'wide' })
+  expect(preview).not.toHaveProperty('sync')
+  for (const note of preview.notes) expect(note).not.toHaveProperty('rawContent')
+  for (const type of Object.values(preview.typeDefinitions)) expect(type).not.toHaveProperty('template')
+  expect((await openWorkspaceSnapshotCache(changed, disk)).snapshot).toBeNull()
+  expect(disk.write).not.toHaveBeenCalled()
+})
+
 it.each(corruptions)('fails closed on %s corruption', async (_label, corrupt) => {
   const { disk, input } = await fixture(), key = hash(input.vaultPath)
   const record = JSON.parse(disk.files.get(key) ?? '')
   disk.files.set(key, corrupt(record))
   expect(await readWorkspaceSnapshotPreview(identity(input), disk)).toBeNull()
   expect(disk.write).not.toHaveBeenCalled()
+})
+
+it.each(['null', '{}', '[]', '"not an identity"'])('rejects malformed identity %s even with a valid checksum', async encoded => {
+  const { disk, input } = await fixture(), key = hash(input.vaultPath)
+  const record: StoredRecord = JSON.parse(disk.files.get(key) ?? '')
+  record.identity = encoded
+  disk.files.set(key, withPayload(record, record.payload))
+  expect(await readWorkspaceSnapshotPreview(identity(input), disk)).toBeNull()
 })
 
 it('does not turn a valid stale preview into an authoritative cache hit after an equal-stat edit', async () => {

@@ -15,13 +15,25 @@ function presentationIdentity(options: WorkspaceSnapshotIdentity, revision?: str
     options.vaultAlias, options.maxNotes, serializeMobileVaultConfig(options.vaultConfig ?? {})])
 }
 
-export async function readWorkspaceSnapshotEnvelope(storage: SnapshotCacheStorage, key: string,
+export function readWorkspaceSnapshotEnvelope(storage: SnapshotCacheStorage, key: string,
   options: WorkspaceSnapshotIdentity, signal?: AbortSignal) {
+  return readEnvelope(storage, key, { identity: options, signal })
+}
+
+/** Presentation only; callers must strip sources before exposing this record. */
+export function readWorkspacePresentationEnvelope(storage: SnapshotCacheStorage, key: string,
+  options: WorkspaceSnapshotIdentity, signal?: AbortSignal) {
+  return readEnvelope(storage, key, { identity: options, signal, presentationOnly: true })
+}
+
+async function readEnvelope(storage: SnapshotCacheStorage, key: string,
+  options: { identity: WorkspaceSnapshotIdentity; signal?: AbortSignal; presentationOnly?: boolean }) {
+  const { identity, signal, presentationOnly = false } = options
   const record = await readRecord(storage, key, signal)
-  if (!validRecord(record, presentationIdentity(options, storage.revision))) return null
+  if (!validRecord(record, presentationIdentity(identity, storage.revision), presentationOnly)) return null
   if (!await matchesChecksum(storage, record, signal)) return null
   const snapshot: MobileWorkspaceSnapshot = JSON.parse(record.payload)
-  if (!validSnapshot(snapshot, options)) return null
+  if (!validSnapshot(snapshot, identity)) return null
   return { input: record.input, snapshot }
 }
 
@@ -52,10 +64,18 @@ function checksumInput(record: Omit<CacheRecord, 'checksum'>) {
   return JSON.stringify([record.version, record.identity, record.input, record.payload])
 }
 
-function validRecord(record: CacheRecord | null, identity: string): record is CacheRecord {
-  if (!record || record.version !== workspaceSnapshotCacheVersion || record.identity !== identity) return false
+function validRecord(record: CacheRecord | null, identity: string, presentationOnly: boolean): record is CacheRecord {
+  if (!record || record.version !== workspaceSnapshotCacheVersion || !matchesIdentity(record.identity, identity, presentationOnly)) return false
   return typeof record.payload === 'string' && record.payload.length <= maxPayloadCharacters
     && validDigest(record.input) && validDigest(record.checksum)
+}
+
+function matchesIdentity(recorded: string, expected: string, presentationOnly: boolean) {
+  if (!presentationOnly) return recorded === expected
+  const previous: unknown = JSON.parse(recorded)
+  const current: unknown[] = JSON.parse(expected)
+  return Array.isArray(previous) && previous.length === current.length && typeof previous.at(-1) === 'string'
+    && previous.slice(0, -1).every((field, index) => field === current[index])
 }
 
 function validDigest(value: unknown) { return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value) }
