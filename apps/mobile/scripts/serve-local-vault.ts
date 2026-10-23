@@ -1,11 +1,12 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { access, readdir, readFile, stat } from 'node:fs/promises'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { basename, join, relative } from 'node:path'
 import { performance } from 'node:perf_hooks'
+import { resolveMobileDevVaultPath } from '../src/scripts/mobileDevVaultPath'
 import {
   buildLocalVaultWorkspaceSnapshot,
-  mobileFileKindForPath,
   type LocalVaultFile,
+  mobileFileKindForPath,
 } from '../src/workspace/localVaultSnapshot'
 
 type AbsolutePath = string
@@ -23,15 +24,20 @@ type LocalVaultSnapshotState = {
   vaultPath: VaultPath
 }
 
-const defaultVaultPath = '/Users/luca/Laputa'
 const defaultPort = 8765
 const host = '0.0.0.0'
 const cacheTtlMs = 1500
 
-let cachedSnapshot: { expiresAt: number; state: LocalVaultSnapshotState } | null = null
+let cachedSnapshot: {
+  expiresAt: number
+  state: LocalVaultSnapshotState
+} | null = null
 
 async function main() {
-  const vaultPath = process.env.MOBILE_DEV_VAULT_PATH || process.env.MOBILE_QA_VAULT_PATH || defaultVaultPath
+  const vaultPath = resolveMobileDevVaultPath({
+    devVaultPath: process.env.MOBILE_DEV_VAULT_PATH,
+    qaVaultPath: process.env.MOBILE_QA_VAULT_PATH,
+  })
   const port = numericEnv('MOBILE_DEV_VAULT_PORT', defaultPort)
   await assertVaultReadable(vaultPath)
 
@@ -264,7 +270,9 @@ function withCors(response: ServerResponse) {
 }
 
 function writeJson(response: ServerResponse, status: number, payload: unknown) {
-  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
+  response.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+  })
   response.end(JSON.stringify(payload))
 }
 
