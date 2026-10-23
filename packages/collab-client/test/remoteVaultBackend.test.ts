@@ -224,7 +224,7 @@ describe('the remote vault backend', () => {
     expect(minimal).toMatchObject({
       path: 'minimal.md',
       title: 'Minimal Note',
-      isA: null,
+      isA: 'Note',
       status: null,
       aliases: [],
       fileKind: 'markdown',
