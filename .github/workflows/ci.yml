@@ -167,7 +167,8 @@ jobs:
         # Thresholds configured in vite.config.ts — exits non-zero if coverage drops
 
       - name: Upload frontend coverage to Codecov
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        # Duplicate upload disabled - CircleCI is the authoritative Codecov uploader
+        if: false
         uses: codecov/codecov-action@5975040f7f7d40edaff8d784b576fd65ae95c073
         with:
           use_oidc: true
@@ -217,7 +218,8 @@ jobs:
         # lib.rs/main.rs/menu.rs are Tauri boilerplate -- not meaningfully unit-testable.
 
       - name: Upload Rust coverage to Codecov
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        # Duplicate upload disabled - CircleCI is the authoritative Codecov uploader
+        if: false
         uses: codecov/codecov-action@5975040f7f7d40edaff8d784b576fd65ae95c073
         with:
           use_oidc: true

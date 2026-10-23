@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b tsconfig.app.json tsconfig.node.json && vite build",
     "build:web": "tsc -b && vite build --config apps/web/vite.config.ts",
+    "typecheck:web": "tsc -b apps/web/tsconfig.json apps/server/tsconfig.json",
     "preview:web": "vite preview --config apps/web/vite.config.ts",
     "codacy:gate": "node --test scripts/codacy-gate-lib.test.mjs && node scripts/codacy-gate.mjs",
     "codacy:gate:test": "node --test scripts/codacy-gate-lib.test.mjs",
