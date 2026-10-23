@@ -85,7 +85,7 @@ function createRelationshipStyles(metrics: MobileMetrics) {
       borderRadius: desktopRelationshipParity.rowRadius,
       paddingHorizontal: desktopRelationshipParity.rowPaddingHorizontal,
       paddingRight: 0,
-      paddingVertical: 0,
+      paddingVertical: desktopRelationshipParity.rowPaddingVertical,
       width: '100%',
     },
     background: {

@@ -12,7 +12,7 @@ it.each([1, 1.2] as const)('keeps real relationship touch targets at scale %s wi
   expect(styles.remove.minHeight).toBe(44)
   expect(styles.openTarget.minHeight).toBe(44)
   expect(styles.row.minHeight).toBeGreaterThanOrEqual(44)
-  expect(styles.row.paddingVertical).toBe(0)
+  expect(styles.row.paddingVertical).toBe(metrics.relationship.rowPaddingVertical)
   expect(styles.text.fontSize).toBe(metrics.relationship.textFontSize)
   expect(styles.text.fontWeight).toBe(metrics.relationship.textFontWeight)
   expect(styles.row.borderRadius).toBe(metrics.relationship.rowRadius)
