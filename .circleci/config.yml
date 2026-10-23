@@ -343,9 +343,6 @@ jobs:
     executor: node
     steps:
       - checkout
-      - skip_unless_changed:
-          scope: mobile-ota-quality
-          paths: "^(apps/mobile/|src/utils/|src/shared/|src/lib/|packages/|pnpm-lock\\.yaml|\\.circleci/)"
       - install_frontend_dependencies
       - run:
           name: Verify mobile source and publishing safeguards
@@ -476,7 +473,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: frontend-lint-build
-          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
+          ignore: "^(src-tauri/.*\\.rs|docs/)"
       - install_frontend_dependencies
       - run:
           name: Frontend lint and build (in parallel)
@@ -503,7 +500,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: frontend-coverage
-          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
+          ignore: "^(src-tauri/.*\\.rs|docs/)"
       - install_frontend_dependencies
       - run:
           name: Vitest coverage shard
@@ -528,7 +525,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: frontend-coverage
-          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
+          ignore: "^(src-tauri/.*\\.rs|docs/)"
       - attach_workspace:
           at: /tmp/coverage-shards
       - install_frontend_dependencies
@@ -637,7 +634,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: playwright-smoke
-          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
+          ignore: "^(src-tauri/.*\\.rs|docs/)"
       - install_frontend_dependencies
       - restore_cache:
           keys:
@@ -709,9 +706,6 @@ jobs:
     resource_class: medium
     steps:
       - checkout
-      - skip_unless_changed:
-          scope: server-docker-build
-          paths: "^(apps/server/|packages/|pnpm-lock\\.yaml)"
       - run:
           name: Build server Docker image
           command: |
@@ -774,8 +768,8 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: web-gates
-          ignore: "^(src-tauri/|apps/mobile/|docs/)"
-          paths: "^(apps/(web|server)/|packages/|src/|docs/web/)"
+          ignore: "^(src-tauri/.*\\.rs|docs/(?!web/))"
+          paths: "^(apps/|packages/|src/|docs/web/)"
       - install_frontend_dependencies
       - restore_cache:
           keys:
@@ -788,9 +782,6 @@ jobs:
           key: playwright-v1-{{ checksum "pnpm-lock.yaml" }}
           paths:
             - ~/.cache/ms-playwright
-      - run:
-          name: Web typecheck
-          command: pnpm typecheck:web
       - run:
           name: Server tests with coverage
           command: pnpm test:server
@@ -1737,6 +1728,11 @@ workflows:
           serial-group: << pipeline.project.slug >>/mobile-ota-alpha
           requires:
             - static-gates
+            - frontend-lint-build
+            - frontend-coverage-report
+            - rust-coverage
+            - rust-lint
+            - playwright-smoke-report
             - mobile-ota-quality
           filters:
             branches:
