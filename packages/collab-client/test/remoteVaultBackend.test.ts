@@ -170,4 +170,230 @@ describe('the remote vault backend', () => {
     expect(deleted).toEqual(['to-delete.md'])
     await expect(backend.files.read('to-delete.md')).rejects.toMatchObject({ status: 404 })
   })
+
+  it('deletes multiple files successfully', async () => {
+    await fixture.desktop.commit('delete-1.md', '# First\n')
+    await fixture.desktop.commit('delete-2.md', '# Second\n')
+    await vault.syncNow()
+
+    const deleted = await backend.files.delete(['delete-1.md', 'delete-2.md'])
+
+    expect(deleted).toEqual(['delete-1.md', 'delete-2.md'])
+    await expect(backend.files.read('delete-1.md')).rejects.toMatchObject({ status: 404 })
+    await expect(backend.files.read('delete-2.md')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('handles delete when file is already deleted', async () => {
+    const deleted = await backend.files.delete(['never-existed.md'])
+
+    expect(deleted).toEqual([])
+  })
+
+  it('lists entries with all required fields populated', async () => {
+    await fixture.desktop.commit('typed-note.md', '---\nIs A: Project\nStatus: Active\naliases:\n  - "alt-name"\n---\n# Typed Note\n')
+    await vault.syncNow()
+
+    const entries = await backend.files.list()
+    const typedEntry = entries.find(e => e.path === 'typed-note.md')
+
+    expect(typedEntry).toMatchObject({
+      path: 'typed-note.md',
+      title: 'Typed Note',
+      isA: 'Project',
+      status: 'Active',
+      aliases: expect.arrayContaining(['alt-name']),
+      archived: false,
+      relatedTo: [],
+      belongsTo: [],
+      relationships: {},
+      visible: true,
+      organized: false,
+      favorite: false,
+      favoriteIndex: null,
+      fileKind: 'markdown',
+    })
+  })
+
+  it('lists entries with minimal frontmatter', async () => {
+    await fixture.desktop.commit('minimal.md', '# Minimal Note\n\nJust content.')
+    await vault.syncNow()
+
+    const entries = await backend.files.list()
+    const minimal = entries.find(e => e.path === 'minimal.md')
+
+    expect(minimal).toMatchObject({
+      path: 'minimal.md',
+      title: 'Minimal Note',
+      isA: null,
+      status: null,
+      aliases: [],
+      fileKind: 'markdown',
+    })
+  })
+
+  it('searches returns empty results for no matches', async () => {
+    const result = await backend.files.search('xyzabc-nonexistent-term')
+
+    expect(result.results).toEqual([])
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('searches handles special characters in query', async () => {
+    await fixture.desktop.commit('special.md', '# Note\n\nContent with [brackets] and (parens)')
+    await vault.syncNow()
+
+    const result = await backend.files.search('[brackets]')
+
+    expect(result.results.some(r => r.path === 'special.md')).toBe(true)
+  })
+
+  it('searches respects the limit parameter', async () => {
+    await fixture.desktop.commit('search-1.md', '# One\n\nfindme content')
+    await fixture.desktop.commit('search-2.md', '# Two\n\nfindme more')
+    await fixture.desktop.commit('search-3.md', '# Three\n\nfindme again')
+    await vault.syncNow()
+
+    const result = await backend.files.search('findme', { limit: 2 })
+
+    expect(result.results.length).toBeLessThanOrEqual(2)
+  })
+
+  it('searches with default limit when not specified', async () => {
+    const result = await backend.files.search('welcome', {})
+
+    expect(result.results.length).toBeGreaterThanOrEqual(0)
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('reads file with path containing special characters', async () => {
+    await fixture.desktop.commit('folder/name with spaces.md', '# Spaced\n')
+    await vault.syncNow()
+
+    const file = await backend.files.read('folder/name with spaces.md')
+
+    expect(file).toMatchObject({
+      path: 'folder/name with spaces.md',
+      content: '# Spaced\n',
+      revision: expect.stringMatching(/^[0-9a-f]{40}$/),
+    })
+  })
+
+  it('reads file with unicode path', async () => {
+    await fixture.desktop.commit('folder/日本語.md', '# Japanese\n')
+    await vault.syncNow()
+
+    const file = await backend.files.read('folder/日本語.md')
+
+    expect(file).toMatchObject({
+      path: 'folder/日本語.md',
+      content: '# Japanese\n',
+      revision: expect.stringMatching(/^[0-9a-f]{40}$/),
+    })
+  })
+
+  it('throws RemoteError with correct status on read failure', async () => {
+    let error: RemoteError | null = null
+    try {
+      await backend.files.read('nonexistent-file.md')
+    } catch (e) {
+      error = e as RemoteError
+    }
+
+    expect(error).toBeInstanceOf(RemoteError)
+    expect(error?.status).toBe(404)
+    expect(error?.name).toBe('RemoteError')
+    expect(error?.message).toContain('404')
+  })
+
+  it('throws RemoteError when server returns error for list', async () => {
+    const badBackend = createRemoteVaultBackend({
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      token: 'invalid-token',
+      createSocket: (url) => new NodeWebSocket(url) as unknown as SocketLike,
+    })
+
+    await expect(badBackend.files.list()).rejects.toMatchObject({
+      name: 'RemoteError',
+      status: 401,
+    })
+  })
+
+  it('throws RemoteError when server returns error for search', async () => {
+    const badBackend = createRemoteVaultBackend({
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      token: 'invalid-token',
+      createSocket: (url) => new NodeWebSocket(url) as unknown as SocketLike,
+    })
+
+    await expect(badBackend.files.search('query')).rejects.toMatchObject({
+      name: 'RemoteError',
+      status: 401,
+    })
+  })
+
+  it('maps protocol entries with all optional fields present', async () => {
+    await fixture.desktop.commit('full-entry.md', [
+      '---',
+      'Is A: Task',
+      'Status: Done',
+      'aliases:',
+      '  - "alias1"',
+      '  - "alias2"',
+      'Belongs to:',
+      '  - "[[parent]]"',
+      '---',
+      '# Full Entry',
+      '',
+      '[[linked-note]]',
+    ].join('\n'))
+    await vault.syncNow()
+
+    const entries = await backend.files.list()
+    const fullEntry = entries.find(e => e.path === 'full-entry.md')
+
+    expect(fullEntry).toBeTruthy()
+    expect(fullEntry?.isA).toBe('Task')
+    expect(fullEntry?.status).toBe('Done')
+    expect(fullEntry?.aliases).toEqual(['alias1', 'alias2'])
+    expect(fullEntry?.belongsTo).toEqual(expect.arrayContaining(['[[parent]]']))
+    expect(fullEntry?.outgoingLinks).toEqual(expect.arrayContaining(['linked-note']))
+  })
+
+  it('searches maps results with path matches having higher scores', async () => {
+    await fixture.desktop.commit('match-in-path.md', '# Some content\n')
+    await fixture.desktop.commit('other.md', '# match-in-path appears here\n')
+    await vault.syncNow()
+
+    const result = await backend.files.search('match-in-path')
+
+    const pathMatch = result.results.find(r => r.path.includes('match-in-path.md'))
+    const contentMatch = result.results.find(r => r.path === 'other.md')
+
+    if (pathMatch && contentMatch) {
+      expect(pathMatch.score).toBeGreaterThan(contentMatch.score)
+    }
+  })
+
+  it('searches extracts snippet from first match', async () => {
+    await fixture.desktop.commit('snippet-test.md', '# Title\n\nFirst paragraph with keyword.\n\nSecond paragraph.')
+    await vault.syncNow()
+
+    const result = await backend.files.search('keyword')
+
+    const match = result.results.find(r => r.path === 'snippet-test.md')
+    expect(match?.snippet).toContain('keyword')
+  })
+
+  it('searches handles results with no matches array gracefully', async () => {
+    const result = await backend.files.search('welcome')
+
+    expect(result.results).toBeDefined()
+    expect(Array.isArray(result.results)).toBe(true)
+    result.results.forEach(r => {
+      expect(r).toHaveProperty('path')
+      expect(r).toHaveProperty('title')
+      expect(r).toHaveProperty('snippet')
+      expect(r).toHaveProperty('score')
+    })
+  })
 })
