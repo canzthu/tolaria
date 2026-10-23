@@ -396,4 +396,18 @@ describe('the remote vault backend', () => {
       expect(r).toHaveProperty('score')
     })
   })
+
+  it('chrome operations throw unsupported errors for listFolders', async () => {
+    await expect(backend.chrome.listFolders()).rejects.toThrow('listing folders')
+  })
+
+  it('chrome operations throw unsupported errors for listViews', async () => {
+    await expect(backend.chrome.listViews()).rejects.toThrow('listing views')
+  })
+
+  it('has chrome operations on the backend interface', () => {
+    expect(backend.chrome).toBeDefined()
+    expect(backend.chrome.listFolders).toBeInstanceOf(Function)
+    expect(backend.chrome.listViews).toBeInstanceOf(Function)
+  })
 })
