@@ -343,9 +343,6 @@ jobs:
     executor: node
     steps:
       - checkout
-      - skip_unless_changed:
-          scope: mobile-ota-quality
-          paths: "^(apps/mobile/|src/utils/|src/shared/|src/lib/|packages/|pnpm-lock\\.yaml|\\.circleci/)"
       - install_frontend_dependencies
       - run:
           name: Verify mobile source and publishing safeguards
