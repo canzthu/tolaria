@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { nativeVaultReadBenchmark } from './nativeVaultReadBenchmark'
+import { createNativeLargeVaultFixture, nativeVaultReadBenchmark } from './nativeVaultReadBenchmark'
 
 const native = vi.hoisted(() => ({ read: vi.fn(), restore: vi.fn(), available: true }))
 vi.mock('../workspace/nativeWorkspaceAccess', () => ({
@@ -49,4 +49,19 @@ it('reports index failures rather than silently timing another vault', async () 
 it('retains an empty fixture as a successful read with no interaction measurements', async () => {
   native.read.mockResolvedValue(JSON.stringify({ directories: [], files: [] }))
   expect(await nativeVaultReadBenchmark(uri)).toMatchObject({ fileCount: 0, noteCount: 0, interactions: null })
+})
+
+it('generates a marked 6000-note fixture and yields between write batches', async () => {
+  const files = new Map<string, string>()
+  const yieldToInput = vi.fn(async () => {})
+  const generated = await createNativeLargeVaultFixture(uri, {
+    createDirectory: vi.fn(),
+    writeText: async (path, content) => { files.set(path, content) },
+  }, { yieldToInput })
+
+  expect(generated.noteCount).toBe(6000)
+  expect(files.size).toBe(6001)
+  expect(files.get(`${uri}/note-0001.md`)).toContain('# Generated note 1')
+  expect(JSON.parse(files.get(generated.markerPath) ?? '{}')).toMatchObject({ fixture: 'tolaria-mobile-large-vault', noteCount: 6000 })
+  expect(yieldToInput).toHaveBeenCalled()
 })

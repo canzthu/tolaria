@@ -1,9 +1,36 @@
-import { preloadNativeWorkspace } from '../workspace/preloadNativeWorkspace'
+import { noteListFilterCountsForSelection, notesForSidebarSelection } from '../screens/tabletWorkspaceNavigation'
 import { buildCooperativeWorkspaceSnapshot } from '../workspace/cooperativeWorkspaceSnapshot'
-import { readWorkspaceSnapshotPreview, type WorkspaceSnapshotPreview } from '../workspace/workspaceSnapshotPreview'
 import { applyMobileWorkspaceEditWithWrites } from '../workspace/mobileWorkspaceEditing'
 import type { MobileWorkspaceSnapshot } from '../workspace/mobileWorkspaceModel'
-import { noteListFilterCountsForSelection, notesForSidebarSelection } from '../screens/tabletWorkspaceNavigation'
+import { preloadNativeWorkspace } from '../workspace/preloadNativeWorkspace'
+import { readWorkspaceSnapshotPreview, type WorkspaceSnapshotPreview } from '../workspace/workspaceSnapshotPreview'
+
+const fixtureMarkerName = '.tolaria-mobile-qa-fixture.json'
+
+type LargeVaultFixtureWriter = {
+  createDirectory: (path: string) => void
+  writeText: (path: string, content: string) => void | Promise<void>
+}
+
+type LargeVaultFixtureOptions = { batchSize?: number; noteCount?: number; yieldToInput?: () => Promise<void> }
+
+export async function createNativeLargeVaultFixture(rootUri: string, writer: LargeVaultFixtureWriter,
+  { batchSize = 16, noteCount = 6000, yieldToInput = yieldToNextTask }: LargeVaultFixtureOptions = {}) {
+  if (!Number.isInteger(noteCount) || noteCount < 0 || !Number.isInteger(batchSize) || batchSize < 1) {
+    throw new Error('invalidLargeVaultFixtureSize')
+  }
+  const root = rootUri.replace(/\/$/u, '')
+  writer.createDirectory(rootUri)
+  for (let index = 0; index < noteCount; index += 1) {
+    const sequence = String(index + 1).padStart(4, '0')
+    await writer.writeText(`${root}/note-${sequence}.md`, `---\ntype: Note\n---\n# Generated note ${index + 1}\n\nDisposable sync responsiveness fixture.\n`)
+    if ((index + 1) % batchSize === 0) await yieldToInput()
+  }
+  const markerPath = `${root}/${fixtureMarkerName}`
+  const marker = { fixture: 'tolaria-mobile-large-vault', schemaVersion: 1, noteCount }
+  await writer.writeText(markerPath, JSON.stringify(marker))
+  return { marker, markerPath, noteCount }
+}
 
 /** Read-only timing on an explicit disposable fixture; reports no note data. */
 export async function nativeVaultReadBenchmark(vaultRootUri: string) {
@@ -13,6 +40,10 @@ export async function nativeVaultReadBenchmark(vaultRootUri: string) {
   if (!repeated) throw new Error('nativeBenchmarkIndexUnavailable')
   return { fileCount: first.fileCount, noteCount: first.snapshot.allNotes?.length ?? first.snapshot.notes.length,
     ...first.timings, repeatedLoad: repeated.timings, interactions: measureReadOnlyInteractions(first.snapshot) }
+}
+
+function yieldToNextTask() {
+  return new Promise<void>(resolve => setTimeout(resolve, 0))
 }
 
 async function measureSnapshot(vaultRootUri: string) {
