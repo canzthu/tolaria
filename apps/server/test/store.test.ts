@@ -13,6 +13,7 @@ import { text } from './helpers.ts'
 class FakeS3Server {
   private server: Server
   private storage = new Map<string, Uint8Array>()
+  readonly paths: string[] = []
   private port = 0
 
   constructor() {
@@ -44,6 +45,7 @@ class FakeS3Server {
 
   private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', `http://${req.headers.host}`)
+    this.paths.push(req.url ?? '')
     const key = url.pathname.slice(1).replace(/^[^/]+\//, '')
 
     if (req.method === 'GET' && url.searchParams.has('list-type')) {
@@ -215,5 +217,44 @@ describe('R2BlobStore', () => {
       expect(message).not.toContain('test-key')
       expect(message).not.toContain('test-secret')
     }
+  })
+})
+
+describe('R2BlobStore request signing', () => {
+  // Expected signatures from botocore's S3SigV4Auth (an independent implementation), same
+  // credentials, date and signed headers (host, x-amz-content-sha256, x-amz-date).
+  const signer = new R2BlobStore(
+    {
+      bucket: 'tolaria-proto',
+      endpoint: 'https://acct.r2.cloudflarestorage.com',
+      region: 'auto',
+      accessKeyId: 'AKIDEXAMPLE',
+      secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
+    },
+    () => new Date('2026-10-23T12:34:56.789Z'),
+  )
+  const base = 'https://acct.r2.cloudflarestorage.com/tolaria-proto'
+
+  it.each([
+    ['GET', `${base}/vaults/prototype/vault-index.json`, undefined, '770c3ace401f3b74cd6ba1cc857c003beaf32f1fed8e9ed531ca2bee07ee6293'],
+    ['PUT', `${base}/vaults/prototype/vault-index.json`, '{"version":1}', '7df3fa7292f8e61dc05a591fa7b76d5ff74354bb042e8503e81ec1f4f08c8a32'],
+    ['GET', `${base}/?list-type=2&prefix=vaults%2Fprototype%2F`, undefined, '8afad17ddd4095c5d9d93f08aadc4236c5ac08f77700c01f0b7dd56871ec29fc'],
+    ['DELETE', `${base}/a%20b/it%27s.json`, undefined, 'b562274d2e736bb9b1c01b9c2e7bec057afa5bdbe33188dffa849d0a4c327ba3'],
+  ])('signs %s %s as SigV4 does', (method, url, body, signature) => {
+    const headers = signer.signRequest(method, new URL(url), body === undefined ? undefined : text(body))
+    expect(headers['X-Amz-Date']).toBe('20261023T123456Z')
+    expect(headers.Authorization).toBe(
+      `AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20261023/auto/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`,
+    )
+  })
+
+  it('sends keys percent-encoded per path segment, as they are signed', async () => {
+    const server = new FakeS3Server()
+    const endpoint = await server.start()
+    const store = new R2BlobStore({ bucket: 'b', endpoint, region: 'auto', accessKeyId: 'k', secretAccessKey: 's' })
+    await store.put("a b/it's (1).json", text('x'))
+    await store.list('a b')
+    await server.stop()
+    expect(server.paths).toEqual(['/b/a%20b/it%27s%20%281%29.json', '/b/?list-type=2&prefix=a%20b%2F'])
   })
 })

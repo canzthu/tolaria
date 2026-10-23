@@ -75,6 +75,8 @@ interface PullClock {
 export type ChangeListener = (changes: VaultChange[]) => Promise<void>
 
 const SYMLINK_MODE = '120000'
+/** A full commit id (SHA-1 or SHA-256): never an option or a revision expression. */
+const COMMIT_ID = /^([0-9a-f]{40}|[0-9a-f]{64})$/
 
 function createOutcome(precondition: WritePrecondition): WriteOutcome {
   // The client edited a file that has since been deleted: its edit wins and the file returns.
@@ -328,6 +330,29 @@ export class Vault {
   async diff(from: string, to: string): Promise<string[]> {
     const result = await this.repo.run(['diff', '--name-only', '-z', `${from}..${to}`])
     return result.stdout.split('\0').filter(Boolean)
+  }
+
+  /**
+   * The file changes from `commit` to the head, for bringing an index saved at `commit` up to
+   * date. Null when that is not worth it or not possible: `commit` is not in this clone (for
+   * example after a force push), or more than `limit` files changed.
+   */
+  async changesSince(commit: string, limit: number): Promise<VaultChange[] | null> {
+    if (!COMMIT_ID.test(commit)) return null
+    let output: string
+    try {
+      output = (await this.repo.run(['diff', '--name-status', '--no-renames', '-z', commit, await this.repo.head()])).stdout
+    } catch {
+      return null
+    }
+    // `<status>\0<path>\0` per file.
+    const fields = output.split('\0')
+    const changes: VaultChange[] = []
+    for (let i = 0; i + 1 < fields.length; i += 2) {
+      const path = fields[i + 1] as VaultPath
+      changes.push(fields[i] === 'D' ? { kind: 'delete', path } : { kind: 'upsert', path })
+    }
+    return changes.length > limit ? null : changes
   }
 
   /** Commits any staged changes and pushes with retry. Logs failures. Used on shutdown. */

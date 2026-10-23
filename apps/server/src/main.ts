@@ -1,8 +1,13 @@
+import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { loadConfig } from './config.ts'
 import { ChangeEmitter } from './changeEmitter.ts'
+import { codeFingerprint, SnapshotSeededStore } from './indexSnapshots.ts'
+import { INDEX_KEY as SEARCH_INDEX_KEY } from './searchIndex.ts'
 import { closeVaultServer, createVaultServer } from './server.ts'
 import { LocalDiskStore, R2BlobStore, type BlobStore } from './store.ts'
 import { Vault } from './vault.ts'
+import { INDEX_KEY as VAULT_INDEX_KEY } from './vaultIndex.ts'
 
 function log(message: string): void {
   process.stdout.write(`${new Date().toISOString()} ${message}\n`)
@@ -15,9 +20,26 @@ function createBlobStore(config: ReturnType<typeof loadConfig>): BlobStore {
   return new R2BlobStore(config.blobStore.config)
 }
 
+/** The blob store, seeded with index snapshots when they are configured; created before the clone so they download meanwhile. */
+async function createStore(config: ReturnType<typeof loadConfig>): Promise<{ store: BlobStore; snapshots?: SnapshotSeededStore }> {
+  const store = createBlobStore(config)
+  if (!config.indexSnapshots) return { store }
+  // The bundle this runs from (scripts/run.ts), so snapshots of other server code are never read.
+  const code = codeFingerprint(await readFile(fileURLToPath(import.meta.url)))
+  const snapshots = new SnapshotSeededStore({
+    local: store,
+    remote: new R2BlobStore(config.indexSnapshots.r2),
+    prefix: `${config.indexSnapshots.prefix}/${code}`,
+    keys: [VAULT_INDEX_KEY, SEARCH_INDEX_KEY],
+    log,
+  })
+  return { store: snapshots, snapshots }
+}
+
 async function main(): Promise<void> {
   const config = loadConfig(process.env)
   const changes = new ChangeEmitter(log)
+  const { store, snapshots } = await createStore(config)
   
   log('initializing vault')
   const vault = await Vault.open({
@@ -32,7 +54,7 @@ async function main(): Promise<void> {
   log('vault initialized')
   const server = await createVaultServer({
     vault,
-    store: createBlobStore(config),
+    store,
     token: config.token,
     maxBodyBytes: config.maxBodyBytes,
     collab: config.collab ?? false,
@@ -40,9 +62,10 @@ async function main(): Promise<void> {
     changes,
     onReady: () => log('server ready'),
   })
+  void snapshots?.publish()
   const stop = (): void => {
     log('shutdown signal received')
-    closeVaultServer(server).catch((error: unknown) => {
+    closeVaultServer(server).then(() => snapshots?.publish()).catch((error: unknown) => {
       log(`shutdown failed: ${String(error)}`)
       process.exitCode = 1
     })

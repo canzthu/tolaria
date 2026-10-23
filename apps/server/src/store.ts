@@ -75,22 +75,28 @@ export interface R2Config {
   secretAccessKey: string
 }
 
+const EMPTY_SHA256 = createHash('sha256').digest('hex')
+
+/** A path segment as SigV4 canonicalizes it: RFC 3986, unreserved characters left alone. */
+function uriEncode(segment: string): string {
+  return encodeURIComponent(segment).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+}
+
 /**
  * S3-compatible BlobStore implementation for Cloudflare R2 (or any S3-compatible service).
  * Uses AWS Signature Version 4 for authentication.
  */
 export class R2BlobStore implements BlobStore {
   private readonly config: R2Config
+  private readonly now: () => Date
 
-  constructor(config: R2Config) {
+  constructor(config: R2Config, now: () => Date = () => new Date()) {
     this.config = config
+    this.now = now
   }
 
   async get(key: string): Promise<Uint8Array | null> {
-    const url = this.objectUrl(key)
-    const headers = this.signRequest('GET', url, '')
-    
-    const response = await fetch(url, { method: 'GET', headers })
+    const response = await this.request('GET', this.objectUrl(key))
     if (response.status === 404) return null
     if (!response.ok) {
       throw new Error(`R2 GET failed: ${response.status} ${response.statusText}`)
@@ -100,25 +106,14 @@ export class R2BlobStore implements BlobStore {
   }
 
   async put(key: string, bytes: Uint8Array): Promise<void> {
-    const url = this.objectUrl(key)
-    const headers = this.signRequest('PUT', url, '', bytes)
-    
-    const response = await fetch(url, { 
-      method: 'PUT', 
-      headers, 
-      body: bytes as BodyInit
-    })
-    
+    const response = await this.request('PUT', this.objectUrl(key), bytes)
     if (!response.ok) {
       throw new Error(`R2 PUT failed: ${response.status} ${response.statusText}`)
     }
   }
 
   async delete(key: string): Promise<void> {
-    const url = this.objectUrl(key)
-    const headers = this.signRequest('DELETE', url, '')
-    
-    const response = await fetch(url, { method: 'DELETE', headers })
+    const response = await this.request('DELETE', this.objectUrl(key))
     if (!response.ok && response.status !== 404) {
       throw new Error(`R2 DELETE failed: ${response.status} ${response.statusText}`)
     }
@@ -127,12 +122,10 @@ export class R2BlobStore implements BlobStore {
   async list(prefix: string): Promise<string[]> {
     const url = new URL(this.config.endpoint)
     url.pathname = `/${this.config.bucket}/`
-    url.searchParams.set('list-type', '2')
-    url.searchParams.set('prefix', `${prefix}/`)
+    // As SigV4 canonicalizes it: sorted by name, values RFC 3986-encoded (URLSearchParams would send `+`).
+    url.search = `list-type=2&prefix=${uriEncode(`${prefix}/`)}`
     
-    const headers = this.signRequest('GET', url.toString(), url.search)
-    
-    const response = await fetch(url.toString(), { method: 'GET', headers })
+    const response = await this.request('GET', url)
     if (!response.ok) {
       throw new Error(`R2 LIST failed: ${response.status} ${response.statusText}`)
     }
@@ -150,46 +143,38 @@ export class R2BlobStore implements BlobStore {
     return keys
   }
 
-  private objectUrl(key: string): string {
+  /** A signed request to the configured endpoint: its URL always comes from `objectUrl` or `list`. */
+  private request(method: string, url: URL, body?: Uint8Array): Promise<Response> {
+    return fetch(url, { method, headers: this.signRequest(method, url, body), body: body as BodyInit | undefined })
+  }
+
+  private objectUrl(key: string): URL {
     const url = new URL(this.config.endpoint)
-    url.pathname = `/${this.config.bucket}/${key}`
-    return url.toString()
+    url.pathname = `/${uriEncode(this.config.bucket)}/${key.split('/').map(uriEncode).join('/')}`
+    return url
   }
 
   /**
    * Sign an S3 request using AWS Signature Version 4.
    * This implements the canonical request signing process without external dependencies.
+   * `fetch` sends the host header itself; it is signed all the same.
    */
-  private signRequest(
-    method: string,
-    url: string,
-    queryString: string,
-    body?: Uint8Array
-  ): Record<string, string> {
-    const now = new Date()
-    const amzDate = now.toISOString().replace(/[:-]|\.\\d{3}/g, '')
+  signRequest(method: string, url: URL, body?: Uint8Array): Record<string, string> {
+    const amzDate = this.now().toISOString().replace(/[:-]|\.\d{3}/g, '')
     const dateStamp = amzDate.slice(0, 8)
+    const payloadHash = body ? createHash('sha256').update(body).digest('hex') : EMPTY_SHA256
     
-    const parsedUrl = new URL(url)
-    const host = parsedUrl.host
-    const canonicalUri = parsedUrl.pathname
-    const canonicalQueryString = queryString.startsWith('?') ? queryString.slice(1) : queryString
-    
-    const payloadHash = body 
-      ? createHash('sha256').update(body).digest('hex')
-      : createHash('sha256').update('').digest('hex')
-    
-    const canonicalHeaders = `host:${host}\\nx-amz-content-sha256:${payloadHash}\\nx-amz-date:${amzDate}\\n`
+    const canonicalHeaders = `host:${url.host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`
     const signedHeaders = 'host;x-amz-content-sha256;x-amz-date'
     
     const canonicalRequest = [
       method,
-      canonicalUri,
-      canonicalQueryString,
+      url.pathname,
+      url.search.slice(1),
       canonicalHeaders,
       signedHeaders,
       payloadHash
-    ].join('\\n')
+    ].join('\n')
     
     const canonicalRequestHash = createHash('sha256').update(canonicalRequest).digest('hex')
     
@@ -199,7 +184,7 @@ export class R2BlobStore implements BlobStore {
       amzDate,
       credentialScope,
       canonicalRequestHash
-    ].join('\\n')
+    ].join('\n')
     
     const signingKey = this.getSignatureKey(
       this.config.secretAccessKey,
@@ -219,7 +204,6 @@ export class R2BlobStore implements BlobStore {
     ].join(', ')
     
     return {
-      'Host': host,
       'X-Amz-Date': amzDate,
       'X-Amz-Content-Sha256': payloadHash,
       'Authorization': authorizationHeader

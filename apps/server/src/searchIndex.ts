@@ -5,8 +5,10 @@ import type { Vault } from './vault.ts'
 import type { VaultChange } from './gitSync.ts'
 import type { VaultPath } from './paths.ts'
 
-const INDEX_KEY = 'search-index.json'
+export const INDEX_KEY = 'search-index.json'
 const INDEX_VERSION = 1
+/** Above this many changed files since the stored index, a rebuild is about as fast. */
+const CATCH_UP_LIMIT = 500
 const MAX_SNIPPET_CHARS = 300
 const MATCHES_PER_FILE = 3
 
@@ -57,6 +59,16 @@ function parseIndex(bytes: Uint8Array | null): { head: string; notes: IndexedNot
   if (typeof head !== 'string' || head === '') throw malformed('no head commit')
   if (!Array.isArray(notes)) throw malformed('no list of notes')
   return { head, notes }
+}
+
+/** Reads the stored index; one that cannot be used is reported and rebuilt, not fatal. */
+async function readStored(store: BlobStore, log: (message: string) => void): Promise<{ head: string; notes: IndexedNote[] } | null> {
+  try {
+    return parseIndex(await store.get(INDEX_KEY))
+  } catch (error) {
+    log(`rebuilding the search index: ${error instanceof Error ? error.message : String(error)}`)
+    return null
+  }
 }
 
 function isMarkdownNote(path: string): boolean {
@@ -179,18 +191,24 @@ export class SearchIndex {
     this.notes = notes
   }
 
-  static async open(vault: Vault, store: BlobStore): Promise<SearchIndex> {
-    const stored = parseIndex(await store.get(INDEX_KEY))
+  /** Loads the stored index and brings it up to the vault's head, or builds it, as `VaultIndex.open` does. */
+  static async open(vault: Vault, store: BlobStore, log: (message: string) => void = () => {}): Promise<SearchIndex> {
     const currentHead = await vault.info().then((info) => info.head)
-    
-    if (!stored || stored.head !== currentHead) {
-      const notes = await SearchIndex.buildFromVault(vault)
-      const index = new SearchIndex(vault, store, currentHead, notes)
-      await index.save()
-      return index
+    const stored = await readStored(store, log)
+    if (stored) {
+      const index = new SearchIndex(vault, store, stored.head, stored.notes)
+      if (stored.head === currentHead) return index
+      const changes = await vault.changesSince(stored.head, CATCH_UP_LIMIT)
+      if (changes) {
+        await index.catchUp(currentHead, changes)
+        log(`search index caught up with ${changes.length} changed file(s)`)
+        return index
+      }
     }
-    
-    return new SearchIndex(vault, store, stored.head, stored.notes)
+    const index = new SearchIndex(vault, store, currentHead, await SearchIndex.buildFromVault(vault))
+    index.dirty = true
+    await index.save()
+    return index
   }
 
   private static async buildFromVault(vault: Vault): Promise<IndexedNote[]> {
@@ -263,9 +281,19 @@ export class SearchIndex {
 
   async apply(changes: VaultChange[]): Promise<void> {
     if (changes.length === 0) return
-    
     this.head = await this.vault.info().then((info) => info.head)
-    
+    await this.applyEach(changes)
+    await this.save()
+  }
+
+  private async catchUp(head: string, changes: VaultChange[]): Promise<void> {
+    this.head = head
+    this.dirty = true
+    await this.applyEach(changes)
+    await this.save()
+  }
+
+  private async applyEach(changes: VaultChange[]): Promise<void> {
     for (const change of changes) {
       if (change.kind === 'upsert') {
         await this.updateNote(change.path)
@@ -276,8 +304,6 @@ export class SearchIndex {
         await this.updateNote(change.to)
       }
     }
-    
-    await this.save()
   }
 
   private async updateNote(path: VaultPath): Promise<void> {

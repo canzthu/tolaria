@@ -204,3 +204,40 @@ describe('blob store settings', () => {
     expect(output).not.toContain(TOKEN)
   })
 })
+
+describe('index snapshot settings', () => {
+  const R2 = {
+    TOLARIA_SERVER_TOKEN: TOKEN,
+    TOLARIA_R2_BUCKET: 'tolaria-proto',
+    TOLARIA_R2_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+    TOLARIA_R2_REGION: 'auto',
+    TOLARIA_R2_ACCESS_KEY_ID: 'key-id',
+    TOLARIA_R2_SECRET_ACCESS_KEY: 'secret',
+  }
+
+  it('keeps indexes on the server disk only by default', () => {
+    expect(loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN }).indexSnapshots).toBeNull()
+  })
+
+  it('snapshots indexes to R2 under the prefix, while the blob store stays local', () => {
+    const config = loadConfig({ ...R2, TOLARIA_INDEX_SNAPSHOTS: 'r2', TOLARIA_INDEX_SNAPSHOT_PREFIX: 'vaults/prototype' })
+    expect(config.blobStore.type).toBe('local')
+    expect(config.indexSnapshots).toEqual({
+      prefix: 'vaults/prototype',
+      r2: { bucket: 'tolaria-proto', endpoint: 'https://account.r2.cloudflarestorage.com', region: 'auto', accessKeyId: 'key-id', secretAccessKey: 'secret' },
+    })
+  })
+
+  it('refuses an unknown kind, a missing or unsafe prefix, and missing R2 settings', () => {
+    expect(() => loadConfig({ ...R2, TOLARIA_INDEX_SNAPSHOTS: 's3' })).toThrowError(/invalid TOLARIA_INDEX_SNAPSHOTS value: s3/)
+    expect(() => loadConfig({ ...R2, TOLARIA_INDEX_SNAPSHOTS: 'r2' })).toThrowError(/TOLARIA_INDEX_SNAPSHOT_PREFIX is required/)
+    for (const prefix of ['../other', 'vaults//x', '/vaults', 'vaults/x?y']) {
+      expect(() => loadConfig({ ...R2, TOLARIA_INDEX_SNAPSHOTS: 'r2', TOLARIA_INDEX_SNAPSHOT_PREFIX: prefix })).toThrowError(
+        /TOLARIA_INDEX_SNAPSHOT_PREFIX must be/,
+      )
+    }
+    expect(() =>
+      loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_INDEX_SNAPSHOTS: 'r2', TOLARIA_INDEX_SNAPSHOT_PREFIX: 'v' }),
+    ).toThrowError('TOLARIA_R2_BUCKET is required when TOLARIA_INDEX_SNAPSHOTS=r2')
+  })
+})

@@ -5,8 +5,10 @@ import type { VaultPath } from './paths.ts'
 import type { BlobStore } from './store.ts'
 import type { Vault } from './vault.ts'
 
-const INDEX_KEY = 'vault-index.json'
+export const INDEX_KEY = 'vault-index.json'
 const INDEX_VERSION = 1
+/** Above this many changed files since the stored index, a rebuild is about as fast. */
+const CATCH_UP_LIMIT = 500
 
 interface StoredIndex {
   version: number
@@ -41,6 +43,16 @@ function parseIndex(bytes: Uint8Array | null): { head: string; entries: VaultEnt
   return { head, entries }
 }
 
+/** Reads the stored index; one that cannot be used is reported and rebuilt, not fatal. */
+async function readStored(store: BlobStore, log: (message: string) => void): Promise<{ head: string; entries: VaultEntry[] } | null> {
+  try {
+    return parseIndex(await store.get(INDEX_KEY))
+  } catch (error) {
+    log(`rebuilding the vault index: ${error instanceof Error ? error.message : String(error)}`)
+    return null
+  }
+}
+
 /**
  * Maintains an incremental index of vault entries. The index is rebuilt from git on startup
  * if missing or stale, and updated incrementally on vault changes (write, pull, rename).
@@ -59,19 +71,28 @@ export class VaultIndex {
     this.entries = entries
   }
 
-  static async open(vault: Vault, store: BlobStore): Promise<VaultIndex> {
-    const stored = parseIndex(await store.get(INDEX_KEY))
+  /**
+   * Loads the stored index and brings it up to the vault's head, or builds it from every file
+   * when there is none, it cannot be read, or catching up would touch more than
+   * `CATCH_UP_LIMIT` files.
+   */
+  static async open(vault: Vault, store: BlobStore, log: (message: string) => void = () => {}): Promise<VaultIndex> {
     const currentHead = await vault.info().then((info) => info.head)
-    
-    // Rebuild if missing or stale
-    if (!stored || stored.head !== currentHead) {
-      const entries = await VaultIndex.buildFromVault(vault)
-      const index = new VaultIndex(vault, store, currentHead, entries)
-      await index.save()
-      return index
+    const stored = await readStored(store, log)
+    if (stored) {
+      const index = new VaultIndex(vault, store, stored.head, stored.entries)
+      if (stored.head === currentHead) return index
+      const changes = await vault.changesSince(stored.head, CATCH_UP_LIMIT)
+      if (changes) {
+        await index.catchUp(currentHead, changes)
+        log(`vault index caught up with ${changes.length} changed file(s)`)
+        return index
+      }
     }
-    
-    return new VaultIndex(vault, store, stored.head, stored.entries)
+    const index = new VaultIndex(vault, store, currentHead, await VaultIndex.buildFromVault(vault))
+    index.dirty = true
+    await index.save()
+    return index
   }
 
   private static async buildFromVault(vault: Vault): Promise<VaultEntry[]> {
@@ -125,8 +146,18 @@ export class VaultIndex {
     
     // Update head from vault
     this.head = await this.vault.info().then((info) => info.head)
-    
-    // Apply changes to entries
+    await this.applyEach(changes)
+    await this.save()
+  }
+
+  private async catchUp(head: string, changes: VaultChange[]): Promise<void> {
+    this.head = head
+    this.dirty = true
+    await this.applyEach(changes)
+    await this.save()
+  }
+
+  private async applyEach(changes: VaultChange[]): Promise<void> {
     for (const change of changes) {
       if (change.kind === 'upsert') {
         await this.updateEntry(change.path)
@@ -138,8 +169,6 @@ export class VaultIndex {
         await this.updateEntry(change.to)
       }
     }
-    
-    await this.save()
   }
 
   private async updateEntry(path: VaultPath): Promise<void> {
