@@ -20,6 +20,7 @@ import {
 	type CollabTicketResponse,
 	DOC_BLOCKS_FRAGMENT,
 	DOC_ID_HEADER,
+	type EntriesDeltaResponse,
 	type EntriesResponse,
 	ROUTES,
 	type SearchResponse,
@@ -27,6 +28,7 @@ import {
 	type VaultEntry as ProtocolVaultEntry,
 } from "../../protocol/src/index.ts";
 import { CollabProvider, type SocketLike } from "./collabProvider.ts";
+import { readCache, writeCache } from "./entriesCache.ts";
 
 /**
  * The Tolaria remote behind the `VaultBackend` seam: files over the HTTP protocol, and notes
@@ -124,6 +126,25 @@ function mapProtocolEntryToApp(entry: ProtocolVaultEntry): AppVaultEntry {
 	};
 }
 
+function mapAppEntryToProtocol(entry: AppVaultEntry): ProtocolVaultEntry {
+	return {
+		path: entry.path,
+		filename: entry.filename,
+		title: entry.title,
+		isA: entry.isA ?? undefined,
+		aliases: entry.aliases.length > 0 ? entry.aliases : undefined,
+		belongsTo: entry.belongsTo.length > 0 ? entry.belongsTo : undefined,
+		status: entry.status ?? undefined,
+		fileSize: entry.fileSize,
+		snippet: entry.snippet,
+		wordCount: entry.wordCount,
+		relationships: Object.keys(entry.relationships).length > 0 ? entry.relationships : undefined,
+		outgoingLinks: entry.outgoingLinks.length > 0 ? entry.outgoingLinks : undefined,
+		hasH1: entry.hasH1,
+		fileKind: entry.fileKind ?? "markdown",
+	};
+}
+
 function mapProtocolSearchResult(result: ProtocolSearchResult): AppSearchResult {
 	return {
 		path: result.path,
@@ -134,10 +155,90 @@ function mapProtocolSearchResult(result: ProtocolSearchResult): AppSearchResult 
 	};
 }
 
+// Module-level cache state for web-only cache-first loading
+let cachedEntries: Map<string, AppVaultEntry> = new Map();
+let revalidating = false;
+
 async function listEntries(request: Request): Promise<AppVaultEntry[]> {
+	// Web-only: try cache-first loading
+	if (typeof indexedDB !== "undefined" && cachedEntries.size === 0) {
+		const cached = await readCache();
+		if (cached) {
+			cachedEntries = new Map(
+				cached.entries.map((e) => [e.path, mapProtocolEntryToApp(e)])
+			);
+			// Start background revalidation
+			if (!revalidating) {
+				revalidateInBackground(request, cached.head);
+			}
+			return Array.from(cachedEntries.values());
+		}
+	}
+
+	// No cache or cache unavailable: fetch full list
 	const response = await ok(await request(ROUTES.entries));
 	const body = (await response.json()) as EntriesResponse;
-	return body.entries.map(mapProtocolEntryToApp);
+	const entries = body.entries.map(mapProtocolEntryToApp);
+	
+	// Update cache for next time (web only)
+	if (typeof indexedDB !== "undefined") {
+		cachedEntries = new Map(entries.map((e) => [e.path, e]));
+		writeCache(body.head, body.entries).catch(() => {
+			// Cache write failures are silent
+		});
+	}
+	
+	return entries;
+}
+
+/**
+ * Revalidates cached entries in the background by fetching deltas since the cached HEAD.
+ * Chunks the work to avoid blocking the main thread.
+ */
+async function revalidateInBackground(request: Request, since: string): Promise<void> {
+	if (revalidating) return;
+	revalidating = true;
+
+	try {
+		const url = `${ROUTES.entries}?since=${encodeURIComponent(since)}`;
+		const response = await ok(await request(url));
+		const delta = (await response.json()) as EntriesDeltaResponse;
+
+		// Yield to the main thread before applying changes
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		// Apply changes in chunks to avoid long tasks
+		const CHUNK_SIZE = 50;
+		for (let i = 0; i < delta.changed.length; i += CHUNK_SIZE) {
+			const chunk = delta.changed.slice(i, i + CHUNK_SIZE);
+			for (const entry of chunk) {
+				cachedEntries.set(entry.path, mapProtocolEntryToApp(entry));
+			}
+			// Yield after each chunk
+			if (i + CHUNK_SIZE < delta.changed.length) {
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			}
+		}
+
+		// Apply deletions in chunks
+		for (let i = 0; i < delta.deleted.length; i += CHUNK_SIZE) {
+			const chunk = delta.deleted.slice(i, i + CHUNK_SIZE);
+			for (const path of chunk) {
+				cachedEntries.delete(path);
+			}
+			if (i + CHUNK_SIZE < delta.deleted.length) {
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			}
+		}
+
+		// Update cache with new HEAD and entries
+		const protocolEntries = Array.from(cachedEntries.values()).map(mapAppEntryToProtocol);
+		await writeCache(delta.head, protocolEntries);
+	} catch {
+		// Revalidation failures are silent; the cached data remains valid
+	} finally {
+		revalidating = false;
+	}
 }
 
 async function searchFiles(
@@ -211,13 +312,30 @@ async function writeFile(
 	return { status: "written", revision: etagOf(await ok(response)) };
 }
 
+async function reloadEntries(request: Request): Promise<AppVaultEntry[]> {
+	// Force a fresh fetch, bypassing cache
+	const response = await ok(await request(ROUTES.entries));
+	const body = (await response.json()) as EntriesResponse;
+	const entries = body.entries.map(mapProtocolEntryToApp);
+	
+	// Update cache (web only)
+	if (typeof indexedDB !== "undefined") {
+		cachedEntries = new Map(entries.map((e) => [e.path, e]));
+		writeCache(body.head, body.entries).catch(() => {
+			// Cache write failures are silent
+		});
+	}
+	
+	return entries;
+}
+
 function fileOps(request: Request): VaultFileOps {
 	return {
 		read: (path) => readFile(request, path),
 		write: (path, content, options = {}) =>
 			writeFile(request, { path, content }, options),
 		list: () => listEntries(request),
-		reload: () => listEntries(request),
+		reload: () => reloadEntries(request),
 		reloadEntry: unsupported("reloading a single entry"),
 		rename: unsupported("renaming with link updates"),
 		delete: (paths) => deleteFiles(request, paths),
