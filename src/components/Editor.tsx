@@ -45,6 +45,11 @@ import type { NoteListItem } from "../utils/ai-context";
 import type { NotePdfExportSource } from "../utils/notePdfExport";
 import type { RichEditorBlockTypeDefinition } from "../utils/richEditorBlockTypes";
 import { installRichEditorMarkdownSerializer } from "../utils/richEditorMarkdown";
+import {
+	type CollabEditorBinding,
+	collabEditorKey,
+	useCollabEditorBinding,
+} from "./collabEditorBinding";
 import { EditorContent } from "./EditorContent";
 import { EditorMemoryProbe } from "./EditorMemoryProbe";
 import { EditorRightPanel } from "./EditorRightPanel";
@@ -73,7 +78,6 @@ import { handleRemoteRichEditorPaste } from "./richEditorPaste";
 import { createRichEditorTextDirectionExtension } from "./richEditorTextDirection";
 import { createRichEditorTransformErrorRecoveryExtension } from "./richEditorTransformErrorRecoveryExtension";
 import { createTodoBlockShortcutExtension } from "./todoBlockShortcutExtension";
-import { useCollabDocument } from "./useCollabDocument";
 import { useEditorPdfExport } from "./useEditorPdfExport";
 import { useFilenameAutolinkGuard } from "./useFilenameAutolinkGuard";
 import { useRawModeWithFlush } from "./useRawModeWithFlush";
@@ -295,8 +299,7 @@ interface EditorSetupParams {
 	tabs: Tab[];
 	activeTabPath: string | null;
 	vaultPath?: string;
-	vaultBackend?: VaultBackend<RemoteBindings> | null;
-	platformCapabilities?: PlatformCapabilities;
+	collabBinding: CollabEditorBinding;
 	onContentChange?: (path: string, content: string) => void;
 	onLoadDiff?: (path: string) => Promise<string>;
 	onLoadDiffAtCommit?: (path: string, commitHash: string) => Promise<string>;
@@ -306,6 +309,59 @@ interface EditorSetupParams {
 	rawToggleRef?: React.MutableRefObject<() => void>;
 	diffToggleRef?: React.MutableRefObject<() => void>;
 	onImageImportError?: ImageImportErrorHandler;
+}
+
+const NO_SWAP_TABS: Tab[] = [];
+const ignoreEditorChange = () => {};
+
+/** The collaboration option of a bound editor: BlockNote edits the live document. */
+function blockNoteCollaboration(binding: CollabEditorBinding) {
+	if (binding.kind !== "bound") return undefined;
+	return {
+		fragment: binding.doc.fragment,
+		provider: binding.doc.provider,
+		user: {
+			name: "User",
+			color: "#30bced",
+		},
+	};
+}
+
+type EditorTabSwapOptions = Parameters<typeof useEditorTabSwap>[0];
+
+/**
+ * Where the rich editor's content comes from. A live document owns a bound note's
+ * content: the tab swap loads nothing into the editor and edits are not saved through
+ * onContentChange, or both would write the shared fragment.
+ */
+function useEditorContentSource({
+	collabBinding,
+	activeTab,
+	activeTabIsSheet,
+	...swapOptions
+}: EditorTabSwapOptions & {
+	collabBinding: CollabEditorBinding;
+	activeTab: Tab | null;
+	activeTabIsSheet: boolean;
+}) {
+	const live = collabBinding.kind !== "local";
+	const swap = useEditorTabSwap({
+		...swapOptions,
+		tabs: live ? NO_SWAP_TABS : swapOptions.tabs,
+		activeTabPath: live ? null : swapOptions.activeTabPath,
+	});
+	const localContentReady = useRichEditorContentReadiness({
+		activeTab,
+		activeTabIsSheet,
+		editorContentPath: swap.editorContentPath,
+	});
+	return {
+		...swap,
+		handleEditorChange: live ? ignoreEditorChange : swap.handleEditorChange,
+		richEditorContentReady: live
+			? collabBinding.kind === "bound"
+			: localContentReady,
+	};
 }
 
 function imageImportErrorMessage(
@@ -343,8 +399,7 @@ function useEditorSetup(options: EditorSetupParams) {
 		tabs,
 		activeTabPath,
 		vaultPath,
-		vaultBackend,
-		platformCapabilities,
+		collabBinding,
 		onContentChange,
 		onLoadDiff,
 		onLoadDiffAtCommit,
@@ -370,25 +425,7 @@ function useEditorSetup(options: EditorSetupParams) {
 		onImageImportErrorRef.current = onImageImportError;
 	}, [onImageImportError]);
 
-	// Open collaborative document on web (per-note editors enabled)
-	const collabEnabled = platformCapabilities?.perNoteEditors ?? false;
-	const { doc: collabDoc } = useCollabDocument({
-		vaultBackend: vaultBackend ?? null,
-		path: activeTabPath,
-		enabled: collabEnabled,
-	});
-
-	// Build collaboration options for BlockNote when document is available
-	const collaboration = collabDoc
-		? {
-				fragment: collabDoc.fragment,
-				provider: collabDoc.provider,
-				user: {
-					name: "User",
-					color: "#30bced",
-				},
-			}
-		: undefined;
+	const collaboration = blockNoteCollaboration(collabBinding);
 
 	const editor = useCreateBlockNote({
 		...RICH_EDITOR_BLOCKNOTE_PERFORMANCE_OPTIONS,
@@ -487,22 +524,20 @@ function useEditorSetup(options: EditorSetupParams) {
 		});
 
 	const {
-		editorContentPath,
 		handleEditorChange,
 		flushPendingEditorChange,
 		editorMountedRef,
-	} = useEditorTabSwap({
+		richEditorContentReady,
+	} = useEditorContentSource({
+		collabBinding,
 		tabs: tabsForEditorSwap,
 		activeTabPath: richEditorActiveTabPath,
+		activeTab,
+		activeTabIsSheet,
 		editor,
 		onContentChange,
 		rawMode,
 		vaultPath,
-	});
-	const richEditorContentReady = useRichEditorContentReadiness({
-		activeTab,
-		activeTabIsSheet,
-		editorContentPath,
 	});
 	useEffect(() => {
 		if (richEditorContentReady) markStartupPhase("editor_interactive");
@@ -946,32 +981,40 @@ export const Editor = memo(function Editor(props: EditorProps) {
 		[locale, onToast],
 	);
 
+	const collabBinding = useCollabEditorBinding(props);
+
 	// When per-note editors are enabled (web), key the editor by active tab path
-	// so React creates a new editor instance for each note.
+	// so React creates a new editor instance for each note, and again once the
+	// note's live document is ready to bind.
 	// When disabled (desktop), use a stable key so the same editor is reused.
-	const editorKey = platformCapabilities?.perNoteEditors
-		? `editor-${props.activeTabPath ?? "none"}`
-		: "shared-editor";
+	const editorKey = collabEditorKey(
+		platformCapabilities?.perNoteEditors,
+		props.activeTabPath,
+		collabBinding,
+	);
 
 	return (
 		<EditorInner
 			key={editorKey}
 			{...props}
+			collabBinding={collabBinding}
 			onImageImportError={handleImageImportError}
 		/>
 	);
 });
 
 function EditorInner(
-	props: EditorProps & { onImageImportError: ImageImportErrorHandler },
+	props: EditorProps & {
+		collabBinding: CollabEditorBinding;
+		onImageImportError: ImageImportErrorHandler;
+	},
 ) {
 	const { onImageImportError } = props;
 	const runtime = useEditorSetup({
 		tabs: props.tabs,
 		activeTabPath: props.activeTabPath,
 		vaultPath: props.vaultPath,
-		vaultBackend: props.vaultBackend,
-		platformCapabilities: props.platformCapabilities,
+		collabBinding: props.collabBinding,
 		onContentChange: props.onContentChange,
 		onLoadDiff: props.onLoadDiff,
 		onLoadDiffAtCommit: props.onLoadDiffAtCommit,

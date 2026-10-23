@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
-import type { VaultBackend, VaultCollabDoc } from "../lib/vaultBackend/types";
+import type {
+	VaultBackend,
+	VaultCollabChannel,
+	VaultCollabDoc,
+} from "../lib/vaultBackend/types";
 
 export interface CollabDocumentState {
 	doc: VaultCollabDoc<RemoteBindings> | null;
@@ -14,106 +18,83 @@ interface UseCollabDocumentOptions {
 	enabled: boolean;
 }
 
+type OpenedDocument = CollabDocumentState & { path: string };
+
+const NO_DOCUMENT: CollabDocumentState = {
+	doc: null,
+	synced: false,
+	error: null,
+};
+
+function collabChannel(
+	vaultBackend: VaultBackend<RemoteBindings> | null,
+): VaultCollabChannel<RemoteBindings> | null {
+	return vaultBackend?.collab ?? null;
+}
+
+function asError(error: unknown): Error {
+	return error instanceof Error ? error : new Error(String(error));
+}
+
+function openCollabDocument(
+	collab: VaultCollabChannel<RemoteBindings>,
+	path: string,
+	report: (state: CollabDocumentState) => void,
+): () => void {
+	let left = false;
+	let opened: VaultCollabDoc<RemoteBindings> | null = null;
+	const update = (state: CollabDocumentState) => {
+		if (!left) report(state);
+	};
+
+	collab
+		.openDoc(path)
+		.then((doc) => {
+			if (left) return doc.close();
+			opened = doc;
+			update({ doc, synced: false, error: null });
+			return doc.synced.then(
+				() => update({ doc, synced: true, error: null }),
+				(error: unknown) =>
+					update({ doc, synced: false, error: asError(error) }),
+			);
+		})
+		.catch((error: unknown) =>
+			update({ doc: null, synced: false, error: asError(error) }),
+		);
+
+	return () => {
+		left = true;
+		opened?.close();
+	};
+}
+
 /**
  * Opens a Yjs collaborative document for the given note path.
- * Returns null when collaboration is not available (desktop) or not enabled.
+ * Returns no document when collaboration is not available (desktop) or not enabled.
  * Manages the document lifecycle: opens on mount/path change, closes on unmount.
+ * The state always belongs to `path`: while another note's document is still open or
+ * closing, the hook reports no document rather than the previous note's.
  */
 export function useCollabDocument({
 	vaultBackend,
 	path,
 	enabled,
 }: UseCollabDocumentOptions): CollabDocumentState {
-	const [doc, setDoc] = useState<VaultCollabDoc<RemoteBindings> | null>(null);
-	const [synced, setSynced] = useState(false);
-	const [error, setError] = useState<Error | null>(null);
-	const currentPathRef = useRef<string | null>(null);
-	const docRef = useRef<VaultCollabDoc<RemoteBindings> | null>(null);
+	const [opened, setOpened] = useState<OpenedDocument | null>(null);
+	const collab = enabled ? collabChannel(vaultBackend) : null;
+	const target = collab ? path : null;
 
 	useEffect(() => {
-		// Early return if not enabled or collaboration not available
-		if (!enabled || !vaultBackend?.collab || !path) {
-			// Clean up in the cleanup function, not synchronously
-			currentPathRef.current = null;
-			return () => {
-				const prevDoc = docRef.current;
-				if (prevDoc) {
-					prevDoc.close();
-					docRef.current = null;
-				}
-				setDoc(null);
-				setSynced(false);
-				setError(null);
-			};
-		}
-
-		// Skip if path hasn't changed
-		if (currentPathRef.current === path) {
-			return;
-		}
-
-		// Path changed: mark as cancelled and schedule cleanup
-		let cancelled = false;
-
-		// Close previous doc before opening new one
-		const prevDoc = docRef.current;
-		if (prevDoc && currentPathRef.current !== path) {
-			prevDoc.close();
-			docRef.current = null;
-			// State will be updated by the new doc opening, no need to reset here
-		}
-
-		async function openDocument() {
-			try {
-				if (!vaultBackend?.collab || !path) return;
-
-				const collabDoc = await vaultBackend.collab.openDoc(path);
-
-				if (cancelled) {
-					collabDoc.close();
-					return;
-				}
-
-				docRef.current = collabDoc;
-				currentPathRef.current = path;
-				setDoc(collabDoc);
-				setError(null);
-
-				// Wait for initial sync
-				try {
-					await collabDoc.synced;
-					if (!cancelled) {
-						setSynced(true);
-					}
-				} catch (syncError) {
-					if (!cancelled) {
-						setError(
-							syncError instanceof Error
-								? syncError
-								: new Error(String(syncError)),
-						);
-					}
-				}
-			} catch (err) {
-				if (!cancelled) {
-					setError(err instanceof Error ? err : new Error(String(err)));
-					setDoc(null);
-					setSynced(false);
-				}
-			}
-		}
-
-		void openDocument();
-
+		if (!collab || !target) return;
+		const leave = openCollabDocument(collab, target, (state) =>
+			setOpened({ ...state, path: target }),
+		);
 		return () => {
-			cancelled = true;
-			const currentDoc = docRef.current;
-			if (currentDoc) {
-				currentDoc.close();
-				docRef.current = null;
-			}
+			leave();
+			setOpened(null);
 		};
-	}, [vaultBackend, path, enabled]);
+	}, [collab, target]);
 
-	return { doc, synced, error };
+	return target && opened?.path === target ? opened : NO_DOCUMENT;
 }

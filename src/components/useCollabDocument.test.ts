@@ -141,6 +141,76 @@ describe("useCollabDocument", () => {
 		});
 	});
 
+	it("reports no document for a new path until that path's document is open", async () => {
+		const newDoc = {
+			...mockDoc,
+			path: "new.md",
+			synced: new Promise<void>(() => {}),
+			close: vi.fn(),
+		};
+		let openNew: (doc: typeof newDoc) => void = () => {};
+		const openDoc = vi
+			.fn()
+			.mockResolvedValueOnce(mockDoc)
+			.mockReturnValueOnce(
+				new Promise((resolve) => {
+					openNew = resolve;
+				}),
+			);
+		const backend = { ...mockVaultBackend, collab: { openDoc } };
+
+		const { result, rerender } = renderHook(
+			({ path }) =>
+				useCollabDocument({ vaultBackend: backend, path, enabled: true }),
+			{ initialProps: { path: "test.md" } },
+		);
+		await waitFor(() => expect(result.current.synced).toBe(true));
+
+		rerender({ path: "new.md" });
+		expect(result.current).toEqual({ doc: null, synced: false, error: null });
+
+		openNew(newDoc);
+		await waitFor(() => expect(result.current.doc).toBe(newDoc));
+		expect(result.current.synced).toBe(false);
+	});
+
+	it("closes a document that opens after the hook has left", async () => {
+		let openLate: (doc: typeof mockDoc) => void = () => {};
+		const openDoc = vi.fn().mockReturnValue(
+			new Promise((resolve) => {
+				openLate = resolve;
+			}),
+		);
+		const backend = { ...mockVaultBackend, collab: { openDoc } };
+
+		const { unmount } = renderHook(() =>
+			useCollabDocument({
+				vaultBackend: backend,
+				path: "test.md",
+				enabled: true,
+			}),
+		);
+		unmount();
+		openLate(mockDoc);
+
+		await waitFor(() => expect(mockDoc.close).toHaveBeenCalled());
+	});
+
+	it("reports a non-Error failure as an Error", async () => {
+		const openDoc = vi.fn().mockRejectedValue("offline");
+		const backend = { ...mockVaultBackend, collab: { openDoc } };
+
+		const { result } = renderHook(() =>
+			useCollabDocument({
+				vaultBackend: backend,
+				path: "test.md",
+				enabled: true,
+			}),
+		);
+
+		await waitFor(() => expect(result.current.error?.message).toBe("offline"));
+	});
+
 	it("handles sync errors gracefully", async () => {
 		const syncError = new Error("Sync failed");
 		const failingDoc = { ...mockDoc, synced: Promise.reject(syncError) };

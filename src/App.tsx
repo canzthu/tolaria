@@ -198,45 +198,36 @@ function App() {
 	return <MainApp noteWindowParams={noteWindowParams} />;
 }
 
+/** The remote server the web build talks to, when one is configured on window. */
+function remoteVaultConfig(): { baseUrl: string; token: string } | null {
+	if (typeof window === "undefined") return null;
+	const { TOLARIA_REMOTE_URL: baseUrl, TOLARIA_REMOTE_TOKEN: token } =
+		window as { TOLARIA_REMOTE_URL?: string; TOLARIA_REMOTE_TOKEN?: string };
+	return baseUrl && token ? { baseUrl, token } : null;
+}
+
+// Platform capabilities: desktop shows all features, web/remote hide desktop-only features
+function resolveShellPlatformCapabilities() {
+	if (isTauri()) return resolvePlatformCapabilities("tauri");
+	return resolvePlatformCapabilities(remoteVaultConfig() ? "remote" : "mock");
+}
+
 function MainApp({
 	noteWindowParams,
 }: {
 	noteWindowParams: NoteWindowParams | null;
 }) {
 	const aiWorkspaceWindow = false;
-	// Platform capabilities: desktop shows all features, web/remote hide desktop-only features
-	const platformCapabilities = useMemo(() => {
-		if (isTauri()) return resolvePlatformCapabilities("tauri");
-
-		// Check if remote backend is configured (web build with server)
-		const hasRemoteConfig =
-			typeof window !== "undefined" &&
-			"TOLARIA_REMOTE_URL" in window &&
-			"TOLARIA_REMOTE_TOKEN" in window &&
-			!!(window as { TOLARIA_REMOTE_URL?: string }).TOLARIA_REMOTE_URL &&
-			!!(window as { TOLARIA_REMOTE_TOKEN?: string }).TOLARIA_REMOTE_TOKEN;
-
-		const backendKind = hasRemoteConfig ? "remote" : "mock";
-		return resolvePlatformCapabilities(backendKind);
-	}, []);
+	const platformCapabilities = useMemo(
+		() => resolveShellPlatformCapabilities(),
+		[],
+	);
 
 	// Create VaultBackend for web collaboration
 	const vaultBackend = useMemo((): VaultBackend<RemoteBindings> | null => {
 		if (!platformCapabilities.perNoteEditors) return null;
-		// Check for remote config
-		const hasRemoteConfig =
-			typeof window !== "undefined" &&
-			"TOLARIA_REMOTE_URL" in window &&
-			"TOLARIA_REMOTE_TOKEN" in window;
-		if (!hasRemoteConfig) return null;
-
-		const serverUrl = (window as { TOLARIA_REMOTE_URL?: string })
-			.TOLARIA_REMOTE_URL;
-		const token = (window as { TOLARIA_REMOTE_TOKEN?: string })
-			.TOLARIA_REMOTE_TOKEN;
-		if (!serverUrl || !token) return null;
-
-		return createRemoteVaultBackend({ baseUrl: serverUrl, token });
+		const remote = remoteVaultConfig();
+		return remote ? createRemoteVaultBackend(remote) : null;
 	}, [platformCapabilities.perNoteEditors]);
 	const [selection, setSelection] =
 		useState<SidebarSelection>(DEFAULT_SELECTION);
@@ -443,7 +434,9 @@ function MainApp({
 		[vaultSwitcher.allVaults],
 	);
 	const { config: vaultConfig, updateConfig } = useVaultConfig(resolvedPath);
-	const gitFeaturesEnabled = areGitFeaturesEnabled(settings);
+	// Git runs on the server for the web build: the shell's git status would be mock data.
+	const gitFeaturesEnabled =
+		platformCapabilities.git && areGitFeaturesEnabled(settings);
 	const automaticGitEnabled = gitFeaturesEnabled && !noteWindowParams;
 	const handleGitSetupPreferenceChange = useCallback(
 		(preference: GitSetupPreference) => {
