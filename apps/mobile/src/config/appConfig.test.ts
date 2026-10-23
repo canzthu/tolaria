@@ -10,6 +10,8 @@ beforeEach(() => {
   vi.stubEnv('TOLARIA_BUILD_PROFILE', undefined)
   vi.stubEnv('TOLARIA_IOS_BUILD_NUMBER', undefined)
   vi.stubEnv('TOLARIA_UPDATE_CHANNEL', undefined)
+  vi.stubEnv('EXPO_PUBLIC_POSTHOG_HOST', undefined)
+  vi.stubEnv('VITE_POSTHOG_HOST', undefined)
   vi.stubEnv('EXPO_PUBLIC_DISTRIBUTION', 'testflight')
   vi.stubEnv('EXPO_PUBLIC_RELEASE_CHANNEL', 'alpha')
 })
@@ -38,6 +40,18 @@ it('enables the supported scene lifecycle for native builds', () => {
 it('preserves other config plugins when enabling scene support', () => {
   const config = { ...structuredClone(manifest.expo), plugins: ['expo-asset'] }
   expect(configure({ config }).plugins).toContain('expo-asset')
+})
+
+it('defaults mobile PostHog ingestion to the desktop US project region', () => {
+  expect(configuredApp().extra?.telemetry?.posthogHost).toBe('https://us.i.posthog.com')
+})
+
+it('prefers the explicit Expo host and falls back to the Vite host', () => {
+  vi.stubEnv('VITE_POSTHOG_HOST', 'https://vite.example.com')
+  expect(configuredApp().extra?.telemetry?.posthogHost).toBe('https://vite.example.com')
+
+  vi.stubEnv('EXPO_PUBLIC_POSTHOG_HOST', 'https://expo.example.com')
+  expect(configuredApp().extra?.telemetry?.posthogHost).toBe('https://expo.example.com')
 })
 
 it.each([undefined, 'development'])('preserves the development sandbox for profile %s', (profile) => {

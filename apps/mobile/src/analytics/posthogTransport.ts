@@ -5,7 +5,8 @@ type EventFetcher = (url: string, options: RequestInit) => Promise<{ ok: boolean
 export function mobileAnalyticsEndpoint(key: string, host: string | undefined): string | null {
   if (!key.trim()) return null
   try {
-    const url = new URL(host || 'https://eu.i.posthog.com')
+    if (!host) return null
+    const url = new URL(host)
     if (!isCaptureOrigin(url)) return null
     return `${url.origin}/i/v0/e/`
   } catch { return null }
