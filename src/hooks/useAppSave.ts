@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { createVaultBackend } from '../lib/vaultBackend'
 import { useEditorSaveWithLinks } from './useEditorSaveWithLinks'
 import { flushEditorContent } from '../utils/autoSave'
 import { extractH1TitleFromContent } from '../utils/noteTitle'
@@ -187,6 +188,7 @@ function pendingRenameOutsideActiveTab({
 async function reloadAutoRenamedNote(options: {
     oldPath: string
     newPath: string
+    vaultPath: string
     tabsRef: MutableRefObject<TabState[]>
     activeTabPathRef: MutableRefObject<string | null>
     setTabs: AppSaveDeps['setTabs']
@@ -194,10 +196,9 @@ async function reloadAutoRenamedNote(options: {
     replaceEntry: AppSaveDeps['replaceEntry']
     loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
 }): Promise<void> {
-  const { oldPath, newPath, tabsRef, activeTabPathRef, setTabs, handleSwitchTab, replaceEntry, loadModifiedFiles } = options
-  const newEntry = await invoke<VaultEntry>('reload_vault_entry', {
-    path: newPath,
-  })
+  const { oldPath, newPath, vaultPath, tabsRef, activeTabPathRef, setTabs, handleSwitchTab, replaceEntry, loadModifiedFiles } = options
+  const backend = createVaultBackend(vaultPath)
+  const newEntry = await backend.files.reloadEntry(newPath)
   const preservedContent =
     tabsRef.current.find((tab) => tab.entry.path === oldPath)?.content ??
     (await invoke<string>('get_note_content', { path: newPath }))
@@ -305,6 +306,7 @@ function useUntitledRenameExecutor(options: {
         await reloadAutoRenamedNote({
           oldPath: path,
           newPath: result.new_path,
+          vaultPath: renameVaultPath,
           tabsRef,
           activeTabPathRef,
           setTabs,

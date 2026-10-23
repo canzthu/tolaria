@@ -216,6 +216,8 @@ function fileOps(request: Request): VaultFileOps {
 		write: (path, content, options = {}) =>
 			writeFile(request, { path, content }, options),
 		list: () => listEntries(request),
+		reload: () => listEntries(request),
+		reloadEntry: unsupported("reloading a single entry"),
 		rename: unsupported("renaming with link updates"),
 		delete: (paths) => deleteFiles(request, paths),
 		search: (query, options = {}) => searchFiles(request, query, options),

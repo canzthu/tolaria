@@ -76,6 +76,7 @@ import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
 import { DeleteProgressNotice } from './components/DeleteProgressNotice'
 import { UpdateBanner } from './components/UpdateBanner'
 import { invoke } from '@tauri-apps/api/core'
+import { createVaultBackend } from './lib/vaultBackend'
 import { isTauri, mockInvoke } from './mock-tauri'
 import type { AiWorkspaceConversationSetting, GitSetupPreference, SidebarSelection, InboxPeriod, VaultEntry, WorkspaceIdentity } from './types'
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
@@ -681,10 +682,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       paths: updatedFiles,
       refreshFullVault: handleVaultUpdate,
       reloadEntry: async (path) => {
-        const request = { path, vaultPath: resolvedPath }
-        return isTauri()
-          ? invoke<VaultEntry>('reload_vault_entry', request)
-          : mockInvoke<VaultEntry>('reload_vault_entry', request)
+        const backend = createVaultBackend(resolvedPath)
+        return backend.files.reloadEntry(path)
       },
       replaceActiveTab: handleReplaceActiveTab,
       refocusActiveEditor,

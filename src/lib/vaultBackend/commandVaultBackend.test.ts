@@ -61,6 +61,22 @@ describe('createCommandVaultBackend', () => {
     expect(calls).toEqual([{ command: 'list_vault', args: { path: VAULT } }])
   })
 
+  it('forces a full vault rescan', async () => {
+    const entries = [{ path: NOTE, title: 'Note' }]
+    const { backend, calls } = harness('tauri', { reload_vault: () => entries })
+
+    await expect(backend.files.reload()).resolves.toBe(entries)
+    expect(calls).toEqual([{ command: 'reload_vault', args: { path: VAULT } }])
+  })
+
+  it('reloads a single entry', async () => {
+    const entry = { path: NOTE, title: 'Note' }
+    const { backend, calls } = harness('tauri', { reload_vault_entry: () => entry })
+
+    await expect(backend.files.reloadEntry(NOTE)).resolves.toBe(entry)
+    expect(calls).toEqual([{ command: 'reload_vault_entry', args: { path: NOTE, vaultPath: VAULT } }])
+  })
+
   it('reads a file with a revision derived from its content', async () => {
     const { backend, calls } = harness('mock', { get_note_content: () => '# Note' })
 
@@ -255,5 +271,22 @@ describe('bytesToBase64', () => {
 
   it('encodes an empty payload', () => {
     expect(bytesToBase64(new Uint8Array())).toBe('')
+  })
+})
+
+describe('snapshot', () => {
+  it('is available for Tauri backends', async () => {
+    const entries = [{ path: NOTE, title: 'Note' }]
+    const { backend, calls } = harness('tauri', { read_vault_snapshot: () => entries })
+
+    expect(backend.snapshot).toBeDefined()
+    await expect(backend.snapshot?.()).resolves.toBe(entries)
+    expect(calls).toEqual([{ command: 'read_vault_snapshot', args: { path: VAULT } }])
+  })
+
+  it('is unavailable for mock backends', () => {
+    const { backend } = harness('mock')
+
+    expect(backend.snapshot).toBeUndefined()
   })
 })

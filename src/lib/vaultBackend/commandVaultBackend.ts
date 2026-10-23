@@ -167,6 +167,8 @@ function createFileOps(options: CommandVaultBackendOptions): VaultFileOps {
 
   return {
     list: () => invoke<VaultEntry[]>('list_vault', { path: vaultPath }),
+    reload: () => invoke<VaultEntry[]>('reload_vault', { path: vaultPath }),
+    reloadEntry: (path) => invoke<VaultEntry>('reload_vault_entry', { path, vaultPath }),
     read,
     write,
     rename,
@@ -177,11 +179,17 @@ function createFileOps(options: CommandVaultBackendOptions): VaultFileOps {
 }
 
 export function createCommandVaultBackend(options: CommandVaultBackendOptions): VaultBackend {
+  const { dialect, invoke, vaultPath } = options
+  const isTauri = dialect === 'tauri'
+  
   return {
     kind: options.dialect,
     interfaceVersion: VAULT_BACKEND_INTERFACE_VERSION,
     capabilities: { collaboration: false, atomicRevisions: false, attachments: true },
     files: createFileOps(options),
     collab: null,
+    snapshot: isTauri
+      ? () => invoke<VaultEntry[] | null>('read_vault_snapshot', { path: vaultPath })
+      : undefined,
   }
 }

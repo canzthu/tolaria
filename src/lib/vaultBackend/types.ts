@@ -75,6 +75,10 @@ export interface VaultAttachment {
 
 export interface VaultFileOps {
   list(): Promise<VaultEntry[]>
+  /** Force a full vault rescan from disk. Desktop only: returns cached results on remote/mock. */
+  reload(): Promise<VaultEntry[]>
+  /** Reload a single entry's metadata from disk or the server. */
+  reloadEntry(path: string): Promise<VaultEntry>
   read(path: string): Promise<VaultFile>
   write(path: string, content: string, options?: VaultWriteOptions): Promise<VaultWriteResult>
   rename(request: VaultRenameRequest): Promise<VaultRenameResult>
@@ -137,4 +141,10 @@ export interface VaultBackend<TBindings extends VaultCollabBindings = VaultColla
   capabilities: VaultBackendCapabilities
   files: VaultFileOps
   collab: VaultCollabChannel<TBindings> | null
+  /**
+   * Read a cached snapshot of the vault for faster startup.
+   * Returns null when no snapshot is available (browser, remote).
+   * Desktop only: the Rust vault maintains a snapshot for instant startup.
+   */
+  snapshot?(): Promise<VaultEntry[] | null>
 }
