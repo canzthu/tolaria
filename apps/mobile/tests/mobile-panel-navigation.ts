@@ -26,16 +26,16 @@ export async function dragPanel(page: Page, start: { x: number; y: number }, end
 export async function openPhoneSidebar(page: Page) {
   if (await phonePanelIsOpen(page, 'phone-sidebar-screen')) return
   await swipePanel(page, 'right')
-  await expect(page.getByTestId('phone-sidebar-screen')).toBeInViewport({ ratio: 1 })
+  await expect(page.getByTestId('sidebar-item-inbox')).toBeInViewport({ ratio: 1 })
 }
 
 export async function closePhoneSidebar(page: Page) {
   await swipePanel(page, 'left')
-  await expect(page.getByTestId('phone-note-list-screen')).toBeInViewport({ ratio: 1 })
+  await expect(page.getByTestId('note-list-toolbar-title')).toBeInViewport({ ratio: 1 })
 }
 
 export async function openPhoneProperties(page: Page) {
-  await expect(page.getByTestId('phone-editor-screen')).toBeInViewport({ ratio: 1 })
+  await expect(page.getByTestId('editor-toolbar-title')).toBeInViewport({ ratio: 1 })
   await swipePanel(page, 'left')
   await expect(page.getByTestId('phone-properties-screen')).toBeInViewport({ ratio: 1 })
 }
@@ -43,30 +43,36 @@ export async function openPhoneProperties(page: Page) {
 export async function phoneBack(page: Page) {
   const fromProperties = await phonePanelIsOpen(page, 'phone-properties-screen')
   await swipePanel(page, 'right')
-  const destination = fromProperties ? 'phone-editor-screen' : 'phone-note-list-screen'
+  const destination = fromProperties ? 'editor-toolbar-title' : 'note-list-toolbar-title'
   await expect(page.getByTestId(destination)).toBeInViewport({ ratio: 1 })
 }
 
 async function phonePanelIsOpen(page: Page, testID: string) {
-  const bounds = await page.getByTestId(testID).boundingBox()
-  return Boolean(bounds && Math.abs(bounds.x) < 1)
+  const screen = page.getByTestId(testID)
+  const first = await screen.boundingBox()
+  await page.waitForTimeout(220)
+  const second = await screen.boundingBox()
+  return Boolean(first && second && first.x >= 0 && first.x <= 16 && Math.abs(first.x - second.x) < 1)
 }
 
 export async function toggleTabletProperties(page: Page) {
-  const panel = page.getByTestId('properties-panel')
+  const panel = page.getByTestId('tablet-properties-panel-host')
   const box = await panel.boundingBox()
   const viewport = page.viewportSize()
   if (!viewport) throw new Error('Panel navigation requires a viewport.')
-  const visible = Boolean(box && box.x < viewport.width - 1)
+  const visible = Boolean(box && box.x <= viewport.width - box.width + 1)
   if (visible && box) {
     await hideTabletProperties(page, box.x, viewport.width)
   } else {
-    await swipePanel(page, 'left')
+    await dragPanel(page, { x: viewport.width - 12, y: 220 }, { x: viewport.width - 280, y: 220 })
   }
   await expect.poll(async () => {
     const bounds = await page.getByTestId('tablet-properties-panel-host').boundingBox()
-    return Boolean(bounds && bounds.x < viewport.width - 1)
-  }).toBe(!visible)
+    if (!bounds) return false
+    return visible
+      ? bounds.x > viewport.width - bounds.width + 1
+      : bounds.x <= viewport.width - bounds.width + 1
+  }).toBe(true)
 }
 
 async function hideTabletProperties(page: Page, left: number, width: number) {

@@ -1,6 +1,6 @@
-import { closePhoneSidebar, openPhoneProperties, openPhoneSidebar, phoneBack } from './mobile-panel-navigation'
+import { openPhoneProperties, openPhoneSidebar, phoneBack } from './mobile-panel-navigation'
 import { expect, test, type Page } from '@playwright/test'
-import { longPressMouseTestId, longPressTestId } from './mobile-phone-test-gestures'
+import { longPressTestId } from './mobile-phone-test-gestures'
 
 test.describe('phone saved view configuration parity', () => {
   test('creates, edits, and deletes a filtered phone saved view', async ({ page }, testInfo) => {
@@ -23,6 +23,8 @@ test.describe('phone saved view configuration parity', () => {
     await expect(page.getByTestId('note-row-open-source-project')).toBeHidden()
 
     await openPhoneSidebar(page)
+    await page.getByTestId('sidebar-item-inbox').click()
+    await openPhoneSidebar(page)
     await longPressTestId(page, 'sidebar-item-view-phone-essay-view')
     await expect(page.getByTestId('workspace-edit-view-name-input')).toHaveValue('Phone Essay View')
     await expect(page.getByTestId('workspace-view-filter-value-input-0')).toHaveValue('Essay')
@@ -30,7 +32,8 @@ test.describe('phone saved view configuration parity', () => {
     await page.getByTestId('workspace-view-filter-value-input-0').fill('Procedure')
     await page.getByTestId('workspace-action-sheet-editView').getByRole('button', { name: 'Save' }).click()
     await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-    await closePhoneSidebar(page)
+    await openPhoneSidebar(page)
+    await page.getByTestId('sidebar-item-view-phone-essay-view').click()
     await expect(page.getByTestId('note-list-toolbar-title')).toHaveText('Phone Procedure View')
     await expect(page.getByTestId('note-row-open-source-project')).toBeVisible()
     await expect(page.getByTestId('note-row-workflow-orchestration')).toBeHidden()
@@ -64,6 +67,8 @@ test.describe('phone saved view configuration parity', () => {
     await expect(page.getByTestId('note-row-workflow-orchestration').getByText('LLM Workflow')).toBeVisible()
 
     await openPhoneSidebar(page)
+    await page.getByTestId('sidebar-item-inbox').click()
+    await openPhoneSidebar(page)
     await longPressTestId(page, 'sidebar-item-view-phone-sort-view')
     await page.getByTestId('workspace-view-sort-custom-field-input').scrollIntoViewIfNeeded()
     await page.getByTestId('workspace-view-sort-custom-field-input').fill('Pri')
@@ -71,7 +76,8 @@ test.describe('phone saved view configuration parity', () => {
     await page.getByTestId('workspace-action-sheet-editView').getByRole('button', { name: 'Save' }).click()
     await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
 
-    await closePhoneSidebar(page)
+    await openPhoneSidebar(page)
+    await page.getByTestId('sidebar-item-view-phone-sort-view').click()
 
     await expect(await rowY(page, 'note-row-open-source-project')).toBeLessThan(
       await rowY(page, 'note-row-workflow-orchestration'),
@@ -98,13 +104,14 @@ test.describe('phone saved view configuration parity', () => {
     await page.getByTestId('sidebar-item-all-notes').click()
     await expect(page.getByTestId('note-list-toolbar-title')).toHaveText('All Notes')
     await openPhoneSidebar(page)
-    await longPressMouseTestId(page, 'sidebar-item-all-notes')
+    await longPressTestId(page, 'sidebar-item-all-notes')
     await expect(page.getByTestId('workspace-action-sheet-editPrimaryListProperties')).toBeVisible()
     await page.getByTestId('workspace-primary-property-search-input').fill('Pri')
     await page.getByTestId('workspace-primary-property-option-priority').click()
     await page.getByTestId('workspace-action-sheet-editPrimaryListProperties').getByRole('button', { name: 'Save' }).click()
     await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-    await closePhoneSidebar(page)
+    await openPhoneSidebar(page)
+    await page.getByTestId('sidebar-item-all-notes').click()
     await expect(page.getByTestId('note-row-workflow-orchestration').getByText('2')).toBeVisible()
     await expect(page.getByTestId('note-row-open-source-project').getByText('1')).toBeVisible()
   })
@@ -123,9 +130,9 @@ async function addNumericPropertyToPhoneNote(page: Page, rowTestId: string, prop
   await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
   await expect(page.getByTestId(`property-row-${propertyName.toLowerCase()}`)).toContainText(propertyValue)
   await phoneBack(page)
-  await expect(page.getByTestId('phone-editor-screen')).toBeVisible()
   await phoneBack(page)
-  await expect(page.getByTestId('phone-note-list-screen')).toBeVisible()
+  await expect(page.getByTestId('note-list-toolbar-title')).toHaveText('Inbox')
+  await expect(page.getByTestId(rowTestId)).toBeInViewport({ ratio: 1 })
 }
 
 async function rowY(page: Page, testId: string) {

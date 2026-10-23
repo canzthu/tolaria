@@ -9,7 +9,9 @@ for (const action of ['button', 'shortcut', 'command'] as const) {
     if (action === 'button') await page.getByTestId('note-list-create-action').click()
     if (action === 'shortcut') await page.keyboard.press('Meta+n')
     if (action === 'command') {
-      await page.getByTestId('phone-note-list-screen').getByTestId('phone-command-palette-action').click()
+      await page.keyboard.press('Meta+k')
+      await expect(page.getByTestId('mobile-command-palette')).toBeVisible()
+      await page.getByTestId('mobile-command-palette-input').fill('new note')
       await page.getByTestId('mobile-command-palette-command-file-new-note').click()
     }
     await expect(page.getByTestId('phone-editor-screen')).toBeVisible()

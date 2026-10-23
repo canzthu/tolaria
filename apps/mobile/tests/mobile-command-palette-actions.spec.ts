@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { openPhoneSidebar } from './mobile-panel-navigation'
 import { workspaceScenarioForId } from '../src/fixtures/workspaceFixtures'
 import {
   HOST_WORKSPACE_NOTE_CONTENTS_GLOBAL_KEY,
@@ -143,6 +144,8 @@ test.describe('mobile command palette actions', () => {
     await expect(page.getByTestId('mobile-command-palette-command-set-default-note-width-normal')).toBeVisible()
     await page.getByTestId('mobile-command-palette-command-set-default-note-width-normal').click()
     await expect(page.getByTestId('mobile-command-palette')).toBeHidden()
+    await page.getByTestId('phone-sidebar-screen').getByTestId('sidebar-item-all-notes').click()
+    await expect(page.getByTestId('phone-note-list-screen')).toBeVisible()
 
     await createTitledNoteFromQuickOpen(page, title, rowTestId)
 
@@ -195,7 +198,12 @@ async function openCommandPalette(page: Page) {
 }
 
 async function openPhoneCommandPalette(page: Page) {
-  await page.getByTestId('phone-command-palette-action').click()
+  if (await page.getByTestId('phone-editor-screen').isVisible()) {
+    await page.keyboard.press('Meta+k')
+  } else {
+    await openPhoneSidebar(page)
+    await page.getByTestId('phone-sidebar-screen').getByTestId('sidebar-command-palette-action').click()
+  }
   await expect(page.getByTestId('mobile-command-palette')).toBeVisible()
   await expect(page.getByTestId('mobile-command-palette-input')).toBeFocused()
 }

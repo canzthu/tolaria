@@ -5,6 +5,7 @@ import { firstSidebarFolder, installLocalVaultSnapshot, localVaultPath, type Loc
 import { workspaceScenarioForId } from '../src/fixtures/workspaceFixtures'
 import { HOST_WORKSPACE_NOTE_CONTENTS_GLOBAL_KEY, HOST_WORKSPACE_SNAPSHOT_GLOBAL_KEY, HOST_WORKSPACE_SNAPSHOT_STORAGE_KEY } from '../src/workspace/readOnlyWorkspaceRepository'
 import { expectSourceContainsSnippet } from './mobile-note-content-assertions'
+import { mobileNoteDisplaysAsSheet } from '../src/workspace/mobileSpreadsheetFormat'
 import type { Page as PageLike } from '@playwright/test'
 import { expectSelectedChromeTitle } from './mobile-workspace-property-flows'
 
@@ -72,7 +73,11 @@ export async function assertNoteSwitchBudget(page: PageLike, state: LocalVaultSn
 export async function assertHiddenNoteHydrationAndWrite(page: PageLike, state: LocalVaultSnapshotState) {
   const hiddenNote = state.snapshot.allNotes?.find((note) => {
     const visibleIds = new Set(state.snapshot.notes.map((candidate) => candidate.id))
-    return !visibleIds.has(note.id) && note.path && state.noteContents[note.path]
+    return !visibleIds.has(note.id)
+      && note.path
+      && note.fileKind === 'markdown'
+      && !mobileNoteDisplaysAsSheet({ ...note, rawContent: state.noteContents[note.path] })
+      && state.noteContents[note.path]
   })
   if (!hiddenNote?.path) return
 

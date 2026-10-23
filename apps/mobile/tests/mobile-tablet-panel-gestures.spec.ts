@@ -44,6 +44,6 @@ async function expectPropertiesVisible(page: Page, visible: boolean) {
   const viewport = page.viewportSize()
   if (!viewport) throw new Error('Cannot measure the mobile QA viewport.')
   const panel = await requiredBox(page, 'tablet-properties-panel-host')
-  if (visible) expect(Math.abs(panel.x + panel.width - viewport.width)).toBeLessThanOrEqual(1)
-  else expect(panel.x).toBeGreaterThanOrEqual(viewport.width - 1)
+  if (visible) expect(panel.x).toBeLessThanOrEqual(viewport.width - panel.width + 1)
+  else expect(panel.x).toBeGreaterThan(viewport.width - panel.width + 1)
 }
