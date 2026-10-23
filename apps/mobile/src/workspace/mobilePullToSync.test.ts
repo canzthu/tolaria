@@ -11,7 +11,6 @@ describe('mobile pull-to-sync', () => {
       git: true,
       linked: false,
       busy: false,
-      phase: null,
       sync,
     })
 
@@ -27,7 +26,6 @@ describe('mobile pull-to-sync', () => {
         git: false,
         linked: true,
         busy: false,
-        phase: null,
         sync,
       }),
     ).not.toBeNull()
@@ -36,7 +34,6 @@ describe('mobile pull-to-sync', () => {
         git: false,
         linked: false,
         busy: false,
-        phase: null,
         sync,
       }),
     ).toBeNull()
@@ -45,11 +42,23 @@ describe('mobile pull-to-sync', () => {
       git: true,
       linked: false,
       busy: true,
-      phase: 'fetch',
       sync,
     })
-    expect(busyProps?.refreshing).toBe(true)
+    expect(busyProps?.refreshing).toBe(false)
     busyProps?.onRefresh()
     expect(sync).not.toHaveBeenCalled()
+  })
+
+  it('shows the pull indicator only for a user-started refresh during background sync', () => {
+    const sync = vi.fn(async () => {})
+    const controls = {
+      git: true,
+      linked: false,
+      busy: true,
+      sync,
+    }
+
+    expect(mobilePullToSyncProps(controls)?.refreshing).toBe(false)
+    expect(mobilePullToSyncProps(controls, true)?.refreshing).toBe(true)
   })
 })
