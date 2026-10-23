@@ -1,10 +1,17 @@
 import { loadConfig } from './config.ts'
 import { closeVaultServer, createVaultServer } from './server.ts'
-import { LocalDiskStore } from './store.ts'
+import { LocalDiskStore, R2BlobStore, type BlobStore } from './store.ts'
 import { Vault } from './vault.ts'
 
 function log(message: string): void {
   process.stdout.write(`${new Date().toISOString()} ${message}\n`)
+}
+
+function createBlobStore(config: ReturnType<typeof loadConfig>): BlobStore {
+  if (config.blobStore.type === 'local') {
+    return new LocalDiskStore(config.blobStore.stateDir)
+  }
+  return new R2BlobStore(config.blobStore.config)
 }
 
 async function main(): Promise<void> {
@@ -19,7 +26,7 @@ async function main(): Promise<void> {
   log('vault initialized')
   const server = await createVaultServer({
     vault,
-    store: new LocalDiskStore(config.stateDir),
+    store: createBlobStore(config),
     token: config.token,
     maxBodyBytes: config.maxBodyBytes,
     collab: config.collab ?? false,

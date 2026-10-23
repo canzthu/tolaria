@@ -1,6 +1,9 @@
 import { isIP } from 'node:net'
 import { join, resolve } from 'node:path'
 import { DEFAULT_FLUSH_POLICY, type FlushPolicy } from './collab/flush.ts'
+import type { R2Config } from './store.ts'
+
+export type BlobStoreType = 'local' | 'r2'
 
 export interface ServerConfig {
   token: string
@@ -16,6 +19,8 @@ export interface ServerConfig {
   maxBodyBytes: number
   /** Null when the collaboration channel is switched off. */
   collab: { policy: FlushPolicy; lingerMs: number } | null
+  /** Blob store configuration */
+  blobStore: { type: 'local'; stateDir: string } | { type: 'r2'; config: R2Config }
 }
 
 type Env = Record<string, string | undefined>
@@ -77,10 +82,52 @@ function collabSettings(env: Env): ServerConfig['collab'] {
   }
 }
 
+function blobStoreSettings(env: Env, stateDir: string): ServerConfig['blobStore'] {
+  const blobStoreType = setting(env, 'TOLARIA_BLOBSTORE') ?? 'local'
+  
+  if (blobStoreType === 'local') {
+    return { type: 'local', stateDir }
+  }
+  
+  if (blobStoreType === 'r2') {
+    const bucket = setting(env, 'TOLARIA_R2_BUCKET')
+    const endpoint = setting(env, 'TOLARIA_R2_ENDPOINT')
+    const region = setting(env, 'TOLARIA_R2_REGION')
+    const accessKeyId = setting(env, 'TOLARIA_R2_ACCESS_KEY_ID')
+    const secretAccessKey = setting(env, 'TOLARIA_R2_SECRET_ACCESS_KEY')
+    
+    if (!bucket) throw new Error('TOLARIA_R2_BUCKET is required when TOLARIA_BLOBSTORE=r2')
+    if (!endpoint) throw new Error('TOLARIA_R2_ENDPOINT is required when TOLARIA_BLOBSTORE=r2')
+    if (!region) throw new Error('TOLARIA_R2_REGION is required when TOLARIA_BLOBSTORE=r2')
+    if (!accessKeyId) throw new Error('TOLARIA_R2_ACCESS_KEY_ID is required when TOLARIA_BLOBSTORE=r2')
+    if (!secretAccessKey) throw new Error('TOLARIA_R2_SECRET_ACCESS_KEY is required when TOLARIA_BLOBSTORE=r2')
+    
+    try {
+      const endpointUrl = new URL(endpoint)
+      if (!['http:', 'https:'].includes(endpointUrl.protocol)) {
+        throw new Error('TOLARIA_R2_ENDPOINT must be an HTTP or HTTPS URL')
+      }
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error('TOLARIA_R2_ENDPOINT must be a valid URL')
+      }
+      throw error
+    }
+    
+    return {
+      type: 'r2',
+      config: { bucket, endpoint, region, accessKeyId, secretAccessKey }
+    }
+  }
+  
+  throw new Error(`invalid TOLARIA_BLOBSTORE value: ${blobStoreType} (must be 'local' or 'r2')`)
+}
+
 /** Reads the configuration from the environment. Throws with a message fit for the operator. */
 export function loadConfig(env: Env): ServerConfig {
   const token = requiredToken(env)
   const dataDir = resolve(setting(env, 'TOLARIA_SERVER_DATA_DIR') ?? 'data')
+  const stateDir = join(dataDir, 'state')
   return {
     token,
     host: bindHost(env),
@@ -88,8 +135,9 @@ export function loadConfig(env: Env): ServerConfig {
     remoteUrl: setting(env, 'TOLARIA_VAULT_REMOTE_URL'),
     branch: setting(env, 'TOLARIA_VAULT_BRANCH'),
     vaultDir: join(dataDir, 'vault'),
-    stateDir: join(dataDir, 'state'),
+    stateDir,
     maxBodyBytes: positiveInteger(env, 'TOLARIA_SERVER_MAX_BODY_BYTES', DEFAULT_MAX_BODY_BYTES, 2 ** 31),
     collab: collabSettings(env),
+    blobStore: blobStoreSettings(env, stateDir),
   }
 }

@@ -88,3 +88,119 @@ describe('collaboration settings', () => {
     expect(() => loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_COLLAB_IDLE_MS: 'soon' })).toThrowError(/TOLARIA_COLLAB_IDLE_MS/)
   })
 })
+
+describe('blob store settings', () => {
+  it('defaults to local disk store', () => {
+    const config = loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN })
+    expect(config.blobStore).toEqual({ type: 'local', stateDir: resolve('data', 'state') })
+  })
+
+  it('configures R2 store when TOLARIA_BLOBSTORE=r2', () => {
+    const config = loadConfig({
+      TOLARIA_SERVER_TOKEN: TOKEN,
+      TOLARIA_BLOBSTORE: 'r2',
+      TOLARIA_R2_BUCKET: 'test-bucket',
+      TOLARIA_R2_ENDPOINT: 'https://r2.example.com',
+      TOLARIA_R2_REGION: 'auto',
+      TOLARIA_R2_ACCESS_KEY_ID: 'key-id',
+      TOLARIA_R2_SECRET_ACCESS_KEY: 'secret-key',
+    })
+
+    expect(config.blobStore).toEqual({
+      type: 'r2',
+      config: {
+        bucket: 'test-bucket',
+        endpoint: 'https://r2.example.com',
+        region: 'auto',
+        accessKeyId: 'key-id',
+        secretAccessKey: 'secret-key',
+      },
+    })
+  })
+
+  it('requires all R2 environment variables when TOLARIA_BLOBSTORE=r2', () => {
+    const base = { TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_BLOBSTORE: 'r2' }
+    expect(() => loadConfig(base)).toThrowError(/TOLARIA_R2_BUCKET is required/)
+
+    expect(() => loadConfig({ ...base, TOLARIA_R2_BUCKET: 'bucket' })).toThrowError(/TOLARIA_R2_ENDPOINT is required/)
+
+    expect(() =>
+      loadConfig({
+        ...base,
+        TOLARIA_R2_BUCKET: 'bucket',
+        TOLARIA_R2_ENDPOINT: 'https://r2.example.com',
+      }),
+    ).toThrowError(/TOLARIA_R2_REGION is required/)
+
+    expect(() =>
+      loadConfig({
+        ...base,
+        TOLARIA_R2_BUCKET: 'bucket',
+        TOLARIA_R2_ENDPOINT: 'https://r2.example.com',
+        TOLARIA_R2_REGION: 'auto',
+      }),
+    ).toThrowError(/TOLARIA_R2_ACCESS_KEY_ID is required/)
+
+    expect(() =>
+      loadConfig({
+        ...base,
+        TOLARIA_R2_BUCKET: 'bucket',
+        TOLARIA_R2_ENDPOINT: 'https://r2.example.com',
+        TOLARIA_R2_REGION: 'auto',
+        TOLARIA_R2_ACCESS_KEY_ID: 'key',
+      }),
+    ).toThrowError(/TOLARIA_R2_SECRET_ACCESS_KEY is required/)
+  })
+
+  it('rejects invalid TOLARIA_BLOBSTORE values', () => {
+    expect(() =>
+      loadConfig({
+        TOLARIA_SERVER_TOKEN: TOKEN,
+        TOLARIA_BLOBSTORE: 'invalid',
+      }),
+    ).toThrowError(/invalid TOLARIA_BLOBSTORE value: invalid/)
+  })
+
+  it('validates R2 endpoint URL format', () => {
+    const base = {
+      TOLARIA_SERVER_TOKEN: TOKEN,
+      TOLARIA_BLOBSTORE: 'r2',
+      TOLARIA_R2_BUCKET: 'test',
+      TOLARIA_R2_REGION: 'auto',
+      TOLARIA_R2_ACCESS_KEY_ID: 'key',
+      TOLARIA_R2_SECRET_ACCESS_KEY: 'secret',
+    }
+    expect(() => loadConfig({ ...base, TOLARIA_R2_ENDPOINT: 'not-a-url' })).toThrowError(/TOLARIA_R2_ENDPOINT must be a valid URL/)
+    expect(() => loadConfig({ ...base, TOLARIA_R2_ENDPOINT: 'ftp://invalid.com' })).toThrowError(/TOLARIA_R2_ENDPOINT must be an HTTP or HTTPS URL/)
+  })
+
+  it('never logs credentials', () => {
+    const messages: string[] = []
+    const originalWrite = process.stderr.write
+    process.stderr.write = ((msg: string) => {
+      messages.push(msg)
+      return true
+    }) as typeof process.stderr.write
+
+    try {
+      loadConfig({
+        TOLARIA_SERVER_TOKEN: TOKEN,
+        TOLARIA_BLOBSTORE: 'r2',
+        TOLARIA_R2_BUCKET: 'bucket',
+        TOLARIA_R2_ENDPOINT: 'ftp://bad',
+        TOLARIA_R2_REGION: 'auto',
+        TOLARIA_R2_ACCESS_KEY_ID: 'secret-key-id',
+        TOLARIA_R2_SECRET_ACCESS_KEY: 'super-secret',
+      })
+    } catch {
+      // expected
+    } finally {
+      process.stderr.write = originalWrite
+    }
+
+    const output = messages.join('')
+    expect(output).not.toContain('secret-key-id')
+    expect(output).not.toContain('super-secret')
+    expect(output).not.toContain(TOKEN)
+  })
+})
