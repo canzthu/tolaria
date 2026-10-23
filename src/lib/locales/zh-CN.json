@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "请先在看板上搜索，为已有想法投票，只有真正全新的想法再创建新帖子！",
   "feedback.featureRequests.cta": "打开产品看板",
   "feedback.featureRequests.linkLabel": "产品看板",
-  "feedback.discussions.title": "讨论",
-  "feedback.discussions.description": "使用 Discussions 提问、交流、展示作品，以及补充社区上下文。",
-  "feedback.discussions.cta": "打开讨论",
-  "feedback.discussions.linkLabel": "GitHub Discussions",
   "feedback.contributeCode.title": "贡献代码",
   "feedback.contributeCode.description": "欢迎小而聚焦的 PR。请先查看看板，确保你构建的是正确的东西！",
   "feedback.contributeCode.cta": "未完成的PR",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "在本地提交",
   "mobile.sync.action": "同步",
   "mobile.sync.failedAt": "{time} 失败",
-  "mobile.properties.addRelationships": "添加关系"
+  "mobile.properties.addRelationships": "添加关系",
+  "feedback.community.title": "加入 Tolaria Discord",
+  "feedback.community.description": "与团队和其他用户聊天，获取帮助，并试用 Alpha 版和移动版。",
+  "feedback.community.cta": "加入 Discord",
+  "feedback.community.linkLabel": "加入 Discord"
 }

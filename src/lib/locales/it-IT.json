@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Cerca prima sulla bacheca, vota le idee esistenti e crea nuovi post quando sono davvero nuovi!",
   "feedback.featureRequests.cta": "Apri Product Board",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Discussioni",
-  "feedback.discussions.description": "Usa Discussions per domande, conversazioni, show & tell e contesto della community.",
-  "feedback.discussions.cta": "Apri Discussions",
-  "feedback.discussions.linkLabel": "Discussioni GitHub",
   "feedback.contributeCode.title": "Contribuisci con il codice",
   "feedback.contributeCode.description": "Sono benvenute piccole PR mirate. Controlla prima la bacheca in modo da creare le cose giuste!",
   "feedback.contributeCode.cta": "PR aperte",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "Esegui commit localmente",
   "mobile.sync.action": "Sincronizza",
   "mobile.sync.failedAt": "Non riuscito {time}",
-  "mobile.properties.addRelationships": "Aggiungi relazioni"
+  "mobile.properties.addRelationships": "Aggiungi relazioni",
+  "feedback.community.title": "Unisciti al server Discord di Tolaria",
+  "feedback.community.description": "Chatta con il team e con altri utenti, ottieni assistenza e prova le build alfa e per dispositivi mobili.",
+  "feedback.community.cta": "Unisciti a Discord",
+  "feedback.community.linkLabel": "Unisciti a Discord"
 }

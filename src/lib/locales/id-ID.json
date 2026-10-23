@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Cari di papan terlebih dahulu, upvote ide yang sudah ada, dan buat postingan baru jika benar-benar baru!",
   "feedback.featureRequests.cta": "Buka Papan Produk",
   "feedback.featureRequests.linkLabel": "Papan Produk",
-  "feedback.discussions.title": "Diskusi",
-  "feedback.discussions.description": "Gunakan Diskusi untuk pertanyaan, percakapan, show & tell, dan konteks komunitas.",
-  "feedback.discussions.cta": "Buka Diskusi",
-  "feedback.discussions.linkLabel": "Diskusi GitHub",
   "feedback.contributeCode.title": "Kontribusikan kode",
   "feedback.contributeCode.description": "PR kecil dan fokus dipersilakan. Periksa papan terlebih dahulu agar Anda membangun hal yang tepat!",
   "feedback.contributeCode.cta": "PR Terbuka",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "Lakukan commit secara lokal",
   "mobile.sync.action": "Sinkronkan",
   "mobile.sync.failedAt": "Gagal {time}",
-  "mobile.properties.addRelationships": "Tambahkan relasi"
+  "mobile.properties.addRelationships": "Tambahkan relasi",
+  "feedback.community.title": "Bergabunglah dengan Discord Tolaria",
+  "feedback.community.description": "Ngobrol dengan tim dan pengguna lain, dapatkan bantuan, dan coba build alpha serta build seluler.",
+  "feedback.community.cta": "Bergabunglah dengan Discord",
+  "feedback.community.linkLabel": "Bergabunglah dengan Discord"
 }

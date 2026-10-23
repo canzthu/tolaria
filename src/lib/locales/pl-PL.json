@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Najpierw przeszukaj tablicę, zagłosuj na istniejące pomysły i utwórz nowe posty, gdy są naprawdę nowe!",
   "feedback.featureRequests.cta": "Otwórz tablicę produktu",
   "feedback.featureRequests.linkLabel": "Tablica produktów",
-  "feedback.discussions.title": "Dyskusje",
-  "feedback.discussions.description": "Używaj Dyskusji do zadawania pytań, prowadzenia rozmów, prezentowania i opowiadania oraz do poznawania kontekstu społeczności.",
-  "feedback.discussions.cta": "Otwórz dyskusje",
-  "feedback.discussions.linkLabel": "Dyskusje na GitHubie",
   "feedback.contributeCode.title": "Prześlij kod",
   "feedback.contributeCode.description": "Mile widziane są małe, ukierunkowane PR-y. Najpierw sprawdź tablicę, żeby tworzyć właściwe rzeczy!",
   "feedback.contributeCode.cta": "Otwarte PR",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "Zatwierdź lokalnie",
   "mobile.sync.action": "Synchronizuj",
   "mobile.sync.failedAt": "Niepowodzenie {time}",
-  "mobile.properties.addRelationships": "Dodaj relacje"
+  "mobile.properties.addRelationships": "Dodaj relacje",
+  "feedback.community.title": "Dołącz do serwera Discord Tolarii",
+  "feedback.community.description": "Porozmawiaj z zespołem i innymi użytkownikami, uzyskaj pomoc oraz wypróbuj kompilacje alfa i wersje mobilne.",
+  "feedback.community.cta": "Dołącz do Discorda",
+  "feedback.community.linkLabel": "Dołącz do Discorda"
 }

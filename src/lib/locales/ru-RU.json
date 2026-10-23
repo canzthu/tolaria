@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Сначала выполните поиск на доске, проголосуйте за существующие идеи и создайте новые сообщения, если они действительно новые!",
   "feedback.featureRequests.cta": "Открыть доску продукта",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Обсуждения",
-  "feedback.discussions.description": "Используйте «Обсуждения» для вопросов, бесед, демонстраций и рассказов, а также для контекста сообщества.",
-  "feedback.discussions.cta": "Открытые обсуждения",
-  "feedback.discussions.linkLabel": "Обсуждения GitHub",
   "feedback.contributeCode.title": "Предоставьте код",
   "feedback.contributeCode.description": "Приветствуются небольшие, целенаправленные PR. Сначала проверьте доску, чтобы создавать нужные вещи!",
   "feedback.contributeCode.cta": "Открытые PR",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "Выполнить коммит локально",
   "mobile.sync.action": "Синхронизация",
   "mobile.sync.failedAt": "Ошибка {time}",
-  "mobile.properties.addRelationships": "Добавить связи"
+  "mobile.properties.addRelationships": "Добавить связи",
+  "feedback.community.title": "Присоединяйтесь к серверу Tolaria в Discord",
+  "feedback.community.description": "Общайтесь с командой и другими пользователями, получайте помощь и тестируйте альфа-версии и сборки для мобильных устройств.",
+  "feedback.community.cta": "Присоединиться к Discord",
+  "feedback.community.linkLabel": "Присоединиться к Discord"
 }

@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Спачатку выканайце пошук на дошцы, прагаласуйце за існуючыя ідэі і стварайце новыя публікацыі, калі яны сапраўды новыя!",
   "feedback.featureRequests.cta": "Адкрыць дошку прадукту",
   "feedback.featureRequests.linkLabel": "Дошка прадукту",
-  "feedback.discussions.title": "Дыскусіі",
-  "feedback.discussions.description": "Выкарыстоўвайце «Обсуждения» для пытанняў, размоваў, паказу і расповеду, а таксама кантэксту супольнасці.",
-  "feedback.discussions.cta": "Адкрытыя абмеркаванні",
-  "feedback.discussions.linkLabel": "Обсуждения GitHub",
   "feedback.contributeCode.title": "Унесці код",
   "feedback.contributeCode.description": "Вітаюцца невялікія, мэтанакіраваныя PR. Спачатку праверце дошку, каб ствараць правільныя рэчы!",
   "feedback.contributeCode.cta": "Адкрытыя PR",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "Зрабіць каміт лакальна",
   "mobile.sync.action": "Сінхранізаваць",
   "mobile.sync.failedAt": "Не атрымалася {time}",
-  "mobile.properties.addRelationships": "Дадаць сувязі"
+  "mobile.properties.addRelationships": "Дадаць сувязі",
+  "feedback.community.title": "Далучайцеся да Discord-сервера Tolaria",
+  "feedback.community.description": "Спісыцеся з камандай і іншымі карыстальнікамі, атрымайце дапамогу і паспрабуйце альфа-версіі і мабільныя зборкі.",
+  "feedback.community.cta": "Далучыцца да Discord",
+  "feedback.community.linkLabel": "Далучыцца да Discord"
 }

@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Najprv vyhľadávajte na nástenke, hlasujte za existujúce nápady a vytvárajte nové príspevky, keď sú skutočne nové!",
   "feedback.featureRequests.cta": "Otvoriť nástenku produktu",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Diskusie",
-  "feedback.discussions.description": "Používajte Diskusie na otázky, konverzácie, prezentácie a kontext komunity.",
-  "feedback.discussions.cta": "Otvoriť diskusie",
-  "feedback.discussions.linkLabel": "Diskusie na GitHub",
   "feedback.contributeCode.title": "Prispieť kódom",
   "feedback.contributeCode.description": "Malé, cielené PR sú vítané. Najprv skontrolujte nástenku, aby ste vytvorili tie správne veci!",
   "feedback.contributeCode.cta": "Otvorené PR",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "Zaviesť lokálne",
   "mobile.sync.action": "Synchronizovať",
   "mobile.sync.failedAt": "Zlyhalo {time}",
-  "mobile.properties.addRelationships": "Pridať vzťahy"
+  "mobile.properties.addRelationships": "Pridať vzťahy",
+  "feedback.community.title": "Pripojte sa k Discordu Tolaria",
+  "feedback.community.description": "Chatujte s tímom a ďalšími používateľmi, získajte pomoc a vyskúšajte alfa verzie a mobilné zostavy.",
+  "feedback.community.cta": "Pripojte sa na Discord",
+  "feedback.community.linkLabel": "Pripojte sa na Discord"
 }

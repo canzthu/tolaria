@@ -69,10 +69,6 @@ files:
     feedback.featureRequests.description: 9583575bdef16e12927b0a5acfa84307
     feedback.featureRequests.cta: c19ef0158349da249920b0d9f67d7d48
     feedback.featureRequests.linkLabel: d125f38d1dc8dbdc7dae3f1778df3a3a
-    feedback.discussions.title: 560f23c77d499c21038c0b4487f03cb2
-    feedback.discussions.description: 2e4da4c5f54c7af3b8db9f3d93ed63c5
-    feedback.discussions.cta: 61ccb6a90ec8037f2926c48c0a90caa3
-    feedback.discussions.linkLabel: 4f85e3343c5e21d2b11812b2baa8ed83
     feedback.contributeCode.title: 8f93fd72b63620711cc118403b85133e
     feedback.contributeCode.description: 53230626356951578842a8cd7233d1f1
     feedback.contributeCode.cta: 900156c5b6af50ce83d772fb8675c3d0
@@ -1307,3 +1303,7 @@ files:
     mobile.sync.action: d8e87c0927539672f54462c837be0b7f
     mobile.sync.failedAt: 3f2a955506277e0a541b9dbf8c4283e0
     mobile.properties.addRelationships: 56cd8370bfb1fdb0d0286f625fab354b
+    feedback.community.title: 531631ae7d07851aa53abf507b9a5020
+    feedback.community.description: d1fa9eb431f008ec1f02b24e28ec6351
+    feedback.community.cta: 5c7ef8c320c94884cd78974ecc493846
+    feedback.community.linkLabel: 5c7ef8c320c94884cd78974ecc493846

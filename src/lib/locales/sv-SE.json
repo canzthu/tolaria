@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Sök på anslagstavlan först, rösta upp befintliga idéer och skapa nya inlägg när de är genuint nya!",
   "feedback.featureRequests.cta": "Öppna anslagstavlan",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Diskussioner",
-  "feedback.discussions.description": "Använd Diskussioner för frågor, samtal, show & tell och community-sammanhang.",
-  "feedback.discussions.cta": "Öppna Diskussioner",
-  "feedback.discussions.linkLabel": "GitHub Discussions",
   "feedback.contributeCode.title": "Bidra med kod",
   "feedback.contributeCode.description": "Små, fokuserade PR:er är välkomna. Kolla anslagstavlan först så att du bygger rätt saker!",
   "feedback.contributeCode.cta": "Öppna PR:er",
@@ -1304,5 +1300,9 @@
   "mobile.git.commitLocal": "Gör en lokal commit",
   "mobile.sync.action": "Synkronisera",
   "mobile.sync.failedAt": "Misslyckades {time}",
-  "mobile.properties.addRelationships": "Lägg till relationer"
+  "mobile.properties.addRelationships": "Lägg till relationer",
+  "feedback.community.title": "Gå med i Tolarias Discord-server",
+  "feedback.community.description": "Chatta med teamet och andra användare, få hjälp och prova alfa- och mobilversioner.",
+  "feedback.community.cta": "Gå med i Discord",
+  "feedback.community.linkLabel": "Gå med i Discord"
 }
