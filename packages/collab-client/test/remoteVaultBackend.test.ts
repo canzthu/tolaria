@@ -95,16 +95,13 @@ describe('the remote vault backend', () => {
   it('refuses by name what needs the note index the server does not have yet', async () => {
     const { files } = backend
     const refused = [
-      files.list(),
       files.rename({ path: 'welcome.md', newFilenameStem: 'hello' }),
-      files.delete(['welcome.md']),
-      files.search('welcome'),
       files.saveAttachment({ filename: 'a.png', bytes: new Uint8Array() }),
     ]
 
     const outcomes = await Promise.allSettled(refused)
 
-    expect(outcomes.map((outcome) => outcome.status)).toEqual(Array(5).fill('rejected'))
+    expect(outcomes.map((outcome) => outcome.status)).toEqual(Array(2).fill('rejected'))
     expect(String((outcomes[0] as PromiseRejectedResult).reason)).toMatch(/not available on the Tolaria remote yet/)
   })
 
@@ -129,5 +126,48 @@ describe('the remote vault backend', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
 
     expect(editor.doc.getText('frontmatter').toString()).not.toContain('defaced')
+  })
+
+  it('lists all entries in the vault', async () => {
+    const entries = await backend.files.list()
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'welcome.md', filename: 'welcome.md', title: 'Welcome' }),
+        expect.objectContaining({ path: 'projects/alpha.md', filename: 'alpha.md', title: 'Alpha' }),
+      ]),
+    )
+    expect(entries.length).toBe(3)
+  })
+
+  it('searches notes by content', async () => {
+    const result = await backend.files.search('welcome')
+
+    expect(result).toMatchObject({
+      results: expect.arrayContaining([
+        expect.objectContaining({
+          path: 'welcome.md',
+          title: expect.any(String),
+          snippet: expect.any(String),
+        }),
+      ]),
+      elapsedMs: expect.any(Number),
+    })
+  })
+
+  it('searches with a limit', async () => {
+    const result = await backend.files.search('the', { limit: 1 })
+
+    expect(result.results).toHaveLength(1)
+  })
+
+  it('deletes files and returns what was deleted', async () => {
+    await fixture.desktop.commit('to-delete.md', '# Will be deleted\n')
+    await vault.syncNow()
+
+    const deleted = await backend.files.delete(['to-delete.md', 'missing.md'])
+
+    expect(deleted).toEqual(['to-delete.md'])
+    await expect(backend.files.read('to-delete.md')).rejects.toMatchObject({ status: 404 })
   })
 })
