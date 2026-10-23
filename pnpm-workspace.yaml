@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - mcp-server
+  - packages/*
 
 ignoredBuiltDependencies:
   - esbuild

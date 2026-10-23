@@ -638,6 +638,8 @@ importers:
         specifier: ^8.20.1
         version: 8.21.0
 
+  packages/vault-index: {}
+
 packages:
 
   '@10play/tentap-editor@1.0.1':
