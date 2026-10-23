@@ -122,6 +122,7 @@ test.describe('mobile UI lab screenshots', () => {
   test('captures the initial workspace reference state', async ({ page }, testInfo) => {
     await page.goto('/')
 
+    expect(new URL(page.url()).searchParams.get('source')).toBe('fixture')
     await expect(page.getByText('Inbox').first()).toBeVisible()
     await expect(page.getByRole('button', { name: 'Workflow Orchestration Essay' })).toBeVisible()
 

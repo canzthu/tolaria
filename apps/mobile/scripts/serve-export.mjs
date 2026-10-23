@@ -47,6 +47,8 @@ async function fileForRequest(url) {
 }
 
 const server = createServer(async (request, response) => {
+  if (redirectToFixtureSource(request, response)) return
+
   const file = await fileForRequest(request.url ?? '/')
   if (!file) {
     response.writeHead(403)
@@ -80,3 +82,24 @@ function close() {
 
 process.on('SIGINT', close)
 process.on('SIGTERM', close)
+
+function redirectToFixtureSource(request, response) {
+  if (request.method !== 'GET') return false
+
+  const fixtureLocation = fixtureSourceLocation(request.url ?? '/', request.headers.accept)
+  if (!fixtureLocation) return false
+
+  response.writeHead(302, { Location: fixtureLocation })
+  response.end()
+  return true
+}
+
+function fixtureSourceLocation(requestUrl, acceptHeader = '') {
+  if (!acceptHeader.includes('text/html')) return null
+
+  const url = new URL(requestUrl, `http://127.0.0.1:${port}`)
+  if (url.searchParams.has('source')) return null
+
+  url.searchParams.set('source', 'fixture')
+  return `${url.pathname}${url.search}${url.hash}`
+}
