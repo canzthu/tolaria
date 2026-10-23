@@ -1,3 +1,4 @@
+import type { DurableBlockCodec } from "../utils/durableMarkdownBlocks";
 import { htmlBlockMarkdownCodec as embeddedCodec } from "../utils/htmlBlockMarkdown";
 
 interface EmbeddedPayload {
@@ -20,19 +21,30 @@ function embeddedCodeElement(element: HTMLElement): Element | null {
 	return code?.tagName === "CODE" ? code : null;
 }
 
+type CodeBlockCodec = Pick<DurableBlockCodec, "readCodeBlock">;
+
+export function readCodecPreElement<T>(
+	element: HTMLElement,
+	{ language, codec }: { language: string; codec: CodeBlockCodec },
+): T | undefined {
+	const code = embeddedCodeElement(element);
+	if (!code || codeLanguage(code) !== language) return undefined;
+	const source = code.textContent ?? "";
+	const payload = codec.readCodeBlock?.({
+		type: "codeBlock",
+		props: { language },
+		content: [
+			{ type: "text", text: source.endsWith("\n") ? source : `${source}\n` },
+		],
+	});
+	return payload ? (payload as T) : undefined;
+}
+
 export function readEmbeddedPreElement(
 	element: HTMLElement,
 ): EmbeddedPayload | undefined {
-	const code = embeddedCodeElement(element);
-	if (!code) return undefined;
-	if (codeLanguage(code) !== "html") return undefined;
-	const markup = code.textContent ?? "";
-	const payload = embeddedCodec.readCodeBlock?.({
-		type: "codeBlock",
-		props: { language: "html" },
-		content: [
-			{ type: "text", text: markup.endsWith("\n") ? markup : `${markup}\n` },
-		],
+	return readCodecPreElement<EmbeddedPayload>(element, {
+		language: "html",
+		codec: embeddedCodec,
 	});
-	return payload ? (payload as EmbeddedPayload) : undefined;
 }

@@ -36,7 +36,7 @@ import {
 import { useExternalMediaPreview } from "../utils/mediaPreviewRuntime";
 import {
 	MERMAID_BLOCK_TYPE,
-	mermaidFenceSource,
+	mermaidMarkdownCodec,
 } from "../utils/mermaidMarkdown";
 import {
 	TLDRAW_BLOCK_TYPE,
@@ -47,7 +47,10 @@ import { resolveWikilinkColor as resolveColor } from "../utils/wikilinkColors";
 import { CalloutBlockSpec } from "./CalloutBlock";
 import { createTolariaCodeBlockOptions } from "./codeBlockOptions";
 import { dispatchRichEditorExternalChange } from "./editorExternalChangeEvents";
-import { readEmbeddedPreElement } from "./embeddedBlockParsing";
+import {
+	readCodecPreElement,
+	readEmbeddedPreElement,
+} from "./embeddedBlockParsing";
 import { HtmlBlock } from "./HtmlBlock";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { NoteTitleIcon } from "./NoteTitleIcon";
@@ -325,39 +328,6 @@ const MathBlock = createReactBlockSpec(
 	},
 );
 
-function readCodeElementLanguage(code: Element): string | null {
-	const language =
-		code.getAttribute("data-language") ??
-		Array.from(code.classList)
-			.find((className) => className.startsWith("language-"))
-			?.replace(/^language-/u, "");
-	if (!language) return null;
-
-	return language.trim().split(/\s+/u)[0]?.toLowerCase() ?? null;
-}
-
-function readMermaidPreElement(
-	element: HTMLElement,
-): { source: string; diagram: string } | undefined {
-	if (element.tagName !== "PRE") return undefined;
-	if (
-		element.childElementCount !== 1 ||
-		element.firstElementChild?.tagName !== "CODE"
-	)
-		return undefined;
-
-	const code = element.firstElementChild;
-	if (readCodeElementLanguage(code) !== "mermaid") return undefined;
-
-	const diagram = code.textContent?.endsWith("\n")
-		? code.textContent
-		: `${code.textContent ?? ""}\n`;
-	return {
-		diagram,
-		source: mermaidFenceSource({ diagram }),
-	};
-}
-
 const MermaidBlock = createReactBlockSpec(
 	{
 		type: MERMAID_BLOCK_TYPE,
@@ -369,7 +339,11 @@ const MermaidBlock = createReactBlockSpec(
 	},
 	{
 		runsBefore: ["codeBlock"],
-		parse: readMermaidPreElement,
+		parse: (element) =>
+			readCodecPreElement<{ source: string; diagram: string }>(element, {
+				language: "mermaid",
+				codec: mermaidMarkdownCodec,
+			}),
 		render: (props) => (
 			<MermaidDiagram
 				diagram={props.block.props.diagram}
