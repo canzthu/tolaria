@@ -38,6 +38,9 @@ test("opens note and displays body content from remote backend", async ({
 	// Wait for editor to be visible
 	await expect(page.locator(".bn-editor")).toBeVisible({ timeout: 5000 });
 
+	// Wait for content blocks to appear (not just the editor container)
+	await expect(page.locator(".bn-block").first()).toBeVisible({ timeout: 5000 });
+
 	// Verify that the editor contains actual note content
 	// The Welcome note should have "Welcome to Tolaria" in it
 	const editorContent = await page
@@ -84,8 +87,9 @@ test("note content cache uses remote backend for reloads", async ({ page }) => {
 		.getByText("Welcome", { exact: true })
 		.click();
 
-	// Wait for content to load
+	// Wait for content to load - wait for blocks, not just the editor container
 	await expect(page.locator(".bn-editor")).toBeVisible({ timeout: 5000 });
+	await expect(page.locator(".bn-block").first()).toBeVisible({ timeout: 5000 });
 	const initialContent = await page.locator(".bn-editor").textContent();
 
 	// Close and reopen the same note
@@ -95,8 +99,9 @@ test("note content cache uses remote backend for reloads", async ({ page }) => {
 		.getByText("Welcome", { exact: true })
 		.click();
 
-	// Content should load again from cache/remote
+	// Content should load again from cache/remote - wait for blocks again
 	await expect(page.locator(".bn-editor")).toBeVisible({ timeout: 5000 });
+	await expect(page.locator(".bn-block").first()).toBeVisible({ timeout: 5000 });
 	const reloadedContent = await page.locator(".bn-editor").textContent();
 
 	expect(reloadedContent).toBeTruthy();
