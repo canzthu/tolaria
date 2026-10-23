@@ -45,7 +45,10 @@ test("opens note and displays body content from remote backend", async ({
 		.textContent({ timeout: 5000 });
 
 	expect(editorContent).toBeTruthy();
-	expect(editorContent!.length).toBeGreaterThan(0);
+	expect(editorContent).not.toBeNull();
+	if (editorContent) {
+		expect(editorContent.length).toBeGreaterThan(0);
+	}
 	expect(editorContent).toContain("Welcome");
 });
 

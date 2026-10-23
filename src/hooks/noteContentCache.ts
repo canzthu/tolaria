@@ -183,14 +183,24 @@ function getNoteContentCommandPayload(path: string, vaultPath?: string): { path:
   return noteWindowParams ? { path, vaultPath: noteWindowParams.vaultPath } : { path }
 }
 
+function hasRemoteBackendConfigured(): boolean {
+  return typeof window !== 'undefined' 
+    && 'TOLARIA_REMOTE_URL' in window 
+    && 'TOLARIA_REMOTE_TOKEN' in window
+}
+
 function runGetNoteContentCommand(path: string, vaultPath?: string): Promise<string> {
   if (isTauri()) {
     const commandPayload = getNoteContentCommandPayload(path, vaultPath)
     return invoke<string>('get_note_content', commandPayload)
   }
-  const resolvedVaultPath = vaultPath ?? ''
-  const backend = createVaultBackend(resolvedVaultPath)
-  return backend.files.read(path).then(file => file.content)
+  if (hasRemoteBackendConfigured()) {
+    const resolvedVaultPath = vaultPath ?? ''
+    const backend = createVaultBackend(resolvedVaultPath)
+    return backend.files.read(path).then(file => file.content)
+  }
+  const commandPayload = getNoteContentCommandPayload(path, vaultPath)
+  return mockInvoke<string>('get_note_content', commandPayload)
 }
 
 function delay(ms: number): Promise<void> {
