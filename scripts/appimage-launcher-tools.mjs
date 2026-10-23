@@ -287,14 +287,18 @@ function assertAppImagePathsExtracted(appImage, tempDir, requiredPaths) {
 }
 
 function listExtractedLibraries(tempDir) {
-  const result = spawnSync('find', ['squashfs-root/usr/lib', '-mindepth', '1', '-printf', '%P\\n'], {
+  const result = spawnSync('find', ['squashfs-root/usr/lib', '-mindepth', '1', '-print'], {
     cwd: tempDir,
     encoding: 'utf8',
   })
   if (result.status !== 0) {
     throw new Error(`Failed to list extracted AppImage libraries: ${result.stderr.trim()}`)
   }
-  return result.stdout.split('\n').filter(Boolean)
+
+  return result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((path) => path.replace(/^squashfs-root\/usr\/lib\//, ''))
 }
 
 async function validateBundledLibraries(appImage, tempDir) {

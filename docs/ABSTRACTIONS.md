@@ -74,6 +74,11 @@ is opt-in, with foreground scheduling and a best-effort background flush (ADR
 0219). Local commits precede authentication/network access. The footer and vault
 manager expose both paths.
 
+`useMobilePullToSync` adapts the vault controls context to a native refresh control
+for remote and linked-folder vaults. It delegates to the existing sync callback,
+so duplicate-operation guards, AutoGit checkpointing, editor save barriers, and
+failure reporting are not duplicated in list or editor UI.
+
 ## Mobile Git Working Copies
 
 `useVaultNotices` owns bounded, session-local notification deduplication by vault

@@ -261,6 +261,9 @@ There is no workspace footer: Settings lives at the sidebar bottom. The phone
 shell colors its top inset from the active panel. Panes and their dividers reach
 the bottom edge; bottom controls and scrollable inspector content own their
 home-indicator clearance without leaving a separate band below the workspace.
+Pull-to-sync on mobile lists and editor scroll surfaces uses the native refresh
+control and existing vault sync action; AutoGit and editor save barriers remain
+owned by the vault controller.
 `MobileGitHubRepositories` uses a bounded, searchable FlatList picker, and
 `MobileDeviceCode` copies authorization codes without routing secrets through the
 diagnostic clipboard helper. Inspector relationship groups expose their own add

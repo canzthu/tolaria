@@ -81,6 +81,13 @@ export const mobileParityInventory = [
     surface: 'Note list rows',
   },
 {
+    assertions: ['note row and neighborhood rendering tests'],
+    contracts: ['desktopNoteItemParity', 'desktopPanelParity'],
+    desktopSource: 'NoteItem and neighborhood note-list rows',
+    mobileFile: 'src/components/workspace/MobileNoteListItems.tsx',
+    surface: 'Note list row content and empty states',
+},
+{
     assertions: ['properties computed styles'],
     contracts: ['desktopPropertyParity'],
     desktopSource: 'propertyPanelLayout',
