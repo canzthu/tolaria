@@ -34,6 +34,7 @@ async function start(maxBodyBytes = 1024 * 1024): Promise<void> {
     maxBodyBytes,
     // The file API on its own; the collaboration channel is covered in collabServer.test.ts.
     collab: false,
+    changes: new (await import('../src/changeEmitter.ts')).ChangeEmitter(),
     log: (message) => logs.push(message),
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))

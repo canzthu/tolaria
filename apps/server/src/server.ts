@@ -1,5 +1,7 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { createServer } from 'node:http'
+import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { isSupportedProtocolVersion, PROTOCOL_HEADER } from '../../../packages/protocol/src/index.ts'
+import type { ChangeEmitter } from './changeEmitter.ts'
 import { DEFAULT_FLUSH_POLICY, type FlushPolicy } from './collab/flush.ts'
 import { CollabHub } from './collab/hub.ts'
 import { TicketBook } from './collab/tickets.ts'
@@ -21,6 +23,8 @@ export interface ServerOptions {
   log?: (message: string) => void
   /** Settings of the collaboration channel; `false` leaves it reserved and unserved. */
   collab?: CollabOptions | false
+  /** SSE change emitter for the change feed. */
+  changes: ChangeEmitter
   /** Called when the server is ready to serve requests. */
   onReady?: () => void
 }
@@ -49,7 +53,7 @@ function checkAccess(request: IncomingMessage, token: string): void {
   }
 }
 
-async function answer(request: IncomingMessage, services: Services, options: ServerOptions, server: Server): Promise<Reply> {
+async function answer(request: IncomingMessage, response: ServerResponse, services: Services, options: ServerOptions, server: Server): Promise<Reply> {
   // The base only gives relative request targets something to resolve against.
   const url = new URL(request.url ?? '/', 'http://vault.invalid')
   if (url.pathname === HEALTH_PATH) {
@@ -65,6 +69,7 @@ async function answer(request: IncomingMessage, services: Services, options: Ser
       url,
       headers: request.headers,
       body: () => readBody(request, options.maxBodyBytes),
+      response,
     },
     services,
   )
@@ -81,32 +86,37 @@ function failure(error: unknown, log: (message: string) => void): Reply {
 
 /** Builds the HTTP server of one vault. The caller decides where it listens. */
 export async function createVaultServer(options: ServerOptions): Promise<Server> {
-  const { vault } = options
+  const { vault, changes } = options
   const log = options.log ?? (() => {})
   const docs = await DocIndex.open(options.store)
   const { files } = await vault.list()
   await docs.reconcile(files.map((file) => file.path as VaultPath).filter(isNote))
-  vault.onChange((changes) => docs.apply(changes))
+  vault.onChange((vaultChanges) => docs.apply(vaultChanges))
   const index = await VaultIndex.open(vault, options.store)
-  vault.onChange((changes) => index.apply(changes))
+  vault.onChange((vaultChanges) => index.apply(vaultChanges))
   const { SearchIndex } = await import('./searchIndex.ts')
   const search = await SearchIndex.open(vault, options.store)
-  vault.onChange((changes) => search.apply(changes))
+  vault.onChange((vaultChanges) => search.apply(vaultChanges))
   const tickets = options.collab === false ? undefined : new TicketBook()
-  const services: Services = { vault, docs, index, search, collab: tickets !== undefined, tickets }
+  const services: Services = { vault, docs, index, search, collab: tickets !== undefined, tickets, changes }
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    answer(request, services, options, server)
+    answer(request, response, services, options, server)
       .catch((error: unknown) => failure(error, log))
-      .then((reply) => send(response, reply))
+      .then((reply: Reply & { sse?: boolean }) => {
+        // SSE handlers write directly to response and set a marker
+        if (!reply.sse) {
+          send(response, reply)
+        }
+      })
   })
   READY.set(server, true)
   options.onReady?.()
   if (tickets) {
-    serveCollab(server, { options, docs, tickets, log })
+    serveCollab(server, { options, docs, tickets, changes, log })
   } else {
     // Set up shutdown handler even without collab
-    setupShutdown(server, { vault, log })
+    setupShutdown(server, { vault, changes, log })
   }
   return server
 }
@@ -115,10 +125,11 @@ interface CollabParts {
   options: ServerOptions
   docs: DocIndex
   tickets: TicketBook
+  changes: ChangeEmitter
   log(message: string): void
 }
 
-function serveCollab(server: Server, { options, docs, tickets, log }: CollabParts): void {
+function serveCollab(server: Server, { options, docs, tickets, changes, log }: CollabParts): void {
   const { vault, store, token } = options
   const settings = options.collab || {}
   const hub = new CollabHub({
@@ -130,12 +141,12 @@ function serveCollab(server: Server, { options, docs, tickets, log }: CollabPart
     lingerMs: settings.lingerMs ?? DEFAULT_LINGER_MS,
   })
   const sockets = attachCollab(server, { hub, tickets, docs, token, log, maxMessageBytes: options.maxBodyBytes })
-  setupShutdown(server, { vault, hub, sockets, log })
+  setupShutdown(server, { vault, hub, sockets, changes, log })
 }
 
 function setupShutdown(
   server: Server,
-  { vault, hub, sockets, log }: { vault: Vault; hub?: CollabHub; sockets?: { close(): void }; log: (msg: string) => void }
+  { vault, hub, sockets, changes, log }: { vault: Vault; hub?: CollabHub; sockets?: { close(): void }; changes: ChangeEmitter; log: (msg: string) => void }
 ): void {
   SHUTDOWN.set(server, async () => {
     if (hub && sockets) {
@@ -143,6 +154,8 @@ function setupShutdown(
       await hub.close()
       sockets.close()
     }
+    log('shutdown: closing change feed connections')
+    changes.close()
     log('shutdown: committing and pushing')
     await vault.flushAndPush()
     log('shutdown: complete')

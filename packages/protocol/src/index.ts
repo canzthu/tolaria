@@ -19,6 +19,8 @@ export const ROUTES = {
   sync: `${API_PREFIX}/sync`,
   /** Vault index of all entries. Supports ETag and `since` parameter for delta updates. */
   entries: `${API_PREFIX}/entries`,
+  /** Server-Sent Events stream of vault changes (commits, pulls, pushes). */
+  changes: `${API_PREFIX}/changes`,
   /** Websocket channel: `${collabDocs}/<docId>` carries the y-protocols sync of one note. */
   collabDocs: `${API_PREFIX}/collab/docs`,
   /** Issues a short-lived ticket that opens one websocket, for clients that cannot send headers. */
@@ -93,6 +95,7 @@ export const FILE_CAPABILITIES = [
   'docs.ids',
   'entries.index',
   'entries.delta',
+  'changes.feed',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
@@ -244,6 +247,22 @@ export type ErrorCode = (typeof ERROR_CODES)[number]
 
 export interface ErrorBody {
   error: { code: ErrorCode; message: string; details?: unknown }
+}
+
+/**
+ * Server-Sent Event types emitted by the change feed (GET /v1/changes).
+ * Clients learn about commits, pulls, and push results in real time.
+ */
+export type ChangeEventType = 'commit' | 'pull' | 'push-success' | 'push-failed'
+
+export interface ChangeEvent {
+  type: ChangeEventType
+  /** Commit SHA after the change (commit/pull), or the SHA that failed to push. */
+  head: string
+  /** Only for 'commit': paths that were added, modified, or deleted. */
+  paths?: string[]
+  /** Only for 'push-failed': error message. */
+  error?: string
 }
 
 /** A client can talk to a server when both speak the same major version. */

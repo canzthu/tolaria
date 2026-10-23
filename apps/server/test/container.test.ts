@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { ChangeEmitter } from '../src/changeEmitter.ts'
 import { closeVaultServer, createVaultServer } from '../src/server.ts'
 import { LocalDiskStore } from '../src/store.ts'
 import { Vault } from '../src/vault.ts'
@@ -26,6 +27,7 @@ describe('Container readiness', () => {
       token: 'test-token-1234567890',
       maxBodyBytes: 1024 * 1024,
       collab: false,
+      changes: new ChangeEmitter(),
       onReady: () => { ready = true },
     })
 
@@ -49,6 +51,7 @@ describe('Container readiness', () => {
       token: 'test-token-1234567890',
       maxBodyBytes: 1024 * 1024,
       collab: false,
+      changes: new ChangeEmitter(),
     })
 
     await closeVaultServer(server)
@@ -75,6 +78,7 @@ describe('SIGTERM handling', () => {
       token: 'test-token-1234567890',
       maxBodyBytes: 1024 * 1024,
       collab: false,
+      changes: new ChangeEmitter(),
     })
 
     // Write a file
@@ -101,6 +105,7 @@ describe('SIGTERM handling', () => {
       token: 'test-token-1234567890',
       maxBodyBytes: 1024 * 1024,
       collab: false,
+      changes: new ChangeEmitter(),
       log: (msg) => logs.push(msg),
     })
 
@@ -141,6 +146,7 @@ describe('Debounced push', () => {
       token: 'test-token-1234567890',
       maxBodyBytes: 1024 * 1024,
       collab: false,
+      changes: new ChangeEmitter(),
     })
 
     // Write a file
@@ -171,6 +177,7 @@ describe('Debounced push', () => {
       token: 'test-token-1234567890',
       maxBodyBytes: 1024 * 1024,
       collab: false,
+      changes: new ChangeEmitter(),
     })
 
     // Write a file - push happens immediately inline

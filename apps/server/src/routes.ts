@@ -1,4 +1,4 @@
-import type { IncomingHttpHeaders } from 'node:http'
+import type { IncomingHttpHeaders, ServerResponse } from 'node:http'
 import {
   COLLAB_CAPABILITIES,
   type CollabAccess,
@@ -15,6 +15,7 @@ import {
   type VaultResponse,
   type WriteResult,
 } from '../../../packages/protocol/src/index.ts'
+import type { ChangeEmitter } from './changeEmitter.ts'
 import type { TicketBook } from './collab/tickets.ts'
 import type { DocIndex } from './docIndex.ts'
 import { VaultError } from './errors.ts'
@@ -33,6 +34,8 @@ export interface Services {
   collab: boolean
   /** Present when the collaboration channel is served. */
   tickets?: TicketBook
+  /** SSE emitter for change feed. */
+  changes: ChangeEmitter
 }
 
 export interface ApiRequest {
@@ -40,6 +43,8 @@ export interface ApiRequest {
   url: URL
   headers: IncomingHttpHeaders
   body(): Promise<Buffer>
+  /** Present for SSE requests. */
+  response?: ServerResponse
 }
 
 type Handler = (request: ApiRequest, services: Services, path: VaultPath) => Promise<Reply>
@@ -232,6 +237,13 @@ async function issueTicket(request: ApiRequest, { docs, tickets }: Services): Pr
   return { status: 201, body: tickets.issue({ docId, access: collabAccess(body.access) }) }
 }
 
+async function changeFeed(request: ApiRequest, { changes }: Services): Promise<Reply> {
+  if (!request.response) throw new VaultError(500, 'internal', 'SSE response not available')
+  changes.connect(request.response)
+  // Return a special marker that tells the server not to send anything
+  return { status: 200, sse: true }
+}
+
 const FILE_METHODS: Methods = new Map([
   ['GET', readFile],
   ['PUT', writeFile],
@@ -245,6 +257,7 @@ const EXACT_ROUTES = new Map<string, Methods>([
   [ROUTES.search, new Map([['GET', search]])],
   [ROUTES.sync, new Map([['POST', sync]])],
   [ROUTES.entries, new Map([['GET', listEntries]])],
+  [ROUTES.changes, new Map([['GET', changeFeed]])],
   [ROUTES.collabTickets, new Map([['POST', issueTicket]])],
 ])
 

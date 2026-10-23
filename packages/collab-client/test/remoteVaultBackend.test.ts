@@ -35,6 +35,7 @@ beforeEach(async () => {
     store: new LocalDiskStore(join(fixture.root, 'server', 'state')),
     token: TOKEN,
     maxBodyBytes: 1024 * 1024,
+    changes: new (await import('../../../apps/server/src/changeEmitter.ts')).ChangeEmitter(),
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   backend = createRemoteVaultBackend({

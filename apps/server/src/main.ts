@@ -1,4 +1,5 @@
 import { loadConfig } from './config.ts'
+import { ChangeEmitter } from './changeEmitter.ts'
 import { closeVaultServer, createVaultServer } from './server.ts'
 import { LocalDiskStore, R2BlobStore, type BlobStore } from './store.ts'
 import { Vault } from './vault.ts'
@@ -16,12 +17,17 @@ function createBlobStore(config: ReturnType<typeof loadConfig>): BlobStore {
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env)
+  const changes = new ChangeEmitter(log)
+  
   log('initializing vault')
   const vault = await Vault.open({
     dir: config.vaultDir,
     remoteUrl: config.remoteUrl,
     branch: config.branch,
     log,
+    onVaultEvent: (event) => {
+      changes.emit(event)
+    },
   })
   log('vault initialized')
   const server = await createVaultServer({
@@ -31,6 +37,7 @@ async function main(): Promise<void> {
     maxBodyBytes: config.maxBodyBytes,
     collab: config.collab ?? false,
     log,
+    changes,
     onReady: () => log('server ready'),
   })
   const stop = (): void => {

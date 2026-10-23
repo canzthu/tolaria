@@ -8,6 +8,8 @@ export interface Reply {
   headers?: Record<string, string>
   /** Bytes are sent as they are; anything else is sent as JSON. */
   body?: Uint8Array | object
+  /** Marker that this reply is SSE and was already written directly to the response. */
+  sse?: boolean
 }
 
 const WEAK_PREFIX = 'W/'

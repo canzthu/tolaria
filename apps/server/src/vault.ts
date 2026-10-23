@@ -20,6 +20,10 @@ export interface VaultOptions extends RepoOptions {
   log?: (message: string) => void
   /** Debounce delay in ms before pushing commits. 0 disables debounced push. */
   pushDebounceMs?: number
+  /** Interval in ms between background fetch operations. 0 disables background fetch. */
+  fetchIntervalMs?: number
+  /** Called when vault changes occur (commits, pulls, pushes). */
+  onVaultEvent?: (event: { type: 'commit' | 'pull' | 'push-success' | 'push-failed'; head: string; paths?: string[]; error?: string }) => void
 }
 
 /** Revision of a file's content: its git blob id. */
@@ -109,10 +113,12 @@ function parseTreeRecord(record: string): FileEntry | null {
 }
 
 const DEFAULT_PUSH_DEBOUNCE_MS = 2000
+const DEFAULT_FETCH_INTERVAL_MS = 30000
 
 /**
  * One vault = one git working clone owned by this process. Every mutation runs under a
- * single lock as: fetch + integrate upstream, change files, commit, push.
+ * single lock as: fetch + integrate upstream, change files, commit. Push happens
+ * asynchronously on a debounce timer.
  */
 export class Vault {
   private readonly repo: GitRepo
@@ -121,7 +127,10 @@ export class Vault {
   private readonly listeners: ChangeListener[] = []
   private readonly log: (message: string) => void
   private readonly pushDebounceMs: number
+  private readonly fetchIntervalMs: number
+  private readonly onVaultEvent?: (event: { type: 'commit' | 'pull' | 'push-success' | 'push-failed'; head: string; paths?: string[]; error?: string }) => void
   private pushTimer: NodeJS.Timeout | null = null
+  private fetchTimer: NodeJS.Timeout | null = null
   private queue: Promise<unknown> = Promise.resolve()
 
   private constructor(repo: GitRepo, options: VaultOptions) {
@@ -129,6 +138,8 @@ export class Vault {
     this.now = options.now ?? (() => new Date())
     this.log = options.log ?? (() => {})
     this.pushDebounceMs = options.pushDebounceMs ?? DEFAULT_PUSH_DEBOUNCE_MS
+    this.fetchIntervalMs = options.fetchIntervalMs ?? DEFAULT_FETCH_INTERVAL_MS
+    this.onVaultEvent = options.onVaultEvent
     this.sync = new GitSync(repo, {
       log: this.log,
       conflictPath: (path) => this.conflictPath(path),
@@ -137,7 +148,11 @@ export class Vault {
   }
 
   static async open(options: VaultOptions): Promise<Vault> {
-    return new Vault(await GitRepo.open(options), options)
+    const vault = new Vault(await GitRepo.open(options), options)
+    if (vault.fetchIntervalMs > 0) {
+      vault.startBackgroundFetch()
+    }
+    return vault
   }
 
   onChange(listener: ChangeListener): void {
@@ -197,18 +212,39 @@ export class Vault {
     const stored = await this.store(path, bytes, precondition)
     const committed = performance.now()
 
+    const head = await this.repo.head()
+    this.onVaultEvent?.({ type: 'commit', head, paths: [stored.path] })
+
+    // When pushDebounceMs is 0, push inline immediately
+    if (this.pushDebounceMs === 0) {
+      this.sync.relocated.clear()
+      const pushed = await this.sync.push()
+      const moved = this.sync.relocated.get(stored.path)
+      const placed: Placement = moved ? { outcome: 'conflict', path: moved } : stored
+      const timings = {
+        pullMs: clock.pulled - clock.started,
+        commitMs: committed - clock.pulled,
+        pushMs: performance.now() - committed,
+      }
+      if (pushed) {
+        this.onVaultEvent?.({ type: 'push-success', head: await this.repo.head() })
+      } else {
+        this.onVaultEvent?.({ type: 'push-failed', head, error: 'push to remote failed' })
+      }
+      return { ...(await this.writeResult(path, bytes, placed, pushed)), timings }
+    }
+
+    // Otherwise, schedule background push
     this.schedulePush()
     this.sync.relocated.clear()
-    const pushed = await this.sync.push()
-    // Someone pushed the same file between our fetch and our push: upstream keeps the path.
     const moved = this.sync.relocated.get(stored.path)
     const placed: Placement = moved ? { outcome: 'conflict', path: moved } : stored
     const timings = {
       pullMs: clock.pulled - clock.started,
       commitMs: committed - clock.pulled,
-      pushMs: performance.now() - committed,
+      pushMs: 0,
     }
-    return { ...(await this.writeResult(path, bytes, placed, pushed)), timings }
+    return { ...(await this.writeResult(path, bytes, placed, false)), timings }
   }
 
   rename(from: VaultPath, to: VaultPath, ifMatch?: Etag): Promise<RenameResult> {
@@ -220,11 +256,26 @@ export class Vault {
       await this.repo.run(['mv', '--', from, to])
       await this.repo.run(['commit', '-q', '-m', `Rename ${from} to ${to}`])
       await this.emit([{ kind: 'rename', from, to }])
+      
+      const head = await this.repo.head()
+      this.onVaultEvent?.({ type: 'commit', head, paths: [from, to] })
+      
+      if (this.pushDebounceMs === 0) {
+        this.sync.relocated.clear()
+        const pushed = await this.sync.push()
+        const path = this.sync.relocated.get(to) ?? to
+        if (pushed) {
+          this.onVaultEvent?.({ type: 'push-success', head: await this.repo.head() })
+        } else {
+          this.onVaultEvent?.({ type: 'push-failed', head, error: 'push to remote failed' })
+        }
+        return { from, path, etag, commit: await this.repo.head(), pushed }
+      }
+      
+      this.schedulePush()
       this.sync.relocated.clear()
-      const pushed = await this.sync.push()
-      // Someone pushed a file at the destination first: theirs keeps it, ours is the conflict copy.
       const path = this.sync.relocated.get(to) ?? to
-      return { from, path, etag, commit: await this.repo.head(), pushed }
+      return { from, path, etag, commit: await this.repo.head(), pushed: false }
     })
   }
 
@@ -235,8 +286,22 @@ export class Vault {
       await this.repo.run(['rm', '-q', '--', path])
       await this.repo.run(['commit', '-q', '-m', `Delete ${path}`])
       await this.emit([{ kind: 'delete', path }])
-      const pushed = await this.sync.push()
-      return { path, commit: await this.repo.head(), pushed }
+      
+      const head = await this.repo.head()
+      this.onVaultEvent?.({ type: 'commit', head, paths: [path] })
+      
+      if (this.pushDebounceMs === 0) {
+        const pushed = await this.sync.push()
+        if (pushed) {
+          this.onVaultEvent?.({ type: 'push-success', head: await this.repo.head() })
+        } else {
+          this.onVaultEvent?.({ type: 'push-failed', head, error: 'push to remote failed' })
+        }
+        return { path, commit: await this.repo.head(), pushed }
+      }
+      
+      this.schedulePush()
+      return { path, commit: await this.repo.head(), pushed: false }
     })
   }
 
@@ -268,6 +333,7 @@ export class Vault {
   /** Commits any staged changes and pushes with retry. Logs failures. Used on shutdown. */
   async flushAndPush(): Promise<void> {
     return this.locked(async () => {
+      this.stopBackgroundFetch()
       this.cancelPushTimer()
       await this.repo.commitStaged('Server shutdown: flush pending changes')
       const pushed = await this.sync.push()
@@ -276,6 +342,34 @@ export class Vault {
         const unpushedCount = ahead.stdout.trim()
         this.log(`WARNING: failed to push ${unpushedCount} commit(s) on shutdown; they remain local only`)
       }
+    })
+  }
+
+  private startBackgroundFetch(): void {
+    this.fetchTimer = setInterval(() => {
+      this.backgroundFetch()
+    }, this.fetchIntervalMs)
+  }
+
+  private stopBackgroundFetch(): void {
+    if (this.fetchTimer !== null) {
+      clearInterval(this.fetchTimer)
+      this.fetchTimer = null
+    }
+  }
+
+  private backgroundFetch(): void {
+    this.locked(async () => {
+      const before = await this.repo.head()
+      const pulled = await this.sync.pull()
+      if (pulled) {
+        const after = await this.repo.head()
+        if (before !== after) {
+          this.onVaultEvent?.({ type: 'pull', head: after })
+        }
+      }
+    }).catch((error: unknown) => {
+      this.log(`background fetch error: ${error instanceof Error ? error.message : String(error)}`)
     })
   }
 
@@ -297,10 +391,21 @@ export class Vault {
 
   private backgroundPush(): void {
     this.locked(async () => {
+      const head = await this.repo.head()
       const pushed = await this.sync.push()
-      if (!pushed) this.log('background push failed; will retry on next commit')
+      if (pushed) {
+        this.onVaultEvent?.({ type: 'push-success', head })
+      } else {
+        this.log('background push failed; will retry on next commit')
+        this.onVaultEvent?.({ type: 'push-failed', head, error: 'push to remote failed' })
+      }
     }).catch((error: unknown) => {
-      this.log(`background push error: ${error instanceof Error ? error.message : String(error)}`)
+      const message = error instanceof Error ? error.message : String(error)
+      this.log(`background push error: ${message}`)
+      this.locked(async () => {
+        const head = await this.repo.head()
+        this.onVaultEvent?.({ type: 'push-failed', head, error: message })
+      }).catch(() => {})
     })
   }
 

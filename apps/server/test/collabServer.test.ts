@@ -91,6 +91,7 @@ async function start(collab?: false): Promise<void> {
     token: TOKEN,
     maxBodyBytes: 1024 * 1024,
     collab: collab ?? { policy: { idleMs: 30, maxWaitMs: 5_000 }, lingerMs: 10 },
+    changes: new (await import('../src/changeEmitter.ts')).ChangeEmitter(),
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
