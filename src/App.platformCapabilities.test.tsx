@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import App from './App'
 
@@ -8,126 +8,70 @@ import App from './App'
  */
 
 describe('App platform capabilities', () => {
+  beforeEach(() => {
+    // Clean up any stubs from previous tests
+    vi.unstubAllGlobals()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   test('detects remote backend configuration', () => {
-    // Mock window with TOLARIA_REMOTE_URL and TOLARIA_REMOTE_TOKEN
-    const originalWindow = global.window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: {
-        ...originalWindow,
-        TOLARIA_REMOTE_URL: 'https://example.com',
-        TOLARIA_REMOTE_TOKEN: 'test-token',
-      },
-    })
+    // Stub window properties for remote backend
+    vi.stubGlobal('TOLARIA_REMOTE_URL', 'https://example.com')
+    vi.stubGlobal('TOLARIA_REMOTE_TOKEN', 'test-token')
 
     const { container } = render(<App />)
     
     // App should render without crashing
     expect(container).toBeTruthy()
-    
-    // Restore original window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: originalWindow,
-    })
   })
 
   test('handles missing remote URL', () => {
-    // Mock window with only TOLARIA_REMOTE_TOKEN
-    const originalWindow = global.window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: {
-        ...originalWindow,
-        TOLARIA_REMOTE_TOKEN: 'test-token',
-      },
-    })
+    // Stub only TOLARIA_REMOTE_TOKEN
+    vi.stubGlobal('TOLARIA_REMOTE_TOKEN', 'test-token')
 
     const { container } = render(<App />)
     
     // App should render without crashing
     expect(container).toBeTruthy()
-    
-    // Restore original window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: originalWindow,
-    })
   })
 
   test('handles missing remote token', () => {
-    // Mock window with only TOLARIA_REMOTE_URL
-    const originalWindow = global.window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: {
-        ...originalWindow,
-        TOLARIA_REMOTE_URL: 'https://example.com',
-      },
-    })
+    // Stub only TOLARIA_REMOTE_URL
+    vi.stubGlobal('TOLARIA_REMOTE_URL', 'https://example.com')
 
     const { container } = render(<App />)
     
     // App should render without crashing
     expect(container).toBeTruthy()
-    
-    // Restore original window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: originalWindow,
-    })
   })
 
   test('handles empty remote URL', () => {
-    // Mock window with empty TOLARIA_REMOTE_URL
-    const originalWindow = global.window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: {
-        ...originalWindow,
-        TOLARIA_REMOTE_URL: '',
-        TOLARIA_REMOTE_TOKEN: 'test-token',
-      },
-    })
+    // Stub empty TOLARIA_REMOTE_URL
+    vi.stubGlobal('TOLARIA_REMOTE_URL', '')
+    vi.stubGlobal('TOLARIA_REMOTE_TOKEN', 'test-token')
 
     const { container } = render(<App />)
     
     // App should render without crashing
     expect(container).toBeTruthy()
-    
-    // Restore original window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: originalWindow,
-    })
   })
 
   test('handles empty remote token', () => {
-    // Mock window with empty TOLARIA_REMOTE_TOKEN
-    const originalWindow = global.window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: {
-        ...originalWindow,
-        TOLARIA_REMOTE_URL: 'https://example.com',
-        TOLARIA_REMOTE_TOKEN: '',
-      },
-    })
+    // Stub empty TOLARIA_REMOTE_TOKEN
+    vi.stubGlobal('TOLARIA_REMOTE_URL', 'https://example.com')
+    vi.stubGlobal('TOLARIA_REMOTE_TOKEN', '')
 
     const { container } = render(<App />)
     
     // App should render without crashing
     expect(container).toBeTruthy()
-    
-    // Restore original window
-    Object.defineProperty(global, 'window', {
-      writable: true,
-      value: originalWindow,
-    })
   })
 
   test('handles window being undefined', () => {
-    // Mock typeof window !== 'undefined' check
+    // No remote config stubs - tests default mock environment
     const { container } = render(<App />)
     
     // App should render without crashing in mock environment

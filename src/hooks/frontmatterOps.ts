@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { isTauri, mockInvoke } from '../mock-tauri'
+import { isTauri } from '../mock-tauri'
 import type { VaultEntry, VaultPropertyValue } from '../types'
 import type { FrontmatterValue } from '../components/Inspector'
 import { updateMockFrontmatter, deleteMockFrontmatterProperty } from './mockFrontmatterHelpers'

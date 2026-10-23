@@ -1863,6 +1863,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               flushPendingEditorContentRef={flushPendingEditorContentRef}
               flushPendingRawContentRef={flushPendingRawContentRef}
               onToast={setToastMessage}
+              platformCapabilities={platformCapabilities}
               locale={appLocale}
             />
           </div>
