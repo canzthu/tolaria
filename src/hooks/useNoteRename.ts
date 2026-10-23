@@ -13,6 +13,7 @@ import {
 import { filenameStemToTitle } from '../utils/noteTitle'
 import { vaultPathForEntry } from '../utils/workspaces'
 import { relativePathStem } from '../utils/wikilink'
+import { createVaultBackend } from '../lib/vaultBackend'
 
 interface RenameResult {
   new_path: string
@@ -259,7 +260,11 @@ export function workspaceMoveReplacementTarget({
 }
 
 export async function loadNoteContent({ path }: LoadNoteContentRequest): Promise<string> {
-  return isTauri() ? invoke<string>('get_note_content', { path }) : mockInvoke<string>('get_note_content', { path })
+  if (isTauri()) {
+    return invoke<string>('get_note_content', { path })
+  }
+  const backend = createVaultBackend('')
+  return (await backend.files.read(path)).content
 }
 
 function rewriteSummaryLabel(params: { updatedFiles: number }): string {

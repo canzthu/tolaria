@@ -8,6 +8,7 @@ import { parseFrontmatter } from '../utils/frontmatter'
 import { normalizeNoteFormat } from '../utils/noteFormat'
 import { canonicalFrontmatterKey, isSystemMetadataKey } from '../utils/systemMetadata'
 import { normalizeNoteWidthMode } from '../utils/noteWidth'
+import { createVaultBackend } from '../lib/vaultBackend'
 
 type FrontmatterCommand = 'update_frontmatter' | 'delete_frontmatter_property'
 type FrontmatterKey = string
@@ -203,9 +204,10 @@ function seedMockContent(path: VaultPath, content: MarkdownContent): void {
   updateMockContent(path, content)
 }
 
-async function loadMockContent(path: VaultPath): Promise<MarkdownContent> {
+async function loadMockContent(path: VaultPath, vaultPath?: string): Promise<MarkdownContent> {
   try {
-    return await mockInvoke<MarkdownContent>('get_note_content', { path })
+    const backend = createVaultBackend(vaultPath ?? '')
+    return (await backend.files.read(path)).content
   } catch {
     return typeof window === 'undefined'
       ? ''
@@ -213,9 +215,10 @@ async function loadMockContent(path: VaultPath): Promise<MarkdownContent> {
   }
 }
 
-async function persistMockContent(path: VaultPath, content: MarkdownContent): Promise<void> {
+async function persistMockContent(path: VaultPath, content: MarkdownContent, vaultPath?: string): Promise<void> {
   try {
-    await mockInvoke('save_note_content', { path, content })
+    const backend = createVaultBackend(vaultPath ?? '')
+    await backend.files.write(path, content)
   } catch (error) {
     updateMockContent(path, content)
     trackMockChange(path)
@@ -240,8 +243,9 @@ async function executeMockFrontmatterOp(
   path: VaultPath,
   key: FrontmatterKey,
   value?: FrontmatterValue,
+  vaultPath?: string,
 ): Promise<MarkdownContent> {
-  seedMockContent(path, await loadMockContent(path))
+  seedMockContent(path, await loadMockContent(path, vaultPath))
   let content: MarkdownContent
   if (op === 'update') {
     if (value === undefined) throw new Error('A frontmatter update requires a value')
@@ -249,7 +253,7 @@ async function executeMockFrontmatterOp(
   } else {
     content = applyMockFrontmatterDelete(path, key)
   }
-  await persistMockContent(path, content)
+  await persistMockContent(path, content, vaultPath)
   return content
 }
 
@@ -258,15 +262,16 @@ async function executeFrontmatterOp(
   path: VaultPath,
   key: FrontmatterKey,
   value?: FrontmatterValue,
+  vaultPath?: string,
 ): Promise<MarkdownContent> {
   if (op === 'update') {
     return isTauri()
       ? invokeFrontmatter('update_frontmatter', { path, key, value })
-      : executeMockFrontmatterOp(op, path, key, value)
+      : executeMockFrontmatterOp(op, path, key, value, vaultPath)
   }
   return isTauri()
     ? invokeFrontmatter('delete_frontmatter_property', { path, key })
-    : executeMockFrontmatterOp(op, path, key)
+    : executeMockFrontmatterOp(op, path, key, undefined, vaultPath)
 }
 
 export interface FrontmatterOpOptions {
