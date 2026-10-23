@@ -21,6 +21,7 @@ export type WorkspaceFileSystem = {
   readVaultConfig?: (rootUri: string) => MobileVaultConfig | null
   readVaultDirectories: (rootUri: string) => string[]
   readTextFile: (rootUri: string, relativePath: string) => string | null
+  readTextFileAsync?: (rootUri: string, relativePath: string) => Promise<string | null>
   readVaultFiles: (rootUri: string) => LocalVaultFile[]
   writeVaultConfig?: (rootUri: string, config: MobileVaultConfig) => WorkspaceMutation
   writeTextFile: (rootUri: string, relativePath: string, content: string) => WorkspaceMutation
@@ -46,7 +47,7 @@ export function createFileSystemWorkspaceRepository(fileSystem: WorkspaceFileSys
     readNoteContent: async (note, request) => {
       const rootUri = workspaceRootUri(request)
       if (!rootUri) return note.rawContent ?? null
-      return withWorkspaceOperation(rootUri, async () => readWorkspaceNote(fileSystem, rootUri, note))
+      return withWorkspaceOperation(rootUri, () => readWorkspaceNote(fileSystem, rootUri, note))
     },
     readSnapshot: (request) => {
       const rootUri = workspaceRootUri(request)
@@ -73,11 +74,14 @@ function workspaceSnapshotIdentity(root: string, request?: ReadOnlyWorkspaceRequ
   return { vaultAlias: request?.vaultAlias, vaultLabel: workspaceLabel(root, request), vaultPath: root }
 }
 
-function readWorkspaceNote(fileSystem: WorkspaceFileSystem, root: string, note: MobileNote) {
+async function readWorkspaceNote(fileSystem: WorkspaceFileSystem, root: string, note: MobileNote) {
   const recovered = fileSystem.recoverPendingWrites?.(root)
   if (note.rawContent !== undefined && !recovered) return note.rawContent
   const relativePath = noteRelativePath(note)
-  return relativePath ? fileSystem.readTextFile(root, relativePath) : null
+  if (!relativePath) return null
+  return fileSystem.readTextFileAsync
+    ? fileSystem.readTextFileAsync(root, relativePath)
+    : fileSystem.readTextFile(root, relativePath)
 }
 
 function workspaceWriteOperations(fileSystem: WorkspaceFileSystem, root: string, writes: MobileWorkspaceWrite[]) {

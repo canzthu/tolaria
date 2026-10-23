@@ -45,6 +45,25 @@ describe('selected note read recovery', () => {
     expect(onError).not.toHaveBeenCalled()
   })
 
+  it('reports a retryable failure when the file provider read never completes', async () => {
+    vi.useFakeTimers()
+    try {
+      const onError = vi.fn()
+      const request = startMobileNoteRead({
+        read: () => new Promise<string | null>(() => {}),
+        onContent: vi.fn(),
+        onError,
+        timeoutMs: 100,
+      })
+
+      await vi.advanceTimersByTimeAsync(100)
+      await request.finished
+      expect(onError).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('never reads over an existing draft, but loads metadata-only native notes', () => {
     const note = metadataSnapshot().notes[0]
     expect(mobileNoteNeedsRead(note, 'native')).toBe(true)

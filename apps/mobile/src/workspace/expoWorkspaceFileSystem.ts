@@ -67,6 +67,13 @@ export const expoWorkspaceFileSystem: WorkspaceFileSystem = {
     const file = workspaceFile(expoFileSystem(), rootUri, normalizedPath)
     return file.exists ? file.textSync() : null
   },
+  readTextFileAsync: async (rootUri, relativePath) => {
+    const normalizedPath = normalizedWorkspaceRelativePath(relativePath)
+    if (!normalizedPath) return null
+
+    const file = workspaceFile(expoFileSystem(), rootUri, normalizedPath)
+    return file.exists ? file.text() : null
+  },
   readVaultFiles: (rootUri) => {
     const module = expoFileSystem()
     assertGitCheckoutComplete(module, rootUri)

@@ -229,6 +229,23 @@ type: Project
     })
   })
 
+  it('prefers the asynchronous file-provider read path for selected notes', async () => {
+    const fileSystem = fakeWorkspaceFileSystem({ 'Writing/Workflow.md': '' })
+    const readTextFileAsync = async (_rootUri: string, relativePath: string) =>
+      relativePath === 'Writing/Workflow.md' ? '# Loaded asynchronously\n' : null
+    const repository = createFileSystemWorkspaceRepository({
+      ...fileSystem,
+      readTextFile: () => null,
+      readTextFileAsync,
+    })
+
+    await expect(repository.readNoteContent({
+      created: '-', date: '-', favorite: false, id: 'Writing/Workflow.md', links: 0,
+      modified: '-', path: 'Writing/Workflow.md', relationships: [], snippet: '', status: '', tags: [],
+      title: 'Workflow', type: 'Note', typeTone: 'gray', workspace: 'Laputa',
+    }, { source: 'native', vaultRootUri: 'file:///vault' })).resolves.toBe('# Loaded asynchronously\n')
+  })
+
   it('moves note files through relative vault paths without rewriting content', async () => {
     const fileSystem = fakeWorkspaceFileSystem({
       'Writing/Workflow.md': '# Workflow\n\nOriginal body.\n',
