@@ -1,6 +1,7 @@
 import type { VaultEntry } from '../types'
 import { joinVaultPath, normalizeVaultRelativePath, notePathFilename } from '../utils/notePathIdentity'
 import { createVaultBackend, hasRemoteVault } from './vaultBackend'
+import { assertVaultWritable } from './offline/offlineMode'
 
 /**
  * Note lifecycle on a Tolaria remote (the web build with a server): the vault lives on the
@@ -10,7 +11,9 @@ import { createVaultBackend, hasRemoteVault } from './vaultBackend'
 
 export { hasRemoteVault }
 
-function remoteFiles() {
+/** The server's file API for a change. Offline it refuses (TOL-198): nothing waits to be sent. */
+function remoteFilesToChange(action: string) {
+  assertVaultWritable(action)
   return createVaultBackend('').files
 }
 
@@ -25,7 +28,7 @@ export function newNotePath(vaultPath: string, relativePath: string): string {
  * same path first. Nothing is overwritten and nothing is lost.
  */
 export async function createRemoteNote(path: string, content: string): Promise<string> {
-  const result = await remoteFiles().write(path, content, { baseRevision: null })
+  const result = await remoteFilesToChange('creating a note').write(path, content, { baseRevision: null })
   return result.status === 'conflict' ? result.copyPath ?? path : path
 }
 
@@ -36,8 +39,8 @@ export function entryAtStoredPath(entry: VaultEntry, storedPath: string): VaultE
 }
 
 /** Resolves with the paths that were deleted. */
-export function deleteRemoteNotes(paths: string[]): Promise<string[]> {
-  return remoteFiles().delete(paths)
+export async function deleteRemoteNotes(paths: string[]): Promise<string[]> {
+  return remoteFilesToChange('deleting notes').delete(paths)
 }
 
 export interface RemoteAutoRename {
@@ -48,7 +51,7 @@ export interface RemoteAutoRename {
 
 /** Renames an untitled note after its first heading. Null when the name already fits. */
 export async function autoRenameRemoteNote(path: string, title: string): Promise<RemoteAutoRename | null> {
-  const { newPath } = await remoteFiles().rename({ path, newTitle: title })
+  const { newPath } = await remoteFilesToChange('renaming a note').rename({ path, newTitle: title })
   if (newPath === path) return null
   return { newPath, entry: { path: newPath, filename: notePathFilename(newPath), title } }
 }

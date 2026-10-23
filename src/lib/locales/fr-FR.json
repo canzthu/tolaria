@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} conflit{plural}",
   "status.offline.title": "Pas de connexion Internet",
   "status.offline.label": "Hors ligne",
+  "status.offline.readOnlyTitle": "Aucune connexion Internet. Les notes sont en lecture seule jusqu’à ce que vous vous reconnectiez.",
+  "status.offline.readOnlyLabel": "Hors ligne · lecture seule",
   "status.changes.view": "Afficher les modifications en attente",
   "status.changes.label": "Modifications",
   "status.commit.local": "Valider les modifications localement",

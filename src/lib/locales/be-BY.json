@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} {plural} канфлікт(аў)",
   "status.offline.title": "Няма інтэрнэту",
   "status.offline.label": "Афлайн",
+  "status.offline.readOnlyTitle": "Няма падключэння да інтэрнэту. Нататкі даступныя толькі для чытання, пакуль вы не падключыцеся зноў.",
+  "status.offline.readOnlyLabel": "Аўтаномны рэжым · толькі для чытання",
   "status.changes.view": "Прагледзець змены",
   "status.changes.label": "Змены",
   "status.commit.local": "Закаміціць лакальна",

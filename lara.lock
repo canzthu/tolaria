@@ -993,6 +993,8 @@ files:
     status.conflict.count: 46293d20ed2071fb30762b71fdaa5894
     status.offline.title: 3bf45a7003646cc4f963810b0b7ac0f5
     status.offline.label: 8d9da4bc0e49a50e09ac9f7e56789d39
+    status.offline.readOnlyTitle: 08ebb02c7326c7e5cf59ae1ed6b166e2
+    status.offline.readOnlyLabel: 4ccb24e416cc4616a63df3e8a128a5ff
     status.changes.view: 6d60d24d8f475ddaef94bbbc58514b5a
     status.changes.label: c112bb3542e98308d12d5ecb10a67abc
     status.commit.local: 6474fe7e2ed525df3da3eb447943bfcd

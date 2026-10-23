@@ -991,6 +991,8 @@
   "status.conflict.count": "Конфлікти: {count}{plural}",
   "status.offline.title": "Немає підключення до інтернету",
   "status.offline.label": "Офлайн",
+  "status.offline.readOnlyTitle": "Немає підключення до Інтернету. Нотатки доступні лише для читання, доки ви не відновите підключення.",
+  "status.offline.readOnlyLabel": "Офлайн · лише для читання",
   "status.changes.view": "Переглянути незавершені зміни",
   "status.changes.label": "Зміни",
   "status.commit.local": "Закомітити зміни локально",

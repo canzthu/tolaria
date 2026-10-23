@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} 个冲突{plural}",
   "status.offline.title": "无互联网连接",
   "status.offline.label": "离线",
+  "status.offline.readOnlyTitle": "未连接互联网。在您重新连接之前，笔记为只读状态。",
+  "status.offline.readOnlyLabel": "离线 · 只读",
   "status.changes.view": "查看待处理更改",
   "status.changes.label": "更改",
   "status.commit.local": "在本地提交更改",

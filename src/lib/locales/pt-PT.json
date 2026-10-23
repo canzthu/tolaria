@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} conflito{plural}",
   "status.offline.title": "Sem ligação à Internet",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Sem ligação à Internet. As notas estão em modo só de leitura até voltar a estabelecer ligação.",
+  "status.offline.readOnlyLabel": "Offline · só de leitura",
   "status.changes.view": "Ver alterações pendentes",
   "status.changes.label": "Alterações",
   "status.commit.local": "Efetuar commit das alterações localmente",

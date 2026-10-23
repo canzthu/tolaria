@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} konflikt{plural}",
   "status.offline.title": "Ingen internetanslutning",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Ingen internetanslutning. Anteckningarna är skrivskyddade tills du återansluter.",
+  "status.offline.readOnlyLabel": "Offline · skrivskyddad",
   "status.changes.view": "Visa väntande ändringar",
   "status.changes.label": "Ändringar",
   "status.commit.local": "Checka in ändringar lokalt",

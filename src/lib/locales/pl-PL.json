@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} konflikt{plural}",
   "status.offline.title": "Brak połączenia z internetem",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Brak połączenia z internetem. Notatki są dostępne tylko do odczytu, dopóki nie połączysz się ponownie.",
+  "status.offline.readOnlyLabel": "Offline · tylko do odczytu",
   "status.changes.view": "Pokaż oczekujące zmiany",
   "status.changes.label": "Zmiany",
   "status.commit.local": "Zatwierdź zmiany lokalnie",

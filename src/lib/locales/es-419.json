@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} conflicto{plural}",
   "status.offline.title": "Sin conexión a Internet",
   "status.offline.label": "Sin conexión",
+  "status.offline.readOnlyTitle": "No hay conexión a Internet. Las notas están en modo de solo lectura hasta que te vuelvas a conectar.",
+  "status.offline.readOnlyLabel": "Sin conexión · solo lectura",
   "status.changes.view": "Ver cambios pendientes",
   "status.changes.label": "Cambios",
   "status.commit.local": "Confirmar cambios localmente",

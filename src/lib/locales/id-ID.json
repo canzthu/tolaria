@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} konflik{plural}",
   "status.offline.title": "Tidak ada koneksi internet",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Tidak ada koneksi internet. Catatan berstatus baca-saja hingga Anda terhubung kembali.",
+  "status.offline.readOnlyLabel": "Offline · baca-saja",
   "status.changes.view": "Lihat perubahan tertunda",
   "status.changes.label": "Perubahan",
   "status.commit.local": "Commit perubahan secara lokal",

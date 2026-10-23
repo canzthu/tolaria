@@ -942,6 +942,8 @@
   "status.conflict.count": "{count} {plural} kanflikt(aŭ)",
   "status.offline.title": "Niama internetu",
   "status.offline.label": "Aflajn",
+  "status.offline.readOnlyTitle": "Niama padklučennia da internetu. Natatki dastupnyja toĺki dlia čytannia, pakuĺ vy nie padklučyciesia znoŭ.",
+  "status.offline.readOnlyLabel": "Aflajn · toĺki dlia čytannia",
   "status.changes.view": "Prahliedzieć zmieny",
   "status.changes.label": "Zmieny",
   "status.commit.local": "Zakamicić lakaĺna",

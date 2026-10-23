@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} Konflikt{plural}",
   "status.offline.title": "Keine Internetverbindung",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Keine Internetverbindung. Notizen sind schreibgeschützt, bis Sie die Verbindung wiederherstellen.",
+  "status.offline.readOnlyLabel": "Offline · schreibgeschützt",
   "status.changes.view": "Ausstehende Änderungen anzeigen",
   "status.changes.label": "Änderungen",
   "status.commit.local": "Änderungen lokal committen",

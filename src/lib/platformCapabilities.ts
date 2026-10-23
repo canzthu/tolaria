@@ -21,6 +21,8 @@ export interface PlatformCapabilities {
   cliAgents: boolean
   /** Per-note editor instances (web: one editor per note for Yjs binding; desktop: single shared editor) */
   perNoteEditors: boolean
+  /** Offline read (web): a service worker caches the shell and recent notes, and the vault turns read-only offline */
+  offlineRead: boolean
 }
 
 /**
@@ -40,5 +42,16 @@ export function resolvePlatformCapabilities(backendKind: VaultBackendKind): Plat
     openCode: isDesktop,
     cliAgents: isDesktop,
     perNoteEditors: !isDesktop,
+    offlineRead: backendKind === 'remote',
   }
+}
+
+interface RemoteVaultGlobals {
+  TOLARIA_REMOTE_URL?: unknown
+  TOLARIA_REMOTE_TOKEN?: unknown
+}
+
+/** Outside Tauri: the remote backend when a server and token are configured, else mock data. */
+export function resolveBrowserBackendKind(scope: RemoteVaultGlobals | undefined = globalThis as RemoteVaultGlobals): 'remote' | 'mock' {
+  return scope?.TOLARIA_REMOTE_URL && scope.TOLARIA_REMOTE_TOKEN ? 'remote' : 'mock'
 }

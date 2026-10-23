@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} konflikt{plural}",
   "status.offline.title": "Žiadne internetové pripojenie",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Žiadne internetové pripojenie. Poznámky sú iba na čítanie, kým sa znova nepripojíte.",
+  "status.offline.readOnlyLabel": "Offline · iba na čítanie",
   "status.changes.view": "Zobraziť čakajúce zmeny",
   "status.changes.label": "Zmeny",
   "status.commit.local": "Lokálne potvrdiť zmeny",

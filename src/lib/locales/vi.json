@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} xung đột{plural}",
   "status.offline.title": "Không có kết nối internet",
   "status.offline.label": "Ngoại tuyến",
+  "status.offline.readOnlyTitle": "Không có kết nối internet. Ghi chú ở chế độ chỉ đọc cho đến khi bạn kết nối lại.",
+  "status.offline.readOnlyLabel": "Ngoại tuyến · chỉ đọc",
   "status.changes.view": "Xem các thay đổi đang chờ",
   "status.changes.label": "Thay đổi",
   "status.commit.local": "Commit các thay đổi cục bộ",

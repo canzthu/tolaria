@@ -991,6 +991,8 @@
   "status.conflict.count": "{count}件の競合{plural}",
   "status.offline.title": "インターネット接続なし",
   "status.offline.label": "オフライン",
+  "status.offline.readOnlyTitle": "インターネットに接続されていません。再接続するまで、ノートは読み取り専用になります。",
+  "status.offline.readOnlyLabel": "オフライン · 読み取り専用",
   "status.changes.view": "保留中の変更を表示",
   "status.changes.label": "変更",
   "status.commit.local": "変更をローカルでコミット",

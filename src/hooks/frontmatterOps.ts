@@ -8,6 +8,7 @@ import { parseFrontmatter } from '../utils/frontmatter'
 import { normalizeNoteFormat } from '../utils/noteFormat'
 import { canonicalFrontmatterKey, isSystemMetadataKey } from '../utils/systemMetadata'
 import { normalizeNoteWidthMode } from '../utils/noteWidth'
+import { assertVaultWritable } from '../lib/offline/offlineMode'
 import { createVaultBackend } from '../lib/vaultBackend'
 
 type FrontmatterCommand = 'update_frontmatter' | 'delete_frontmatter_property'
@@ -210,17 +211,23 @@ function hasRemoteBackendConfigured(): boolean {
     && 'TOLARIA_REMOTE_TOKEN' in window
 }
 
+/** The browser's in-memory copy of a note, when reading it failed. */
+function windowMockContent(path: VaultPath): MarkdownContent {
+  if (typeof window === 'undefined' || !window.__mockContent) return ''
+  return (Reflect.get(window.__mockContent, path) as string | undefined) ?? ''
+}
+
+async function readMockContent(path: VaultPath, vaultPath?: string): Promise<MarkdownContent> {
+  if (!hasRemoteBackendConfigured()) return mockInvoke<MarkdownContent>('get_note_content', { path })
+  const backend = createVaultBackend(vaultPath ?? '')
+  return (await backend.files.read(path)).content
+}
+
 async function loadMockContent(path: VaultPath, vaultPath?: string): Promise<MarkdownContent> {
   try {
-    if (hasRemoteBackendConfigured()) {
-      const backend = createVaultBackend(vaultPath ?? '')
-      return (await backend.files.read(path)).content
-    }
-    return await mockInvoke<MarkdownContent>('get_note_content', { path })
+    return await readMockContent(path, vaultPath)
   } catch {
-    return typeof window === 'undefined'
-      ? ''
-      : (window.__mockContent ? Reflect.get(window.__mockContent, path) as string | undefined : undefined) ?? ''
+    return windowMockContent(path)
   }
 }
 
@@ -251,13 +258,16 @@ function applyMockFrontmatterDelete(path: VaultPath, key: FrontmatterKey): Markd
   return content
 }
 
-async function executeMockFrontmatterOp(
-  op: FrontmatterOp,
-  path: VaultPath,
-  key: FrontmatterKey,
-  value?: FrontmatterValue,
-  vaultPath?: string,
-): Promise<MarkdownContent> {
+interface FrontmatterOpRequest {
+  op: FrontmatterOp
+  path: VaultPath
+  key: FrontmatterKey
+  value?: FrontmatterValue
+  vaultPath?: string
+}
+
+async function executeMockFrontmatterOp({ op, path, key, value, vaultPath }: FrontmatterOpRequest): Promise<MarkdownContent> {
+  assertVaultWritable('editing properties')
   seedMockContent(path, await loadMockContent(path, vaultPath))
   let content: MarkdownContent
   if (op === 'update') {
@@ -270,21 +280,12 @@ async function executeMockFrontmatterOp(
   return content
 }
 
-async function executeFrontmatterOp(
-  op: FrontmatterOp,
-  path: VaultPath,
-  key: FrontmatterKey,
-  value?: FrontmatterValue,
-  vaultPath?: string,
-): Promise<MarkdownContent> {
-  if (op === 'update') {
-    return isTauri()
-      ? invokeFrontmatter('update_frontmatter', { path, key, value })
-      : executeMockFrontmatterOp(op, path, key, value, vaultPath)
-  }
-  return isTauri()
-    ? invokeFrontmatter('delete_frontmatter_property', { path, key })
-    : executeMockFrontmatterOp(op, path, key, undefined, vaultPath)
+async function executeFrontmatterOp(request: FrontmatterOpRequest): Promise<MarkdownContent> {
+  const { op, path, key, value } = request
+  if (!isTauri()) return executeMockFrontmatterOp(request)
+  return op === 'update'
+    ? invokeFrontmatter('update_frontmatter', { path, key, value })
+    : invokeFrontmatter('delete_frontmatter_property', { path, key })
 }
 
 export interface FrontmatterOpOptions {
@@ -422,7 +423,7 @@ async function handleFrontmatterFailure({
 export async function runFrontmatterAndApply(request: FrontmatterRunRequest): Promise<MarkdownContent | undefined> {
   const { op, path, key, value, callbacks, options } = request
   try {
-    const newContent = await executeFrontmatterOp(op, path, key, value)
+    const newContent = await executeFrontmatterOp({ op, path, key, value })
     callbacks.cacheContent?.(path, newContent)
     if (callbacks.shouldApply && !callbacks.shouldApply(path)) return undefined
     callbacks.updateTab(path, newContent)

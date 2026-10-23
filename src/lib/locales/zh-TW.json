@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} 個衝突{plural}",
   "status.offline.title": "無網際網路連線",
   "status.offline.label": "離線",
+  "status.offline.readOnlyTitle": "沒有網路連線。在您重新連線之前，筆記為唯讀狀態。",
+  "status.offline.readOnlyLabel": "離線 · 唯讀",
   "status.changes.view": "檢視待處理更改",
   "status.changes.label": "更改",
   "status.commit.local": "在本地提交更改",

@@ -8,6 +8,8 @@ import {
   webPreviewPort,
   webPreviewProxy,
 } from './previewOptions'
+import { phosphorStaticIconChunk } from './phosphorIconChunk'
+import { tolariaServiceWorker } from './serviceWorkerPlugin'
 
 // Tolaria Web: static build of the shared shell (no Tauri runtime).
 //
@@ -51,11 +53,16 @@ function sharedShellConfig(): UserConfig {
   return shared
 }
 
+// One chunk for the icons the shell imports statically (TOL-198), instead of one request each.
+const staticIcons = phosphorStaticIconChunk()
+
 export default defineConfig(mergeConfig(sharedShellConfig(), {
   root: REPO_ROOT,
-  plugins: [staticWebApiGuard()],
+  plugins: [staticWebApiGuard(), staticIcons.plugin, tolariaServiceWorker()],
+  // Read by src/main.tsx: only this build ships service-worker.js (TOL-198).
+  define: { 'import.meta.env.VITE_TOLARIA_WEB_BUILD': JSON.stringify('true') },
   build: {
-    rollupOptions: { input: WEB_PAGES },
+    rollupOptions: { input: WEB_PAGES, output: { manualChunks: staticIcons.manualChunks } },
     outDir: WEB_OUT_DIR,
     emptyOutDir: true,
     // Mobile Safari is the acceptance target; the desktop config follows TAURI_* env.

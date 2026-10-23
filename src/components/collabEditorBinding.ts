@@ -1,6 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { reportLiveNoteTitle } from "../lib/liveNoteTitle";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
+import { useOfflineReadOnly } from "../hooks/useOfflineReadOnly";
 import type { PlatformCapabilities } from "../lib/platformCapabilities";
 import type { VaultBackend, VaultCollabDoc } from "../lib/vaultBackend/types";
 import type { VaultEntry } from "../types";
@@ -68,17 +69,36 @@ export function resolveCollabEditorBinding(
 	return PENDING;
 }
 
+/**
+ * The live document to open while offline (TOL-198): none, unless the note is already bound.
+ * Opening a document needs the server, and a document opened offline would keep edits
+ * locally to send later. A bound note keeps its document so it stays readable; the editor
+ * is read-only meanwhile, so nothing is queued in it.
+ */
+export function offlineCollabPath(
+	path: string | null,
+	offline: boolean,
+	boundPath: string | null,
+): string | null {
+	return !offline || path === boundPath ? path : null;
+}
+
 /** Opens the active note's live document when the platform edits notes collaboratively. */
 export function useCollabEditorBinding(
 	options: CollabEditorBindingOptions,
 ): CollabEditorBinding {
-	const path = collabNotePath(options);
+	const offline = useOfflineReadOnly();
+	const [boundPath, setBoundPath] = useState<string | null>(null);
+	const path = offlineCollabPath(collabNotePath(options), offline, boundPath);
 	const state = useCollabDocument({
 		vaultBackend: options.vaultBackend ?? null,
 		path,
 		enabled: path !== null,
 	});
-	return resolveCollabEditorBinding(path, state);
+	const binding = resolveCollabEditorBinding(path, state);
+	const nowBound = binding.kind === "bound" ? path : null;
+	if (nowBound !== boundPath) setBoundPath(nowBound);
+	return binding;
 }
 
 interface InlineNode {

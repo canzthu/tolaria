@@ -991,6 +991,8 @@
   "status.conflict.count": "{count} конфликт{plural}",
   "status.offline.title": "Нет подключения к Интернету",
   "status.offline.label": "Офлайн",
+  "status.offline.readOnlyTitle": "Нет подключения к Интернету. Заметки доступны только для чтения, пока вы не подключитесь снова.",
+  "status.offline.readOnlyLabel": "Офлайн · только для чтения",
   "status.changes.view": "Посмотреть изменения, ожидающие подтверждения",
   "status.changes.label": "Изменения",
   "status.commit.local": "Зафиксировать изменения локально",

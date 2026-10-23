@@ -31,6 +31,11 @@ import { isRecoveredActionTooltipError } from './components/ui/actionTooltipReco
 import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 import { markStartupPhase } from './lib/startupPerformance'
+import {
+  clearOfflineDataOnAccountExit,
+  hasOfflineRead,
+  scheduleOfflineServiceWorkerRegistration,
+} from './lib/offline/offlineMode'
 
 markStartupPhase('renderer_module_loaded')
 
@@ -277,3 +282,12 @@ createRoot(getRequiredRootElement(), {
     </TooltipProvider>
   </StrictMode>,
 )
+
+// Web only (TOL-198): offline read. Inert on desktop, where neither the capability nor the
+// web build flag is set; registration waits until the app has painted.
+if (hasOfflineRead()) clearOfflineDataOnAccountExit(window)
+scheduleOfflineServiceWorkerRegistration({
+  isWebBuild: import.meta.env.VITE_TOLARIA_WEB_BUILD === 'true',
+  isTauri: isTauriRuntime(),
+  window,
+})
