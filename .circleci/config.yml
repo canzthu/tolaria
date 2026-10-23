@@ -473,7 +473,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: frontend-lint-build
-          ignore: "^(src-tauri/.*\\.rs|docs/)"
+          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
       - install_frontend_dependencies
       - run:
           name: Frontend lint and build (in parallel)
@@ -500,7 +500,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: frontend-coverage
-          ignore: "^(src-tauri/.*\\.rs|docs/)"
+          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
       - install_frontend_dependencies
       - run:
           name: Vitest coverage shard
@@ -525,7 +525,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: frontend-coverage
-          ignore: "^(src-tauri/.*\\.rs|docs/)"
+          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
       - attach_workspace:
           at: /tmp/coverage-shards
       - install_frontend_dependencies
@@ -634,7 +634,7 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: playwright-smoke
-          ignore: "^(src-tauri/.*\\.rs|docs/)"
+          ignore: "^(src-tauri/.*\\.rs|docs/|apps/mobile/|apps/server/|site/|release-notes/|.*\\.md)"
       - install_frontend_dependencies
       - restore_cache:
           keys:
@@ -706,6 +706,9 @@ jobs:
     resource_class: medium
     steps:
       - checkout
+      - skip_unless_changed:
+          scope: server-docker-build
+          paths: "^(apps/server/|packages/|pnpm-lock\\.yaml)"
       - run:
           name: Build server Docker image
           command: |
@@ -768,8 +771,8 @@ jobs:
       - checkout
       - skip_unless_changed:
           scope: web-gates
-          ignore: "^(src-tauri/.*\\.rs|docs/(?!web/))"
-          paths: "^(apps/|packages/|src/|docs/web/)"
+          ignore: "^(src-tauri/|apps/mobile/|docs/)"
+          paths: "^(apps/(web|server)/|packages/|src/|docs/web/)"
       - install_frontend_dependencies
       - restore_cache:
           keys:
