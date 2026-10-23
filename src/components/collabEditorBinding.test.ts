@@ -1,11 +1,16 @@
+import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
+import { onLiveNoteTitle } from "../lib/liveNoteTitle";
 import { resolvePlatformCapabilities } from "../lib/platformCapabilities";
 import type { VaultBackend, VaultCollabDoc } from "../lib/vaultBackend/types";
 import {
 	collabEditorKey,
 	collabNotePath,
+	liveDocumentTitle,
 	resolveCollabEditorBinding,
+	type TitleBlock,
+	useLiveTitleReporter,
 } from "./collabEditorBinding";
 
 const web = resolvePlatformCapabilities("remote");
@@ -121,8 +126,75 @@ describe("collabEditorKey", () => {
 		expect(collabEditorKey(true, "a.md", { kind: "pending" })).toBe(
 			"editor-a.md",
 		);
-		expect(collabEditorKey(true, "a.md", { kind: "bound", doc })).toBe(
-			"editor-a.md:collab",
+		expect(collabEditorKey(true, "a.md", { kind: "bound", doc })).toMatch(
+			/^editor-collab-\d+$/,
 		);
+	});
+
+	it("keeps a bound editor when its note is renamed, and not for another document", () => {
+		const other = { path: "other.md" } as VaultCollabDoc<RemoteBindings>;
+		const bound = collabEditorKey(true, "untitled-note-1.md", {
+			kind: "bound",
+			doc,
+		});
+
+		expect(collabEditorKey(true, "big-idea.md", { kind: "bound", doc })).toBe(
+			bound,
+		);
+		expect(
+			collabEditorKey(true, "untitled-note-1.md", { kind: "bound", doc: other }),
+		).not.toBe(bound);
+	});
+});
+
+function heading(text: string, level = 1): TitleBlock {
+	return { type: "heading", props: { level }, content: [{ type: "text", text }] };
+}
+
+function paragraph(text: string): TitleBlock {
+	return { type: "paragraph", props: {}, content: text ? [{ type: "text", text }] : [] };
+}
+
+describe("liveDocumentTitle", () => {
+	it("reads the first H1, like the desktop reads it from markdown", () => {
+		expect(liveDocumentTitle([paragraph(""), heading(" Big Idea "), paragraph("Body")])).toBe(
+			"Big Idea",
+		);
+		expect(
+			liveDocumentTitle([
+				{
+					type: "heading",
+					props: { level: 1 },
+					content: [
+						{ type: "text", text: "See " },
+						{ type: "link", content: [{ type: "text", text: "Ada" }] },
+					],
+				},
+			]),
+		).toBe("See Ada");
+	});
+
+	it("is null when the note does not start with an H1", () => {
+		expect(liveDocumentTitle([])).toBeNull();
+		expect(liveDocumentTitle([heading("")])).toBeNull();
+		expect(liveDocumentTitle([heading("Section", 2)])).toBeNull();
+		expect(liveDocumentTitle([paragraph("Intro"), heading("Late title")])).toBeNull();
+		expect(liveDocumentTitle([{ type: "table", content: { rows: [] } }])).toBeNull();
+	});
+});
+
+describe("useLiveTitleReporter", () => {
+	it("reports the title of a bound note and nothing for a local one", () => {
+		const reported: [string, string | null][] = [];
+		const stop = onLiveNoteTitle((path, title) => reported.push([path, title]));
+		const editor = { document: [heading("Big Idea")] };
+
+		renderHook(() => useLiveTitleReporter({ kind: "bound", doc }, editor, "note.md")).result.current();
+		renderHook(() => useLiveTitleReporter({ kind: "local" }, editor, "note.md")).result.current();
+		renderHook(() => useLiveTitleReporter({ kind: "bound", doc }, editor, null)).result.current();
+		stop();
+		renderHook(() => useLiveTitleReporter({ kind: "bound", doc }, editor, "note.md")).result.current();
+
+		expect(reported).toEqual([["note.md", "Big Idea"]]);
 	});
 });

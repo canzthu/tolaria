@@ -35,14 +35,23 @@ describe("useCollabDocument", () => {
 		};
 	});
 
-	it("returns null when not enabled", () => {
-		const { result } = renderHook(() =>
-			useCollabDocument({
-				vaultBackend: mockVaultBackend,
-				path: "test.md",
-				enabled: false,
-			}),
-		);
+	function renderCollab(
+		overrides: Partial<Parameters<typeof useCollabDocument>[0]> = {},
+	) {
+		const options = {
+			vaultBackend: mockVaultBackend,
+			path: "test.md",
+			enabled: true,
+			...overrides,
+		};
+		return renderHook(() => useCollabDocument(options));
+	}
+
+	it.each([
+		["not enabled", { enabled: false }],
+		["no path provided", { path: null }],
+	])("returns null when %s", (_reason, overrides) => {
+		const { result } = renderCollab(overrides);
 
 		expect(result.current.doc).toBeNull();
 		expect(result.current.synced).toBe(false);
@@ -52,40 +61,15 @@ describe("useCollabDocument", () => {
 	it("returns null when no collab support", () => {
 		const noCollabBackend = { ...mockVaultBackend, collab: null };
 
-		const { result } = renderHook(() =>
-			useCollabDocument({
-				vaultBackend: noCollabBackend,
-				path: "test.md",
-				enabled: true,
-			}),
-		);
+		const { result } = renderCollab({ vaultBackend: noCollabBackend });
 
 		expect(result.current.doc).toBeNull();
 		expect(result.current.synced).toBe(false);
 	});
 
-	it("returns null when no path provided", () => {
-		const { result } = renderHook(() =>
-			useCollabDocument({
-				vaultBackend: mockVaultBackend,
-				path: null,
-				enabled: true,
-			}),
-		);
-
-		expect(result.current.doc).toBeNull();
-		expect(result.current.synced).toBe(false);
-		expect(mockVaultBackend.collab?.openDoc).not.toHaveBeenCalled();
-	});
 
 	it("opens document and waits for sync", async () => {
-		const { result } = renderHook(() =>
-			useCollabDocument({
-				vaultBackend: mockVaultBackend,
-				path: "test.md",
-				enabled: true,
-			}),
-		);
+		const { result } = renderCollab();
 
 		await waitFor(() => {
 			expect(result.current.doc).toBe(mockDoc);
@@ -196,34 +180,13 @@ describe("useCollabDocument", () => {
 		await waitFor(() => expect(mockDoc.close).toHaveBeenCalled());
 	});
 
-	it("reports a non-Error failure as an Error", async () => {
-		const openDoc = vi.fn().mockRejectedValue("offline");
-		const backend = { ...mockVaultBackend, collab: { openDoc } };
-
-		const { result } = renderHook(() =>
-			useCollabDocument({
-				vaultBackend: backend,
-				path: "test.md",
-				enabled: true,
-			}),
-		);
-
-		await waitFor(() => expect(result.current.error?.message).toBe("offline"));
-	});
-
 	it("handles sync errors gracefully", async () => {
 		const syncError = new Error("Sync failed");
 		const failingDoc = { ...mockDoc, synced: Promise.reject(syncError) };
 		const openDoc = vi.fn().mockResolvedValue(failingDoc);
 		const backend = { ...mockVaultBackend, collab: { openDoc } };
 
-		const { result } = renderHook(() =>
-			useCollabDocument({
-				vaultBackend: backend,
-				path: "test.md",
-				enabled: true,
-			}),
-		);
+		const { result } = renderCollab({ vaultBackend: backend });
 
 		await waitFor(() => {
 			expect(result.current.error).toEqual(syncError);
@@ -231,22 +194,54 @@ describe("useCollabDocument", () => {
 		});
 	});
 
-	it("handles openDoc errors gracefully", async () => {
-		const openError = new Error("Failed to open");
-		const openDoc = vi.fn().mockRejectedValue(openError);
+	it.each([
+		["an Error", new Error("Failed to open"), "Failed to open"],
+		["a non-Error, as an Error", "offline", "offline"],
+	])("reports an openDoc failure that is %s", async (_kind, failure, message) => {
+		const openDoc = vi.fn().mockRejectedValue(failure);
 		const backend = { ...mockVaultBackend, collab: { openDoc } };
 
-		const { result } = renderHook(() =>
-			useCollabDocument({
-				vaultBackend: backend,
-				path: "test.md",
-				enabled: true,
-			}),
-		);
+		const { result } = renderCollab({ vaultBackend: backend });
 
 		await waitFor(() => {
-			expect(result.current.error).toEqual(openError);
+			expect(result.current.error).toBeInstanceOf(Error);
+			expect(result.current.error?.message).toBe(message);
 			expect(result.current.doc).toBeNull();
 		});
+	});
+
+	it("keeps the open document when its note is renamed from this page", async () => {
+		const { result, rerender } = renderHook(
+			({ path }) =>
+				useCollabDocument({ vaultBackend: mockVaultBackend, path, enabled: true }),
+			{ initialProps: { path: "test.md" } },
+		);
+		await waitFor(() => expect(result.current.synced).toBe(true));
+
+		// The backend moves an open document with its file when this page renames it.
+		mockDoc.path = "big-idea.md";
+		rerender({ path: "big-idea.md" });
+
+		expect(result.current).toMatchObject({ doc: mockDoc, synced: true });
+		await waitFor(() => expect(result.current.doc).toBe(mockDoc));
+		expect(mockVaultBackend.collab?.openDoc).toHaveBeenCalledTimes(1);
+		expect(mockDoc.close).not.toHaveBeenCalled();
+	});
+
+	it("closes the document for a different note, and on unmount", async () => {
+		const { result, rerender, unmount } = renderHook(
+			({ path }) =>
+				useCollabDocument({ vaultBackend: mockVaultBackend, path, enabled: true }),
+			{ initialProps: { path: "test.md" } },
+		);
+		await waitFor(() => expect(result.current.synced).toBe(true));
+
+		rerender({ path: "other.md" });
+		expect(result.current.doc).toBeNull();
+		expect(mockDoc.close).toHaveBeenCalledTimes(1);
+		expect(mockVaultBackend.collab?.openDoc).toHaveBeenLastCalledWith("other.md");
+
+		unmount();
+		await waitFor(() => expect(mockDoc.close).toHaveBeenCalledTimes(2));
 	});
 });

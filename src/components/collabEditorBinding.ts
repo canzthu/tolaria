@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+import { reportLiveNoteTitle } from "../lib/liveNoteTitle";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
 import type { PlatformCapabilities } from "../lib/platformCapabilities";
 import type { VaultBackend, VaultCollabDoc } from "../lib/vaultBackend/types";
@@ -15,7 +17,8 @@ import {
  *  - `pending`: the note's live document is opening; the editor shows nothing yet and loads
  *    or saves nothing, so it cannot race the document;
  *  - `bound`: BlockNote edits the live document's shared fragment, which the server writes
- *    to the file. The tab-swap content load and `onContentChange` saves stay off.
+ *    to the file. The tab-swap content load and `onContentChange` saves stay off; edits
+ *    report the note's first H1 instead (`reportLiveNoteTitle`), for the untitled rename.
  */
 export type CollabEditorBinding =
 	| { kind: "local" }
@@ -78,9 +81,64 @@ export function useCollabEditorBinding(
 	return resolveCollabEditorBinding(path, state);
 }
 
+interface InlineNode {
+	type?: string;
+	text?: string;
+	content?: unknown;
+}
+
+export interface TitleBlock {
+	type: string;
+	props?: { level?: unknown };
+	content?: unknown;
+}
+
+function inlineText(content: unknown): string {
+	if (!Array.isArray(content)) return "";
+	return (content as InlineNode[])
+		.map((node) => node.text ?? inlineText(node.content))
+		.join("");
+}
+
+/**
+ * The note's title as the desktop reads it from markdown: the first non-empty block, when it
+ * is an H1. Null when the note does not start with one.
+ */
+export function liveDocumentTitle(blocks: readonly TitleBlock[]): string | null {
+	const first = blocks.find((block) => inlineText(block.content).trim() !== "");
+	const isH1 = first?.type === "heading" && (first.props?.level ?? 1) === 1;
+	return isH1 ? inlineText(first.content).trim() : null;
+}
+
+/** The editor-change handler of a bound editor: it reports the first H1 and saves nothing. */
+export function useLiveTitleReporter(
+	binding: CollabEditorBinding,
+	editor: { document: readonly TitleBlock[] },
+	path: string | null,
+): () => void {
+	const bound = binding.kind === "bound";
+	return useCallback(() => {
+		if (bound && path) reportLiveNoteTitle(path, liveDocumentTitle(editor.document));
+	}, [bound, editor, path]);
+}
+
+const documentKeys = new WeakMap<object, number>();
+let lastDocumentKey = 0;
+
+function documentKey(doc: object): number {
+	let key = documentKeys.get(doc);
+	if (key === undefined) {
+		lastDocumentKey += 1;
+		key = lastDocumentKey;
+		documentKeys.set(doc, key);
+	}
+	return key;
+}
+
 /**
  * The key of the editor instance: a bound editor is a new instance, because BlockNote binds
- * to a document only when it is created.
+ * to a document only when it is created. It is keyed by its document, not its path, so a
+ * note renamed while open (the untitled rename) keeps its editor, caret and focus.
  */
 export function collabEditorKey(
 	perNoteEditors: boolean | undefined,
@@ -88,6 +146,7 @@ export function collabEditorKey(
 	binding: CollabEditorBinding,
 ): string {
 	if (!perNoteEditors) return "shared-editor";
-	const suffix = binding.kind === "bound" ? ":collab" : "";
-	return `editor-${activeTabPath ?? "none"}${suffix}`;
+	if (binding.kind === "bound")
+		return `editor-collab-${documentKey(binding.doc)}`;
+	return `editor-${activeTabPath ?? "none"}`;
 }

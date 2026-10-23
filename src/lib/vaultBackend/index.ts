@@ -19,19 +19,15 @@ interface RemoteVaultConfig {
 }
 
 function getRemoteVaultConfig(): RemoteVaultConfig | null {
-	if (
-		typeof window === "undefined" ||
-		!("TOLARIA_REMOTE_URL" in window) ||
-		!("TOLARIA_REMOTE_TOKEN" in window)
-	) {
-		return null;
-	}
-	const serverUrl = (window as { TOLARIA_REMOTE_URL?: string })
-		.TOLARIA_REMOTE_URL;
-	const token = (window as { TOLARIA_REMOTE_TOKEN?: string })
-		.TOLARIA_REMOTE_TOKEN;
-	if (!serverUrl || !token) return null;
-	return { serverUrl, token };
+	if (typeof window === "undefined") return null;
+	const { TOLARIA_REMOTE_URL: serverUrl, TOLARIA_REMOTE_TOKEN: token } =
+		window as { TOLARIA_REMOTE_URL?: string; TOLARIA_REMOTE_TOKEN?: string };
+	return serverUrl && token ? { serverUrl, token } : null;
+}
+
+/** True in the web build when a Tolaria remote serves the vault. */
+export function hasRemoteVault(): boolean {
+	return !isTauri() && getRemoteVaultConfig() !== null;
 }
 
 /** The desktop path: Tauri commands backed by the Rust vault crate. */

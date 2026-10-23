@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+import {
+	type Dispatch,
+	type SetStateAction,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
 import type {
 	VaultBackend,
@@ -18,7 +24,8 @@ interface UseCollabDocumentOptions {
 	enabled: boolean;
 }
 
-type OpenedDocument = CollabDocumentState & { path: string };
+/** The state of one opened document, with the session that opened it. */
+type OpenedDocument = CollabDocumentState & { session: DocumentSession };
 
 const NO_DOCUMENT: CollabDocumentState = {
 	doc: null,
@@ -36,15 +43,31 @@ function asError(error: unknown): Error {
 	return error instanceof Error ? error : new Error(String(error));
 }
 
+/** One opened document, which the hook keeps while its note is renamed. */
+interface DocumentSession {
+	collab: VaultCollabChannel<RemoteBindings>;
+	/** The note the document belongs to: the backend moves `doc.path` on a rename from this page. */
+	path(): string;
+	leave(): void;
+}
+
 function openCollabDocument(
 	collab: VaultCollabChannel<RemoteBindings>,
 	path: string,
-	report: (state: CollabDocumentState) => void,
-): () => void {
+	report: (state: OpenedDocument) => void,
+): DocumentSession {
 	let left = false;
 	let opened: VaultCollabDoc<RemoteBindings> | null = null;
+	const session: DocumentSession = {
+		collab,
+		path: () => opened?.path ?? path,
+		leave: () => {
+			left = true;
+			opened?.close();
+		},
+	};
 	const update = (state: CollabDocumentState) => {
-		if (!left) report(state);
+		if (!left) report({ ...state, session });
 	};
 
 	collab
@@ -63,10 +86,37 @@ function openCollabDocument(
 			update({ doc: null, synced: false, error: asError(error) }),
 		);
 
-	return () => {
-		left = true;
-		opened?.close();
-	};
+	return session;
+}
+
+function isOpenAt(
+	session: DocumentSession | undefined | null,
+	collab: VaultCollabChannel<RemoteBindings> | null,
+	target: string | null,
+): boolean {
+	return session?.collab === collab && session.path() === target;
+}
+
+/**
+ * Keeps one document open for `target`. A target the open document already moved to (a
+ * rename from this page) keeps it; any other target closes it and opens the new one.
+ */
+function useDocumentSession(
+	collab: VaultCollabChannel<RemoteBindings> | null,
+	target: string | null,
+	setOpened: Dispatch<SetStateAction<OpenedDocument | null>>,
+): void {
+	const sessionRef = useRef<DocumentSession | null>(null);
+
+	useEffect(() => {
+		if (isOpenAt(sessionRef.current, collab, target)) return;
+		sessionRef.current?.leave();
+		setOpened(null);
+		sessionRef.current =
+			collab && target ? openCollabDocument(collab, target, setOpened) : null;
+	}, [collab, target, setOpened]);
+
+	useEffect(() => () => sessionRef.current?.leave(), []);
 }
 
 /**
@@ -74,7 +124,8 @@ function openCollabDocument(
  * Returns no document when collaboration is not available (desktop) or not enabled.
  * Manages the document lifecycle: opens on mount/path change, closes on unmount.
  * The state always belongs to `path`: while another note's document is still open or
- * closing, the hook reports no document rather than the previous note's.
+ * closing, the hook reports no document rather than the previous note's. A note renamed from
+ * this page keeps its open document, which followed the file.
  */
 export function useCollabDocument({
 	vaultBackend,
@@ -84,17 +135,8 @@ export function useCollabDocument({
 	const [opened, setOpened] = useState<OpenedDocument | null>(null);
 	const collab = enabled ? collabChannel(vaultBackend) : null;
 	const target = collab ? path : null;
-
-	useEffect(() => {
-		if (!collab || !target) return;
-		const leave = openCollabDocument(collab, target, (state) =>
-			setOpened({ ...state, path: target }),
-		);
-		return () => {
-			leave();
-			setOpened(null);
-		};
-	}, [collab, target]);
-
-	return target && opened?.path === target ? opened : NO_DOCUMENT;
+	useDocumentSession(collab, target, setOpened);
+	return opened && isOpenAt(opened.session, collab, target)
+		? opened
+		: NO_DOCUMENT;
 }

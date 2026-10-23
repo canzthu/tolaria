@@ -92,10 +92,10 @@ describe('the remote vault backend', () => {
     await expect(open('attachments/pixel.bin')).rejects.toBeInstanceOf(RemoteError)
   })
 
-  it('refuses by name what needs the note index the server does not have yet', async () => {
+  it('refuses by name what the server does not offer yet', async () => {
     const { files } = backend
     const refused = [
-      files.rename({ path: 'welcome.md', newFilenameStem: 'hello' }),
+      files.reloadEntry('welcome.md'),
       files.saveAttachment({ filename: 'a.png', bytes: new Uint8Array() }),
     ]
 
@@ -265,30 +265,16 @@ describe('the remote vault backend', () => {
     expect(result.elapsedMs).toBeGreaterThanOrEqual(0)
   })
 
-  it('reads file with path containing special characters', async () => {
-    await fixture.desktop.commit('folder/name with spaces.md', '# Spaced\n')
+  it.each([
+    ['spaces', 'folder/name with spaces.md', '# Spaced\n'],
+    ['unicode', 'folder/日本語.md', '# Japanese\n'],
+  ])('reads a file whose path has %s', async (_kind, path, content) => {
+    await fixture.desktop.commit(path, content)
     await vault.syncNow()
 
-    const file = await backend.files.read('folder/name with spaces.md')
+    const file = await backend.files.read(path)
 
-    expect(file).toMatchObject({
-      path: 'folder/name with spaces.md',
-      content: '# Spaced\n',
-      revision: expect.stringMatching(/^[0-9a-f]{40}$/),
-    })
-  })
-
-  it('reads file with unicode path', async () => {
-    await fixture.desktop.commit('folder/日本語.md', '# Japanese\n')
-    await vault.syncNow()
-
-    const file = await backend.files.read('folder/日本語.md')
-
-    expect(file).toMatchObject({
-      path: 'folder/日本語.md',
-      content: '# Japanese\n',
-      revision: expect.stringMatching(/^[0-9a-f]{40}$/),
-    })
+    expect(file).toMatchObject({ path, content, revision: expect.stringMatching(/^[0-9a-f]{40}$/) })
   })
 
   it('throws RemoteError with correct status on read failure', async () => {
@@ -305,30 +291,17 @@ describe('the remote vault backend', () => {
     expect(error?.message).toContain('404')
   })
 
-  it('throws RemoteError when server returns error for list', async () => {
+  it.each([
+    ['list', (files: VaultBackend['files']) => files.list()],
+    ['search', (files: VaultBackend['files']) => files.search('query')],
+  ])('throws RemoteError when the server refuses %s', async (_operation, run) => {
     const badBackend = createRemoteVaultBackend({
       baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
       token: 'invalid-token',
       createSocket: (url) => new NodeWebSocket(url) as unknown as SocketLike,
     })
 
-    await expect(badBackend.files.list()).rejects.toMatchObject({
-      name: 'RemoteError',
-      status: 401,
-    })
-  })
-
-  it('throws RemoteError when server returns error for search', async () => {
-    const badBackend = createRemoteVaultBackend({
-      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
-      token: 'invalid-token',
-      createSocket: (url) => new NodeWebSocket(url) as unknown as SocketLike,
-    })
-
-    await expect(badBackend.files.search('query')).rejects.toMatchObject({
-      name: 'RemoteError',
-      status: 401,
-    })
+    await expect(run(badBackend.files)).rejects.toMatchObject({ name: 'RemoteError', status: 401 })
   })
 
   it('maps protocol entries with all optional fields present', async () => {

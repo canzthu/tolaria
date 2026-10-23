@@ -49,6 +49,7 @@ import {
 	type CollabEditorBinding,
 	collabEditorKey,
 	useCollabEditorBinding,
+	useLiveTitleReporter,
 } from "./collabEditorBinding";
 import { EditorContent } from "./EditorContent";
 import { EditorMemoryProbe } from "./EditorMemoryProbe";
@@ -312,7 +313,6 @@ interface EditorSetupParams {
 }
 
 const NO_SWAP_TABS: Tab[] = [];
-const ignoreEditorChange = () => {};
 
 /** The collaboration option of a bound editor: BlockNote edits the live document. */
 function blockNoteCollaboration(binding: CollabEditorBinding) {
@@ -332,7 +332,7 @@ type EditorTabSwapOptions = Parameters<typeof useEditorTabSwap>[0];
 /**
  * Where the rich editor's content comes from. A live document owns a bound note's
  * content: the tab swap loads nothing into the editor and edits are not saved through
- * onContentChange, or both would write the shared fragment.
+ * onContentChange, or both would write the shared fragment; its changes only report the title.
  */
 function useEditorContentSource({
 	collabBinding,
@@ -350,6 +350,11 @@ function useEditorContentSource({
 		tabs: live ? NO_SWAP_TABS : swapOptions.tabs,
 		activeTabPath: live ? null : swapOptions.activeTabPath,
 	});
+	const reportLiveTitle = useLiveTitleReporter(
+		collabBinding,
+		swapOptions.editor,
+		swapOptions.activeTabPath,
+	);
 	const localContentReady = useRichEditorContentReadiness({
 		activeTab,
 		activeTabIsSheet,
@@ -357,7 +362,7 @@ function useEditorContentSource({
 	});
 	return {
 		...swap,
-		handleEditorChange: live ? ignoreEditorChange : swap.handleEditorChange,
+		handleEditorChange: live ? reportLiveTitle : swap.handleEditorChange,
 		richEditorContentReady: live
 			? collabBinding.kind === "bound"
 			: localContentReady,

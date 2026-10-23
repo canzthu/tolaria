@@ -39,8 +39,12 @@ export interface VaultWriteOptions {
 
 export type VaultWriteResult =
   | { status: 'written'; revision: VaultRevision }
-  /** `current` is the stored file that won, or `null` when it could not be read. */
-  | { status: 'conflict'; current: VaultFile | null }
+  /**
+   * `current` is the stored file that won, or `null` when it could not be read.
+   * `copyPath` is where the store kept this write's content instead, when it keeps
+   * conflicting writes as conflict copies (the Tolaria remote does).
+   */
+  | { status: 'conflict'; current: VaultFile | null; copyPath?: string }
 
 export type VaultRenameRequest =
   | { path: string; newTitle: string; oldTitle?: string }

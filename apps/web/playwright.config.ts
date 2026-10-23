@@ -16,6 +16,8 @@ const remotePort = process.env.TOLARIA_E2E_REMOTE_PORT ?? '41761'
 const remoteUrl = `http://127.0.0.1:${remotePort}`
 const remoteDir = join(tmpdir(), `tolaria-web-collab-e2e-${remotePort}`)
 export const COLLAB_TOKEN = 'e2e-token-not-a-secret-0123456789'
+/** The seeded git remote the server pushes to: what the desktop app pulls. */
+export const REMOTE_GIT_DIR = `${remoteDir}/remote.git`
 const COLLAB_SPEC = /collab\.spec\.ts/
 const storageState = {
   cookies: [],
