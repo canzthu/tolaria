@@ -259,6 +259,12 @@ export class Vault {
     await this.queue
   }
 
+  /** Returns paths that changed between two commits. */
+  async diff(from: string, to: string): Promise<string[]> {
+    const result = await this.repo.run(['diff', '--name-only', '-z', `${from}..${to}`])
+    return result.stdout.split('\0').filter(Boolean)
+  }
+
   /** Commits any staged changes and pushes with retry. Logs failures. Used on shutdown. */
   async flushAndPush(): Promise<void> {
     return this.locked(async () => {

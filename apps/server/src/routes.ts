@@ -7,6 +7,8 @@ import {
   DOC_FRONTMATTER_FIELD,
   DOC_ID_HEADER,
   DOC_META_MAP,
+  type EntriesDeltaResponse,
+  type EntriesResponse,
   FILE_CAPABILITIES,
   PROTOCOL_VERSION,
   ROUTES,
@@ -19,10 +21,12 @@ import { VaultError } from './errors.ts'
 import { entityTag, errorReply, quoted, type Reply, singleHeader } from './httpIo.ts'
 import { isNote, type VaultPath, vaultPath } from './paths.ts'
 import type { TimedWriteResult, Timings, Vault, WritePrecondition } from './vault.ts'
+import type { VaultIndex } from './vaultIndex.ts'
 
 export interface Services {
   vault: Vault
   docs: DocIndex
+  index: VaultIndex
   /** True once the collaboration channel is served, not only reserved. */
   collab: boolean
   /** Present when the collaboration channel is served. */
@@ -181,6 +185,26 @@ async function sync(_request: ApiRequest, { vault }: Services): Promise<Reply> {
   return { status: 200, body: await vault.syncNow() }
 }
 
+async function listEntries({ url, headers }: ApiRequest, { index }: Services): Promise<Reply> {
+  const since = url.searchParams.get('since')
+  
+  if (since) {
+    const delta = await index.getDelta(since)
+    const body: EntriesDeltaResponse = delta
+    return { status: 200, headers: { etag: quoted(delta.head) }, body }
+  }
+  
+  const { head, entries } = index.getAll()
+  const body: EntriesResponse = { head, entries }
+  const replyHeaders: Record<string, string> = { etag: quoted(head) }
+  
+  if (entityTag(singleHeader(headers, 'if-none-match')) === head) {
+    return { status: 304, headers: replyHeaders }
+  }
+  
+  return { status: 200, headers: replyHeaders, body }
+}
+
 function collabAccess(value: unknown): CollabAccess {
   if (value === undefined || value === 'write') return 'write'
   if (value === 'read') return 'read'
@@ -218,6 +242,7 @@ const EXACT_ROUTES = new Map<string, Methods>([
   [ROUTES.rename, new Map([['POST', renameFile]])],
   [ROUTES.search, new Map([['GET', search]])],
   [ROUTES.sync, new Map([['POST', sync]])],
+  [ROUTES.entries, new Map([['GET', listEntries]])],
   [ROUTES.collabTickets, new Map([['POST', issueTicket]])],
 ])
 

@@ -11,6 +11,7 @@ import { isNote, type VaultPath } from './paths.ts'
 import { route, type Services } from './routes.ts'
 import type { BlobStore } from './store.ts'
 import type { Vault } from './vault.ts'
+import { VaultIndex } from './vaultIndex.ts'
 
 export interface ServerOptions {
   vault: Vault
@@ -86,8 +87,10 @@ export async function createVaultServer(options: ServerOptions): Promise<Server>
   const { files } = await vault.list()
   await docs.reconcile(files.map((file) => file.path as VaultPath).filter(isNote))
   vault.onChange((changes) => docs.apply(changes))
+  const index = await VaultIndex.open(vault, options.store)
+  vault.onChange((changes) => index.apply(changes))
   const tickets = options.collab === false ? undefined : new TicketBook()
-  const services: Services = { vault, docs, collab: tickets !== undefined, tickets }
+  const services: Services = { vault, docs, index, collab: tickets !== undefined, tickets }
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     answer(request, services, options, server)

@@ -357,3 +357,60 @@ describe('POST /v1/sync', () => {
     expect((await api('/v1/files/projects/beta.md')).headers.get(DOC_ID_HEADER)).toMatch(UUID)
   })
 })
+
+describe('GET /v1/entries', () => {
+  it('returns all vault entries with etag and supports If-None-Match 304', async () => {
+    const response = await api('/v1/entries')
+    expect(response.status).toBe(200)
+    const etag = response.headers.get('etag')
+    expect(etag).toMatch(/^"[0-9a-f]{40}"$/)
+    
+    const body = await response.json()
+    expect(body).toHaveProperty('head')
+    expect(body).toHaveProperty('entries')
+    expect(Array.isArray(body.entries)).toBe(true)
+    expect(body.entries.length).toBeGreaterThan(0)
+    
+    const welcomeEntry = body.entries.find((e: { path: string }) => e.path === 'welcome.md')
+    expect(welcomeEntry).toMatchObject({
+      path: 'welcome.md',
+      filename: 'welcome.md',
+      title: expect.any(String),
+      fileKind: 'markdown',
+      fileSize: expect.any(Number),
+      snippet: expect.any(String),
+      wordCount: expect.any(Number),
+      hasH1: expect.any(Boolean),
+    })
+
+    if (etag) {
+      const cached = await api('/v1/entries', { headers: { 'if-none-match': etag } })
+      expect(cached.status).toBe(304)
+    }
+  })
+
+  it('returns delta with since parameter showing only changed and deleted entries', async () => {
+    const initial = await api('/v1/entries')
+    const initialEtag = initial.headers.get('etag')?.slice(1, -1)
+    expect(initialEtag).toBeTruthy()
+
+    await put('new-note.md', '# New Note\n', { 'if-none-match': '*' })
+
+    const delta = await api(`/v1/entries?since=${initialEtag}`)
+    expect(delta.status).toBe(200)
+    const deltaBody = await delta.json()
+    
+    expect(deltaBody).toHaveProperty('head')
+    expect(deltaBody).toHaveProperty('changed')
+    expect(deltaBody).toHaveProperty('deleted')
+    expect(Array.isArray(deltaBody.changed)).toBe(true)
+    expect(Array.isArray(deltaBody.deleted)).toBe(true)
+    
+    const newEntry = deltaBody.changed.find((e: { path: string }) => e.path === 'new-note.md')
+    expect(newEntry).toMatchObject({
+      path: 'new-note.md',
+      title: 'New Note',
+      fileKind: 'markdown',
+    })
+  })
+})

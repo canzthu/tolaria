@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.1'
+export const PROTOCOL_VERSION = '1.2'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -17,6 +17,8 @@ export const ROUTES = {
   rename: `${API_PREFIX}/rename`,
   search: `${API_PREFIX}/search`,
   sync: `${API_PREFIX}/sync`,
+  /** Vault index of all entries. Supports ETag and `since` parameter for delta updates. */
+  entries: `${API_PREFIX}/entries`,
   /** Websocket channel: `${collabDocs}/<docId>` carries the y-protocols sync of one note. */
   collabDocs: `${API_PREFIX}/collab/docs`,
   /** Issues a short-lived ticket that opens one websocket, for clients that cannot send headers. */
@@ -89,6 +91,8 @@ export const FILE_CAPABILITIES = [
   'search.text',
   'sync.git',
   'docs.ids',
+  'entries.index',
+  'entries.delta',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
@@ -188,6 +192,36 @@ export interface SyncResult {
   /** False when the git remote could not be reached; the server keeps serving its copy. */
   pulled: boolean
   pushed: boolean
+}
+
+export type FileKind = 'markdown' | 'text' | 'binary'
+
+export interface VaultEntry {
+  path: string
+  filename: string
+  title: string
+  isA?: string
+  aliases?: string[]
+  belongsTo?: string[]
+  status?: string
+  fileSize: number
+  snippet: string
+  relationships?: Record<string, string[]>
+  wordCount: number
+  outgoingLinks?: string[]
+  hasH1: boolean
+  fileKind: FileKind
+}
+
+export interface EntriesResponse {
+  head: string
+  entries: VaultEntry[]
+}
+
+export interface EntriesDeltaResponse {
+  head: string
+  changed: VaultEntry[]
+  deleted: string[]
 }
 
 export const ERROR_CODES = [
