@@ -201,7 +201,7 @@ async function reloadAutoRenamedNote(options: {
   const newEntry = await backend.files.reloadEntry(newPath)
   const preservedContent =
     tabsRef.current.find((tab) => tab.entry.path === oldPath)?.content ??
-    (await invoke<string>('get_note_content', { path: newPath }))
+    (await backend.files.read(newPath)).content
 
   const otherTabPaths = tabsRef.current
     .filter((tab) => tab.entry.path !== oldPath && tab.entry.path !== newPath)
@@ -224,7 +224,7 @@ async function reloadAutoRenamedNote(options: {
 
   void Promise.all(
     otherTabPaths.map(async (path) => {
-    const content = await invoke<string>('get_note_content', { path })
+      const { content } = await backend.files.read(path)
     startTransition(() => {
         setTabs((prev: TabState[]) => prev.map((tab) => (tab.entry.path === path ? { ...tab, content } : tab)))
     })

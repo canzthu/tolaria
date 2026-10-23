@@ -206,7 +206,8 @@ export function reloadVaultEntries({ vaultPath, vaults, defaultWorkspacePath }: 
 }
 
 export function loadVaultFolders({ vaultPath }: VaultPathOptions): Promise<FolderNode[]> {
-  return tauriCall<FolderNode[]>({ command: 'list_vault_folders', tauriArgs: { path: vaultPath } })
+  const backend = createVaultBackend(vaultPath)
+  return backend.chrome.listFolders()
 }
 
 export async function loadMountedVaultFolders(options: MountedVaultFoldersOptions): Promise<FolderNode[]> {
@@ -245,8 +246,8 @@ export async function loadMountedVaultFolders(options: MountedVaultFoldersOption
 }
 
 export function loadVaultViews({ vaultPath }: VaultPathOptions): Promise<ViewFile[]> {
-  return tauriCall<unknown>({ command: 'list_views', tauriArgs: { vaultPath } })
-    .then(normalizeViewFiles)
+  const backend = createVaultBackend(vaultPath)
+  return backend.chrome.listViews().then(normalizeViewFiles)
 }
 
 export async function loadMountedVaultViews(options: MountedVaultViewsOptions): Promise<ViewFile[]> {

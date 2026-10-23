@@ -594,15 +594,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     const activeTab = noteTabsRef.current.find((tab) => notePathsMatch(tab.entry.path, path))
     if (!activeTab) return false
 
-    const request = {
-      path: activeTab.entry.path,
-      vaultPath: vaultPathForEntry(activeTab.entry, resolvedPath),
-    }
+    const vaultPath = vaultPathForEntry(activeTab.entry, resolvedPath)
 
     try {
-      const content = isTauri()
-        ? await invoke<string>('get_note_content', request)
-        : await mockInvoke<string>('get_note_content', request)
+      const backend = createVaultBackend(vaultPath)
+      const { content } = await backend.files.read(activeTab.entry.path)
       return content === activeTab.content
     } catch (error) {
       console.warn('Failed to compare active tab content before vault refresh:', error)
@@ -1454,6 +1450,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   } = useNoteWidthMode({
     tabs: notes.tabs,
     activeTabPath: notes.activeTabPath,
+    vaultPath: resolvedPath,
     settings,
     saveSettings,
     updateFrontmatter: notes.handleUpdateFrontmatter,

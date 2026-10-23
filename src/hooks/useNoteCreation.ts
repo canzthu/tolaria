@@ -6,6 +6,7 @@ import { slugifyNoteStem as slugify } from '../utils/noteSlug'
 import { resolveEntry } from '../utils/wikilink'
 import { trackEvent } from '../lib/telemetry'
 import { cacheNoteContent } from './useTabManagement'
+import { createVaultBackend } from '../lib/vaultBackend'
 import {
   findByCollidingNotePath,
   joinVaultPath,
@@ -571,8 +572,8 @@ async function typeTargetExistsOnDisk({
   if (!isTauri()) return false
 
   try {
-    const args = vaultPath ? { path, vaultPath } : { path }
-    await invoke<string>('get_note_content', args)
+    const backend = createVaultBackend(vaultPath ?? '')
+    await backend.files.read(path)
     return true
   } catch {
     return false

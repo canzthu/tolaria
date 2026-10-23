@@ -1,4 +1,4 @@
-import type { SearchResult, VaultEntry } from '../../types'
+import type { FolderNode, SearchResult, VaultEntry, ViewFile } from '../../types'
 import { contentRevision } from './contentRevision'
 import {
   VAULT_BACKEND_INTERFACE_VERSION,
@@ -6,6 +6,7 @@ import {
   type VaultAttachmentUpload,
   type VaultBackend,
   type VaultBackendKind,
+  type VaultChromeOps,
   type VaultFile,
   type VaultFileOps,
   type VaultRenameRequest,
@@ -178,6 +179,15 @@ function createFileOps(options: CommandVaultBackendOptions): VaultFileOps {
   }
 }
 
+function createChromeOps(options: CommandVaultBackendOptions): VaultChromeOps {
+  const { invoke, vaultPath } = options
+
+  return {
+    listFolders: () => invoke<FolderNode[]>('list_vault_folders', { path: vaultPath }),
+    listViews: () => invoke<ViewFile[]>('list_views', { vaultPath }),
+  }
+}
+
 export function createCommandVaultBackend(options: CommandVaultBackendOptions): VaultBackend {
   const { dialect, invoke, vaultPath } = options
   const isTauri = dialect === 'tauri'
@@ -187,6 +197,7 @@ export function createCommandVaultBackend(options: CommandVaultBackendOptions): 
     interfaceVersion: VAULT_BACKEND_INTERFACE_VERSION,
     capabilities: { collaboration: false, atomicRevisions: false, attachments: true },
     files: createFileOps(options),
+    chrome: createChromeOps(options),
     collab: null,
     snapshot: isTauri
       ? () => invoke<VaultEntry[] | null>('read_vault_snapshot', { path: vaultPath })

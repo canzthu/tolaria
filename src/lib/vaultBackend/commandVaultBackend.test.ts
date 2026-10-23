@@ -290,3 +290,21 @@ describe('snapshot', () => {
     expect(backend.snapshot).toBeUndefined()
   })
 })
+
+describe('chrome operations', () => {
+  it('lists folders from the vault', async () => {
+    const folders = [{ name: 'Inbox', path: 'Inbox', children: [] }]
+    const { backend, calls } = harness('tauri', { list_vault_folders: () => folders })
+
+    await expect(backend.chrome.listFolders()).resolves.toBe(folders)
+    expect(calls).toEqual([{ command: 'list_vault_folders', args: { path: VAULT } }])
+  })
+
+  it('lists views from the vault', async () => {
+    const views = [{ filename: 'active.yml', definition: { name: 'Active', filters: {} } }]
+    const { backend, calls } = harness('tauri', { list_views: () => views })
+
+    await expect(backend.chrome.listViews()).resolves.toBe(views)
+    expect(calls).toEqual([{ command: 'list_views', args: { vaultPath: VAULT } }])
+  })
+})

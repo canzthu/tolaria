@@ -3,6 +3,7 @@ import * as Y from "yjs";
 import {
 	VAULT_BACKEND_INTERFACE_VERSION,
 	type VaultBackend,
+	type VaultChromeOps,
 	type VaultCollabBindings,
 	type VaultCollabDoc,
 	type VaultCollabOpenOptions,
@@ -225,6 +226,13 @@ function fileOps(request: Request): VaultFileOps {
 	};
 }
 
+function chromeOps(): VaultChromeOps {
+	return {
+		listFolders: unsupported("listing folders"),
+		listViews: unsupported("listing views"),
+	};
+}
+
 function socketOrigin(baseUrl: string): string {
 	return (baseUrl || globalThis.location.origin).replace(/^http/u, "ws");
 }
@@ -298,6 +306,7 @@ export function createRemoteVaultBackend(
 			attachments: false,
 		},
 		files: fileOps(requester(options)),
+		chrome: chromeOps(),
 		collab: {
 			openDoc: (path, openOptions) => openDoc(options, path, openOptions),
 		},

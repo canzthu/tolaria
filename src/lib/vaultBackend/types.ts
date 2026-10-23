@@ -1,4 +1,4 @@
-import type { SearchResult, VaultEntry } from '../../types'
+import type { FolderNode, SearchResult, VaultEntry, ViewFile } from '../../types'
 
 /**
  * VaultBackend: the storage seam between the Tolaria shell and wherever a vault
@@ -125,6 +125,13 @@ export interface VaultCollabChannel<TBindings extends VaultCollabBindings = Vaul
   openDoc(path: string, options?: VaultCollabOpenOptions): Promise<VaultCollabDoc<TBindings>>
 }
 
+export interface VaultChromeOps {
+  /** List the vault's folder tree (directories only, no files). */
+  listFolders(): Promise<FolderNode[]>
+  /** List saved views (filters, sorts, and display settings). */
+  listViews(): Promise<ViewFile[]>
+}
+
 export interface VaultBackendCapabilities {
   /** `collab` is available: notes can be opened as live documents. */
   collaboration: boolean
@@ -140,6 +147,7 @@ export interface VaultBackend<TBindings extends VaultCollabBindings = VaultColla
   interfaceVersion: number
   capabilities: VaultBackendCapabilities
   files: VaultFileOps
+  chrome: VaultChromeOps
   collab: VaultCollabChannel<TBindings> | null
   /**
    * Read a cached snapshot of the vault for faster startup.
