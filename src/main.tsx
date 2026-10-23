@@ -31,8 +31,12 @@ import { isRecoveredActionTooltipError } from './components/ui/actionTooltipReco
 import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 import { markStartupPhase } from './lib/startupPerformance'
+import { registerServiceWorker } from './lib/serviceWorker'
 
 markStartupPhase('renderer_module_loaded')
+
+// Register service worker for offline support (web build only, not Tauri)
+void registerServiceWorker()
 
 const TLDRAW_CONTEXT_MENU_SELECTOR = '.tldraw-whiteboard'
 const MACOS_FULLSCREEN_CHROME_CLASS = 'mac-chrome-fullscreen'
