@@ -1,8 +1,8 @@
-# Tolaria remote protocol, version 1.1
+# Tolaria remote protocol, version 1.2
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API.
 
 ## Design rules
 
@@ -31,6 +31,9 @@ Capabilities:
 | `search.text` | `GET /v1/search`. |
 | `sync.git` | The vault is backed by a git remote; `pushed` and `POST /v1/sync` are meaningful. |
 | `docs.ids` | Notes carry a stable `docId`. |
+| `entries.index` | `GET /v1/entries` provides a parsed vault index (since 1.2). |
+| `entries.delta` | `GET /v1/entries?since=<head>` provides incremental updates (since 1.2). |
+| `changes.feed` | `GET /v1/changes` Server-Sent Events stream of vault changes (since 1.2). |
 | `collab.yjs`, `collab.awareness` | The collaboration channel is served (since 1.1). |
 | `collab.tickets` | `POST /v1/collab/tickets` issues websocket tickets (since 1.1). |
 
@@ -84,8 +87,8 @@ A write that ends in a conflict copy is not an error body: see `PUT` below.
 
 ```json
 {
-  "protocolVersion": "1.1",
-  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "collab.yjs", "collab.awareness", "collab.tickets"],
+  "protocolVersion": "1.2",
+  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "collab.yjs", "collab.awareness", "collab.tickets"],
   "vault": { "name": "my-vault", "branch": "main", "head": "eea2db93a391d110c4707fa1f6c6078c2f39c1ca" },
   "collab": { "available": true, "path": "/v1/collab/docs", "docFormat": "tolaria.blocknote/1", "blocksFragment": "blocks", "frontmatterField": "frontmatter", "metaMap": "meta" }
 }
@@ -202,6 +205,33 @@ Pulls from the git remote and pushes anything pending. Clients call it to pick u
 ```
 
 `pulled: false` means the remote could not be reached; the server keeps serving its copy.
+
+### `GET /v1/changes` (Server-Sent Events)
+
+Opens a Server-Sent Events connection that emits `ChangeEvent` messages when the vault changes. Clients subscribe to track commits, pulls, and push results in real time.
+
+Event types:
+
+| Type | When | Fields |
+|---|---|---|
+| `commit` | A change was committed (write, rename, delete) | `head` (new commit SHA), `paths` (array of affected paths) |
+| `pull` | A fetch integrated remote changes and HEAD moved | `head` (new commit SHA after pull) |
+| `push-success` | Pending commits were pushed to the git remote | `head` (commit SHA that was pushed) |
+| `push-failed` | A push to the git remote failed | `head` (commit SHA that failed to push), `error` (error message) |
+
+Example events:
+
+```json
+data: {"type":"commit","head":"a1b2c3d4…","paths":["welcome.md"]}
+
+data: {"type":"pull","head":"e5f6g7h8…"}
+
+data: {"type":"push-success","head":"a1b2c3d4…"}
+
+data: {"type":"push-failed","head":"a1b2c3d4…","error":"push to remote failed"}
+```
+
+The connection is long-lived. The server sends events as they occur; the client should reconnect on disconnect. Authentication via `Authorization: Bearer <token>` header.
 
 ## How the server keeps git consistent
 

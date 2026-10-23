@@ -273,3 +273,7 @@ proposed → active → superseded
 | [0269](0269-mobile-ota-validated-main-range.md) | Mobile OTA validated main range | active |
 | [0270](0270-expiring-exact-codacy-approval-records.md) | Expiring exact Codacy approval records | temporary; expires 2026-10-21 |
 | [0271](0271-mobile-revisioned-pending-note-indicators.md) | Mobile revisioned pending-note indicators | active |
+| [0277](0277-mobile-read-only-reload-reconciliation.md) | Reconcile read-only mobile reloads in the existing snapshot frame | active |
+| [0278](0278-desktop-note-save-byte-transport.md) | Desktop note saves use UTF-8 byte transport | active |
+| [0279](0279-mobile-preview-configuration-tolerance.md) | Mobile preview configuration tolerance | active |
+| [0280](0280-debounced-push-and-background-fetch.md) | Debounced push and background fetch for Tolaria remote | active |
