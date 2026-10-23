@@ -762,6 +762,43 @@ jobs:
             
             echo "Container smoke test passed"
 
+  web-gates:
+    executor: browser
+    steps:
+      - checkout
+      - skip_unless_changed:
+          scope: web-gates
+          ignore: "^(src-tauri/.*\\.rs|docs/(?!web/))"
+          paths: "^(apps/|packages/|src/|docs/web/)"
+      - install_frontend_dependencies
+      - restore_cache:
+          keys:
+            - playwright-v1-{{ checksum "pnpm-lock.yaml" }}
+            - playwright-v1-
+      - run:
+          name: Install Playwright browsers
+          command: pnpm exec playwright install --with-deps chromium webkit
+      - save_cache:
+          key: playwright-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.cache/ms-playwright
+      - run:
+          name: Server tests with coverage
+          command: pnpm test:server
+      - run:
+          name: Build web bundle
+          command: pnpm build:web
+      - run:
+          name: Web Playwright tests (Chromium, WebKit, iPhone, iPad, collab)
+          command: pnpm playwright:web
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+          destination: web-playwright
+      - mark_validated:
+          scope: web-gates
+
   linux-build-verification:
     machine:
       image: ubuntu-2204:current
@@ -1703,6 +1740,12 @@ workflows:
             tags:
               ignore: /.*/
       - server-docker-build:
+          filters:
+            branches:
+              ignore: gh-pages
+            tags:
+              ignore: /.*/
+      - web-gates:
           filters:
             branches:
               ignore: gh-pages
