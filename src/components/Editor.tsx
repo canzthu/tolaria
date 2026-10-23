@@ -220,8 +220,6 @@ export interface EditorProps {
 	/** VaultBackend for opening collaborative documents (web only) */
 	vaultBackend?: VaultBackend<RemoteBindings> | null;
 	locale?: AppLocale;
-	/** Whether the editor should be read-only. When false, editing is disabled. */
-	editable?: boolean;
 }
 
 type ImageImportErrorHandler = (error: ImageImportError) => void;
@@ -308,7 +306,6 @@ interface EditorSetupParams {
 	rawToggleRef?: React.MutableRefObject<() => void>;
 	diffToggleRef?: React.MutableRefObject<() => void>;
 	onImageImportError?: ImageImportErrorHandler;
-	editable?: boolean;
 }
 
 function imageImportErrorMessage(
@@ -357,7 +354,6 @@ function useEditorSetup(options: EditorSetupParams) {
 		rawToggleRef,
 		diffToggleRef,
 		onImageImportError,
-		editable = true,
 	} = options;
 	const vaultPathRef = useRef(vaultPath);
 	const activeTabPathRef = useRef(activeTabPath);
@@ -398,7 +394,6 @@ function useEditorSetup(options: EditorSetupParams) {
 		...RICH_EDITOR_BLOCKNOTE_PERFORMANCE_OPTIONS,
 		schema,
 		domAttributes: RICH_EDITOR_BIDI_DOM_ATTRIBUTES,
-		editable,
 		collaboration,
 		uploadFile: async (file: File) => {
 			try {
@@ -986,7 +981,6 @@ function EditorInner(
 		rawToggleRef: props.rawToggleRef,
 		diffToggleRef: props.diffToggleRef,
 		onImageImportError,
-		editable: props.editable,
 	});
 	const findRequest = useEditorFindCommand({
 		activeTab: runtime.activeTab,
