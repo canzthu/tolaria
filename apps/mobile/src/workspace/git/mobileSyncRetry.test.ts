@@ -76,6 +76,8 @@ it('caps repeated retry delays at five minutes', async () => {
 
 it.each([
   [new Error('githubNetworkFailed'), 'retry'],
+  [new Error('linkedFolderUnavailable'), 'provider'],
+  [Object.assign(new Error('folderOpenFailed'), { name: 'FolderOpenFailure' }), 'provider'],
   [new TypeError('Network request failed'), 'retry'],
   [Object.assign(new Error('HTTP'), { data: { statusCode: 503 } }), 'retry'],
   [Object.assign(new Error('HTTP'), { data: { statusCode: 401 } }), 'authentication'],

@@ -17,7 +17,9 @@ export function MobileVaultNotice({ notice, dismiss, onManage }: {
   const styles = useMobileStyles(createStyles)
   const colors = useMobileColors()
   const insets = useSafeAreaInsets()
-  const message = mobileText(notice.kind === 'saveFailed' ? 'mobile.vaults.saveFailed' : `mobile.sync.${notice.kind}`)
+  const messageKey = notice.kind === 'saveFailed' ? 'mobile.vaults.saveFailed'
+    : notice.kind === 'provider' ? 'mobile.vaults.folderUnavailable' : `mobile.sync.${notice.kind}` as Parameters<typeof mobileText>[0]
+  const message = mobileText(messageKey)
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(message)
     const timer = setTimeout(dismiss, 10_000)

@@ -16,7 +16,8 @@ export function MobileVaultSyncHistory({ manager }: { manager: HistoryProps }) {
     {pending && <Text style={styles.detail}>{mobileText('mobile.sync.pending')}</Text>}
     {record.lastSuccessAt !== null && <Text style={styles.detail} testID="vault-last-sync">{mobileText('mobile.sync.lastSuccess').replace('{time}', new Date(record.lastSuccessAt).toLocaleString())}</Text>}
     {record.lastCommitId && <Text style={styles.detail}>{mobileText('mobile.sync.lastCommit').replace('{commit}', record.lastCommitId)}</Text>}
-    {record.error && <Text style={styles.detail}>{mobileText(`mobile.sync.${record.error}`)}</Text>}
+    {record.error && <Text style={styles.detail}>{mobileText(record.error === 'provider'
+      ? 'mobile.vaults.folderUnavailable' : `mobile.sync.${record.error}` as Parameters<typeof mobileText>[0])}</Text>}
     {failed && <Text style={styles.error}>{mobileText('mobile.sync.historyFailed')}</Text>}
   </View>
 }

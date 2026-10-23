@@ -79,10 +79,18 @@ export function useMobileVaults() {
     if (present) setOpened(true)
     setError(null)
   }
-  const handleOperationFailure = (failure: unknown, saved: boolean, present: boolean, signal?: AbortSignal) => {
+  const handleFolderOpenFailure = (failure: FolderOpenFailure, present: boolean, operation?: 'commit' | 'sync' | 'autoSync') => {
+    setError(folderOpenMessage(failure))
+    if (operation !== 'sync' && operation !== 'autoSync' && (present || !linked)) return 'failed' as const
+    syncHistory.setProblem('provider')
+    setStatus('failed')
+    if (!present) notices.show('provider')
+    return 'failed' as const
+  }
+  const handleOperationFailure = (failure: unknown, saved: boolean, present: boolean, signal?: AbortSignal, operation?: 'commit' | 'sync' | 'autoSync') => {
     const interruption = operationInterruption(failure, signal)
     if (interruption) { setStatus('pending'); return interruption }
-    if (failure instanceof FolderOpenFailure) { setError(folderOpenMessage(failure)); return 'failed' }
+    if (failure instanceof FolderOpenFailure) return handleFolderOpenFailure(failure, present, operation)
     const kind = syncFailureKind(failure)
     syncHistory.setProblem(kind)
     const result = vaultFailure(saved, failure)
@@ -119,7 +127,7 @@ export function useMobileVaults() {
         refresh: selectedNoteId => workspaceRefresh.refresh(next, active, selectedNoteId),
       })
     } catch (failure) {
-      const outcome = handleOperationFailure(failure, saved, present, signal)
+      const outcome = handleOperationFailure(failure, saved, present, signal, operation)
       return operationRetry(outcome)
     } finally {
       finishOperation({ networkSync, present })
