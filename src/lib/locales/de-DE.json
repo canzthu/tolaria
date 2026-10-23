@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Dem Tolaria-Discord beitreten",
   "feedback.community.description": "Chatten Sie mit dem Team und anderen Nutzern, erhalten Sie Hilfe und testen Sie Alpha- und Mobile-Builds.",
   "feedback.community.cta": "Discord beitreten",
-  "feedback.community.linkLabel": "Discord beitreten"
+  "feedback.community.linkLabel": "Discord beitreten",
+  "communityBanner.invite": "Treten Sie der Tolaria-Community bei und chatten Sie mit uns auf Discord.",
+  "communityBanner.dismiss": "Community-Einladung verwerfen"
 }

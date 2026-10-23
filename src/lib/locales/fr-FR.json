@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Rejoignez le serveur Discord de Tolaria",
   "feedback.community.description": "Discutez avec l'équipe et d'autres utilisateurs, obtenez de l'aide et testez les versions alpha et mobiles.",
   "feedback.community.cta": "Rejoindre Discord",
-  "feedback.community.linkLabel": "Rejoindre Discord"
+  "feedback.community.linkLabel": "Rejoindre Discord",
+  "communityBanner.invite": "Rejoignez la communauté Tolaria et discutez avec nous sur Discord.",
+  "communityBanner.dismiss": "Rejeter l’invitation à rejoindre la communauté"
 }

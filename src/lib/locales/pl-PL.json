@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Dołącz do serwera Discord Tolarii",
   "feedback.community.description": "Porozmawiaj z zespołem i innymi użytkownikami, uzyskaj pomoc oraz wypróbuj kompilacje alfa i wersje mobilne.",
   "feedback.community.cta": "Dołącz do Discorda",
-  "feedback.community.linkLabel": "Dołącz do Discorda"
+  "feedback.community.linkLabel": "Dołącz do Discorda",
+  "communityBanner.invite": "Dołącz do społeczności Tolarii i porozmawiaj z nami na Discordzie.",
+  "communityBanner.dismiss": "Odrzuć zaproszenie do społeczności"
 }

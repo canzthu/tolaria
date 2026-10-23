@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Junte-se ao Discord da Tolaria",
   "feedback.community.description": "Converse com a equipa e com outros utilizadores, obtenha ajuda e experimente as versões alfa e móveis.",
   "feedback.community.cta": "Juntar-se ao Discord",
-  "feedback.community.linkLabel": "Juntar-se ao Discord"
+  "feedback.community.linkLabel": "Juntar-se ao Discord",
+  "communityBanner.invite": "Junte-se à comunidade Tolaria e converse connosco no Discord.",
+  "communityBanner.dismiss": "Ignorar convite da comunidade"
 }

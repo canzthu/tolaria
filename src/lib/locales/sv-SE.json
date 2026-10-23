@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Gå med i Tolarias Discord-server",
   "feedback.community.description": "Chatta med teamet och andra användare, få hjälp och prova alfa- och mobilversioner.",
   "feedback.community.cta": "Gå med i Discord",
-  "feedback.community.linkLabel": "Gå med i Discord"
+  "feedback.community.linkLabel": "Gå med i Discord",
+  "communityBanner.invite": "Gå med i Tolaria-communityn och chatta med oss på Discord.",
+  "communityBanner.dismiss": "Avvisa inbjudan till communityn"
 }

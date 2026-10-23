@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Tolaria Discord에 가입하세요",
   "feedback.community.description": "팀 및 다른 사용자와 채팅하고, 도움을 받고, 알파 및 모바일 빌드를 사용해 보세요.",
   "feedback.community.cta": "Discord에 가입하기",
-  "feedback.community.linkLabel": "Discord에 가입하기"
+  "feedback.community.linkLabel": "Discord에 가입하기",
+  "communityBanner.invite": "Tolaria 커뮤니티에 가입하고 Discord에서 저희와 채팅하세요.",
+  "communityBanner.dismiss": "커뮤니티 초대 거절"
 }

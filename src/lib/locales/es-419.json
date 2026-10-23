@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Únase al Discord de Tolaria",
   "feedback.community.description": "Chatea con el equipo y con otros usuarios, obtén ayuda y prueba las versiones alfa y móviles.",
   "feedback.community.cta": "Unirse a Discord",
-  "feedback.community.linkLabel": "Unirse a Discord"
+  "feedback.community.linkLabel": "Unirse a Discord",
+  "communityBanner.invite": "Únete a la comunidad de Tolaria y chatea con nosotros en Discord.",
+  "communityBanner.dismiss": "Descartar invitación a la comunidad"
 }

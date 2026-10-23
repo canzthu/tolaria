@@ -1304,5 +1304,7 @@
   "feedback.community.title": "加入 Tolaria Discord",
   "feedback.community.description": "与团队和其他用户聊天，获取帮助，并试用 Alpha 版和移动版。",
   "feedback.community.cta": "加入 Discord",
-  "feedback.community.linkLabel": "加入 Discord"
+  "feedback.community.linkLabel": "加入 Discord",
+  "communityBanner.invite": "加入 Tolaria 社区，在 Discord 上与我们聊天。",
+  "communityBanner.dismiss": "拒绝社区邀请"
 }

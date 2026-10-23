@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Присоединяйтесь к серверу Tolaria в Discord",
   "feedback.community.description": "Общайтесь с командой и другими пользователями, получайте помощь и тестируйте альфа-версии и сборки для мобильных устройств.",
   "feedback.community.cta": "Присоединиться к Discord",
-  "feedback.community.linkLabel": "Присоединиться к Discord"
+  "feedback.community.linkLabel": "Присоединиться к Discord",
+  "communityBanner.invite": "Присоединяйтесь к сообществу Tolaria и общайтесь с нами в Discord.",
+  "communityBanner.dismiss": "Отклонить приглашение в сообщество"
 }

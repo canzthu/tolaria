@@ -1304,5 +1304,7 @@
   "feedback.community.title": "Tham gia Discord của Tolaria",
   "feedback.community.description": "Trò chuyện với nhóm và những người dùng khác, nhận trợ giúp và thử các bản dựng alpha cũng như bản dựng dành cho thiết bị di động.",
   "feedback.community.cta": "Tham gia Discord",
-  "feedback.community.linkLabel": "Tham gia Discord"
+  "feedback.community.linkLabel": "Tham gia Discord",
+  "communityBanner.invite": "Tham gia cộng đồng Tolaria và trò chuyện với chúng tôi trên Discord.",
+  "communityBanner.dismiss": "Bỏ qua lời mời tham gia cộng đồng"
 }
