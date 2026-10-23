@@ -11,6 +11,7 @@ describe('resolvePlatformCapabilities', () => {
     expect(capabilities.multiWindow).toBe(true)
     expect(capabilities.openCode).toBe(true)
     expect(capabilities.cliAgents).toBe(true)
+    expect(capabilities.perNoteEditors).toBe(false)
   })
 
   test('mock backend enables all desktop features', () => {
@@ -22,6 +23,7 @@ describe('resolvePlatformCapabilities', () => {
     expect(capabilities.multiWindow).toBe(true)
     expect(capabilities.openCode).toBe(true)
     expect(capabilities.cliAgents).toBe(true)
+    expect(capabilities.perNoteEditors).toBe(false)
   })
 
   test('remote backend disables desktop-only features', () => {
@@ -33,5 +35,18 @@ describe('resolvePlatformCapabilities', () => {
     expect(capabilities.multiWindow).toBe(false)
     expect(capabilities.openCode).toBe(false)
     expect(capabilities.cliAgents).toBe(false)
+    expect(capabilities.perNoteEditors).toBe(true)
+  })
+
+  test('includes all capability flags', () => {
+    const capabilities = resolvePlatformCapabilities('tauri')
+    
+    expect(capabilities).toHaveProperty('git')
+    expect(capabilities).toHaveProperty('mcp')
+    expect(capabilities).toHaveProperty('updater')
+    expect(capabilities).toHaveProperty('multiWindow')
+    expect(capabilities).toHaveProperty('openCode')
+    expect(capabilities).toHaveProperty('cliAgents')
+    expect(capabilities).toHaveProperty('perNoteEditors')
   })
 })

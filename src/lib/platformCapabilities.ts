@@ -19,13 +19,15 @@ export interface PlatformCapabilities {
   openCode: boolean
   /** CLI agents (AI agents that run in the terminal) */
   cliAgents: boolean
+  /** Per-note editor instances (web: one editor per note for Yjs binding; desktop: single shared editor) */
+  perNoteEditors: boolean
 }
 
 /**
  * Derive platform capabilities from the vault backend kind.
- * - `tauri` (desktop): all features available
- * - `mock` (desktop unit tests): all features available
- * - `remote` (web): desktop-only features hidden
+ * - `tauri` (desktop): all features available, single shared editor
+ * - `mock` (desktop unit tests): all features available, single shared editor
+ * - `remote` (web): desktop-only features hidden, per-note editors for Yjs
  */
 export function resolvePlatformCapabilities(backendKind: VaultBackendKind): PlatformCapabilities {
   const isDesktop = backendKind === 'tauri' || backendKind === 'mock'
@@ -37,5 +39,6 @@ export function resolvePlatformCapabilities(backendKind: VaultBackendKind): Plat
     multiWindow: isDesktop,
     openCode: isDesktop,
     cliAgents: isDesktop,
+    perNoteEditors: !isDesktop,
   }
 }

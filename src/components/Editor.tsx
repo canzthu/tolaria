@@ -56,6 +56,7 @@ import { installRichEditorDispatchPerformanceProbe } from './richEditorDispatchP
 import { RICH_EDITOR_BLOCKNOTE_PERFORMANCE_OPTIONS } from './richEditorBlockNoteOptions'
 import { markStartupPhase } from '../lib/startupPerformance'
 import { useTurnCurrentBlockIntoCommand } from './useTurnCurrentBlockIntoCommand'
+import type { PlatformCapabilities } from '../lib/platformCapabilities'
 import './Editor.css'
 import './EditorTheme.css'
 
@@ -162,6 +163,8 @@ export interface EditorProps {
   flushPendingEditorContentRef?: React.MutableRefObject<((path: string) => void) | null>
   /** Registers a hook that flushes the raw editor buffer into app state before external actions. */
   flushPendingRawContentRef?: React.MutableRefObject<((path: string) => void) | null>
+  /** Platform capabilities (desktop shows all features, web hides desktop-only features) */
+  platformCapabilities?: PlatformCapabilities
   locale?: AppLocale
 }
 
@@ -796,13 +799,26 @@ function buildEditorLayoutProps(
 }
 
 export const Editor = memo(function Editor(props: EditorProps) {
-  const { locale, onToast } = props
+  const { locale, onToast, platformCapabilities } = props
   const handleImageImportError = useCallback(
     (error: ImageImportError) => {
     onToast?.(imageImportErrorMessage(error, locale))
     },
     [locale, onToast],
   )
+  
+  // When per-note editors are enabled (web), key the editor by active tab path
+  // so React creates a new editor instance for each note.
+  // When disabled (desktop), use a stable key so the same editor is reused.
+  const editorKey = platformCapabilities?.perNoteEditors
+    ? `editor-${props.activeTabPath ?? 'none'}`
+    : 'shared-editor'
+
+  return <EditorInner key={editorKey} {...props} onImageImportError={handleImageImportError} />
+})
+
+function EditorInner(props: EditorProps & { onImageImportError: ImageImportErrorHandler }) {
+  const { onImageImportError } = props
   const runtime = useEditorSetup({
     tabs: props.tabs,
     activeTabPath: props.activeTabPath,
@@ -815,7 +831,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     getNoteStatus: props.getNoteStatus,
     rawToggleRef: props.rawToggleRef,
     diffToggleRef: props.diffToggleRef,
-    onImageImportError: handleImageImportError,
+    onImageImportError,
   })
   const findRequest = useEditorFindCommand({
     activeTab: runtime.activeTab,
@@ -861,7 +877,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
   return (
     <EditorLayout
       {...buildEditorLayoutProps(props, runtime, findRequest)}
-      onImageImportError={handleImageImportError}
+      onImageImportError={onImageImportError}
       onToggleInspector={rightPanel.handleToggleInspectorPanel}
       showAIChat={props.showAIChat}
       onToggleAIChat={props.onToggleAIChat ? rightPanel.handleToggleAIChatPanel : undefined}
@@ -870,4 +886,4 @@ export const Editor = memo(function Editor(props: EditorProps) {
       onExportPdf={handleExportPdf}
     />
   )
-})
+}
