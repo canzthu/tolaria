@@ -8,6 +8,11 @@ on:
       - ".husky/**"
       - ".github/workflows/deploy-docs.yml"
       - ".github/workflows/release.yml"
+      - "apps/mobile/**"
+      - "apps/web/**"
+      - "apps/server/**"
+      - "docs/**"
+      - "release-notes/**"
       - "site/**"
 
 concurrency:
