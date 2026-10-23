@@ -86,7 +86,7 @@ describe("App platform capabilities", () => {
 
 		const statusBar = await screen.findByTestId("status-bar");
 		await waitFor(() => expect(statusBar).toHaveTextContent("Contribute"));
-		expect(statusBar).not.toHaveTextContent(/Synced|Changes|Commit/);
+		expect(statusBar).not.toHaveTextContent(/synced|changes|commit/i);
 	});
 
 	test("keeps the git status in the status bar without a remote server", async () => {
@@ -95,6 +95,6 @@ describe("App platform capabilities", () => {
 		const statusBar = await screen.findByTestId("status-bar");
 		await waitFor(() => expect(statusBar).toHaveTextContent("Contribute"));
 		expect(statusBar).toHaveTextContent(/Changes/);
-		expect(statusBar).toHaveTextContent(/Synced/);
+		expect(statusBar).toHaveTextContent(/Commit/);
 	});
 });
