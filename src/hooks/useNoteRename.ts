@@ -259,12 +259,21 @@ export function workspaceMoveReplacementTarget({
     : localTarget
 }
 
+function hasRemoteBackendConfigured(): boolean {
+  return typeof window !== 'undefined' 
+    && 'TOLARIA_REMOTE_URL' in window 
+    && 'TOLARIA_REMOTE_TOKEN' in window
+}
+
 export async function loadNoteContent({ path }: LoadNoteContentRequest): Promise<string> {
   if (isTauri()) {
     return invoke<string>('get_note_content', { path })
   }
-  const backend = createVaultBackend('')
-  return (await backend.files.read(path)).content
+  if (hasRemoteBackendConfigured()) {
+    const backend = createVaultBackend('')
+    return (await backend.files.read(path)).content
+  }
+  return mockInvoke<string>('get_note_content', { path })
 }
 
 function rewriteSummaryLabel(params: { updatedFiles: number }): string {

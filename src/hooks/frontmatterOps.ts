@@ -204,10 +204,19 @@ function seedMockContent(path: VaultPath, content: MarkdownContent): void {
   updateMockContent(path, content)
 }
 
+function hasRemoteBackendConfigured(): boolean {
+  return typeof window !== 'undefined' 
+    && 'TOLARIA_REMOTE_URL' in window 
+    && 'TOLARIA_REMOTE_TOKEN' in window
+}
+
 async function loadMockContent(path: VaultPath, vaultPath?: string): Promise<MarkdownContent> {
   try {
-    const backend = createVaultBackend(vaultPath ?? '')
-    return (await backend.files.read(path)).content
+    if (hasRemoteBackendConfigured()) {
+      const backend = createVaultBackend(vaultPath ?? '')
+      return (await backend.files.read(path)).content
+    }
+    return await mockInvoke<MarkdownContent>('get_note_content', { path })
   } catch {
     return typeof window === 'undefined'
       ? ''
@@ -217,8 +226,12 @@ async function loadMockContent(path: VaultPath, vaultPath?: string): Promise<Mar
 
 async function persistMockContent(path: VaultPath, content: MarkdownContent, vaultPath?: string): Promise<void> {
   try {
-    const backend = createVaultBackend(vaultPath ?? '')
-    await backend.files.write(path, content)
+    if (hasRemoteBackendConfigured()) {
+      const backend = createVaultBackend(vaultPath ?? '')
+      await backend.files.write(path, content)
+    } else {
+      await mockInvoke('save_note_content', { path, content })
+    }
   } catch (error) {
     updateMockContent(path, content)
     trackMockChange(path)
