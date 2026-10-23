@@ -1865,7 +1865,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onToast={setToastMessage}
               platformCapabilities={platformCapabilities}
               locale={appLocale}
-              editable={!networkStatus.isOffline}
+              editable={platformCapabilities.git || !networkStatus.isOffline}
             />
           </div>
         </div>
