@@ -1,5 +1,5 @@
 import { openPhoneSidebar, phoneBack } from './mobile-panel-navigation'
-import { fileRevealAttempts, latestClipboardAttempt } from './mobile-browser-attempts'
+import { latestClipboardAttempt } from './mobile-browser-attempts'
 import { expect, test, type Page } from '@playwright/test'
 import { buildLocalVaultWorkspaceSnapshot, mobileFileKindForPath, type LocalVaultFile } from '../src/workspace/localVaultSnapshot'
 import {
@@ -23,7 +23,7 @@ test.describe('mobile non-markdown file action parity', () => {
       copiedPath: 'Files/config.yml',
       fileTitle: 'Mobile Config',
       hasNeighborhoodAction: true,
-      revealNoteId: 'Files/config.yml',
+      fileNoteId: 'Files/config.yml',
     })
     await openSelectedFileNeighborhood(page, 'Mobile Config', 'note-row-Files/config.yml')
     await page.getByRole('button', { name: 'Files' }).click()
@@ -35,7 +35,7 @@ test.describe('mobile non-markdown file action parity', () => {
       copiedPath: 'Files/diagram.png',
       fileTitle: 'diagram.png',
       hasNeighborhoodAction: false,
-      revealNoteId: 'Files/diagram.png',
+      fileNoteId: 'Files/diagram.png',
     })
     await deleteSelectedFileFromMoreSheet(page, 'note-row-Files/diagram.png')
   })
@@ -54,7 +54,7 @@ test.describe('mobile non-markdown file action parity', () => {
       copiedPath: 'Files/config.yml',
       fileTitle: 'Mobile Config',
       hasNeighborhoodAction: true,
-      revealNoteId: 'Files/config.yml',
+      fileNoteId: 'Files/config.yml',
     })
     await openSelectedFileNeighborhood(page, 'Mobile Config', 'note-row-Files/config.yml')
     await openPhoneFolder(page, 'Files')
@@ -66,7 +66,7 @@ test.describe('mobile non-markdown file action parity', () => {
       copiedPath: 'Files/diagram.png',
       fileTitle: 'diagram.png',
       hasNeighborhoodAction: false,
-      revealNoteId: 'Files/diagram.png',
+      fileNoteId: 'Files/diagram.png',
     })
     await deleteSelectedFileFromMoreSheet(page, 'note-row-Files/diagram.png')
     await phoneBack(page)
@@ -80,12 +80,12 @@ async function assertFileActionSheet(
     copiedPath,
     fileTitle,
     hasNeighborhoodAction,
-    revealNoteId,
+    fileNoteId,
   }: {
     copiedPath: string
     fileTitle: string
     hasNeighborhoodAction: boolean
-    revealNoteId: string
+    fileNoteId: string
   },
 ) {
   await page.getByTestId('editor-more-action').click()
@@ -96,7 +96,7 @@ async function assertFileActionSheet(
   }
   await expect(page.getByTestId('workspace-action-copy-file-path')).toBeVisible()
   await expect(page.getByTestId('workspace-action-open-default-app')).toBeVisible()
-  await expect(page.getByTestId('workspace-action-reveal-file')).toBeVisible()
+  await expect(page.getByTestId('workspace-action-reveal-file')).toHaveCount(0)
   await expect(page.getByTestId('workspace-action-copy-deep-link')).toBeVisible()
   await expect(page.getByTestId('workspace-action-delete-note')).toBeVisible()
   await expect(page.getByTestId('workspace-action-table-of-contents')).toBeHidden()
@@ -107,19 +107,10 @@ async function assertFileActionSheet(
   await expect(latestClipboardAttempt(page)).resolves.toBe(copiedPath)
 
   await page.getByTestId('editor-more-action').click()
-  await page.getByTestId('workspace-action-reveal-file').click()
-  await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-  await expect(fileRevealAttempts(page).then(attempts => attempts.at(-1))).resolves.toEqual({
-    noteId: revealNoteId,
-    path: copiedPath,
-    title: fileTitle,
-  })
-
-  await page.getByTestId('editor-more-action').click()
   await page.getByTestId('workspace-action-open-default-app').click()
   await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
   await expect(latestFileOpenAttempt(page)).resolves.toEqual({
-    noteId: revealNoteId,
+    noteId: fileNoteId,
     path: copiedPath,
     title: fileTitle,
   })

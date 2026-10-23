@@ -7,7 +7,6 @@ import {
   ArchiveIcon,
   ArrowClockwise,
   ArrowCounterClockwise,
-  ArrowSquareOut,
   ArrowsInLineHorizontal,
   ArrowsOutLineHorizontal,
   CheckCircle,
@@ -19,7 +18,6 @@ import {
   ShareNetwork,
   Smiley,
   Star,
-  Tag,
   TextAa,
   Trash,
 } from 'phosphor-react-native'
@@ -46,13 +44,10 @@ type NoteMoreActionRowsProps = {
   onEnterNeighborhood: (noteId: string) => void
   onCopyFilePath: () => void
   onOpenFileInDefaultApp: () => void
-  onOpenChangeNoteType: () => void
   onOpenFindInNote: () => void
   onOpenMoveNoteToFolder: () => void
   onOpenReplaceInNote: () => void
   onOpenRenameNoteFile: () => void
-  onOpenSetNoteIcon: () => void
-  onRevealFile: () => void
   onRenameNoteFileToTitle: () => void
   onRedoWorkspaceEdit: () => void
   onRemoveNoteIcon: () => void
@@ -75,25 +70,24 @@ export function NoteMoreActionRows(props: NoteMoreActionRowsProps) {
       <NoteStateActionRows {...props} />
       <NoteNavigationActionRows {...props} />
       <NoteIconActionRows {...props} />
-      <NoteTypeActionRow onOpenChangeNoteType={props.onOpenChangeNoteType} />
       <NoteWidthActionRow noteWide={note.noteWidth === 'wide'} onClose={props.onClose} onToggleNoteWidth={props.onToggleNoteWidth} />
       <DeleteActionRow onClose={props.onClose} onDeleteNote={props.onDeleteNote} />
     </>
   )
 }
 
-function NonMarkdownFileActionRows({
-  group,
-  note,
-  onClose,
-  onCopyFilePath,
-  onDeleteNote,
-  onEnterNeighborhood,
-  onOpenFileInDefaultApp,
-  onOpenFindInNote,
-  onOpenReplaceInNote,
-  onRevealFile,
-}: Pick<NoteMoreActionRowsProps, 'group' | 'note' | 'onClose' | 'onCopyFilePath' | 'onDeleteNote' | 'onEnterNeighborhood' | 'onOpenFileInDefaultApp' | 'onOpenFindInNote' | 'onOpenReplaceInNote' | 'onRevealFile'>) {
+function NonMarkdownFileActionRows(props: NoteMoreActionRowsProps) {
+  const {
+    group,
+    note,
+    onClose,
+    onCopyFilePath,
+    onDeleteNote,
+    onEnterNeighborhood,
+    onOpenFileInDefaultApp,
+    onOpenFindInNote,
+    onOpenReplaceInNote,
+  } = props
   const { mobileColors } = useMobileStyles(createThemeStyles)
   if (group === 'edit') return <NoteEditorActionRows onOpenFindInNote={onOpenFindInNote} onOpenReplaceInNote={onOpenReplaceInNote} />
   return (
@@ -108,7 +102,6 @@ function NonMarkdownFileActionRows({
       <NotePathActionRows
         onClose={onClose}
         onCopyFilePath={onCopyFilePath}
-        onRevealFile={onRevealFile}
       />
       <ActionRow
         icon={<ShareNetwork color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
@@ -263,22 +256,14 @@ function NoteNavigationActionRows({
 
 function NoteIconActionRows({
   note,
-  onOpenSetNoteIcon,
   onRemoveNoteIcon,
 }: {
   note: MobileNote
-  onOpenSetNoteIcon: () => void
   onRemoveNoteIcon: () => void
 }) {
   const { mobileColors } = useMobileStyles(createThemeStyles)
   return (
     <>
-      <ActionRow
-        icon={<Smiley color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
-        label={mobileText('command.note.setIcon')}
-        testID="workspace-action-set-note-icon"
-        onPress={onOpenSetNoteIcon}
-      />
       {note.icon ? (
         <ActionRow
           icon={<Smiley color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
@@ -296,14 +281,12 @@ function NoteFileActionRows({
   onCopyFilePath,
   onOpenMoveNoteToFolder,
   onOpenRenameNoteFile,
-  onRevealFile,
   onRenameNoteFileToTitle,
 }: {
   onClose: () => void
   onCopyFilePath: () => void
   onOpenMoveNoteToFolder: () => void
   onOpenRenameNoteFile: () => void
-  onRevealFile: () => void
   onRenameNoteFileToTitle: () => void
 }) {
   const { mobileColors } = useMobileStyles(createThemeStyles)
@@ -333,50 +316,25 @@ function NoteFileActionRows({
       <NotePathActionRows
         onClose={onClose}
         onCopyFilePath={onCopyFilePath}
-        onRevealFile={onRevealFile}
       />
     </>
   )
-}
-
-function NoteTypeActionRow({ onOpenChangeNoteType }: Pick<NoteMoreActionRowsProps, 'onOpenChangeNoteType'>) {
-  const { mobileColors } = useMobileStyles(createThemeStyles)
-  return <ActionRow
-    icon={<Tag color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
-    label={mobileText('command.note.changeType')}
-    testID="workspace-action-change-note-type"
-    onPress={onOpenChangeNoteType}
-  />
 }
 
 function NotePathActionRows({
   onClose,
   onCopyFilePath,
-  onRevealFile,
-}: Pick<NoteMoreActionRowsProps, 'onClose' | 'onCopyFilePath' | 'onRevealFile'>) {
+}: Pick<NoteMoreActionRowsProps, 'onClose' | 'onCopyFilePath'>) {
   const { mobileColors } = useMobileStyles(createThemeStyles)
-  return (
-    <>
-      <ActionRow
-        icon={<ClipboardText color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
-        label={mobileText('editor.toolbar.copyFilePath')}
-        testID="workspace-action-copy-file-path"
-        onPress={() => {
-          onCopyFilePath()
-          onClose()
-        }}
-      />
-      <ActionRow
-        icon={<ArrowSquareOut color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
-        label={mobileText('editor.toolbar.revealFile')}
-        testID="workspace-action-reveal-file"
-        onPress={() => {
-          onRevealFile()
-          onClose()
-        }}
-      />
-    </>
-  )
+  return <ActionRow
+    icon={<ClipboardText color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
+    label={mobileText('editor.toolbar.copyFilePath')}
+    testID="workspace-action-copy-file-path"
+    onPress={() => {
+      onCopyFilePath()
+      onClose()
+    }}
+  />
 }
 
 function NoteWidthActionRow({

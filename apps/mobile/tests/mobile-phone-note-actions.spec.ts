@@ -1,4 +1,4 @@
-import { openPhoneProperties, openPhoneSidebar, phoneBack } from './mobile-panel-navigation'
+import { openPhoneSidebar, phoneBack } from './mobile-panel-navigation'
 import { expect, test, type Page } from '@playwright/test'
 import { createTitledNoteFromQuickOpen } from './mobile-note-create-actions'
 
@@ -23,9 +23,7 @@ test.describe('phone note action parity', () => {
     test.skip(testInfo.project.name !== 'phone-portrait', 'Phone note actions run on the phone editor shell.')
 
     await createPhoneNote(page, 'Phone Action Source')
-    await changePhoneNoteType(page)
     await addAndRemovePhoneNoteFavorite(page)
-    await setAndRemovePhoneNoteIcon(page)
     await moveAndRenamePhoneNote(page)
     await togglePhoneNoteWidth(page)
     await archiveOrganizeAndDeletePhoneNote(page)
@@ -38,19 +36,6 @@ async function createPhoneNote(page: Page, title: string) {
   await page.getByTestId(`note-row-${noteRowSlug(title)}.md`).click()
   await expect(page.getByTestId('phone-editor-screen')).toBeVisible()
   await expectBodyOnlyPhoneNote(page, title)
-}
-
-async function changePhoneNoteType(page: Page) {
-  await page.getByTestId('editor-more-action').click()
-  await page.getByTestId('workspace-action-change-note-type').click()
-  await expect(page.getByTestId('workspace-change-type-input')).toBeVisible()
-  await page.getByTestId('workspace-change-type-input').fill('Procedure')
-  await page.getByTestId('workspace-action-sheet-changeNoteType').getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-  await openPhoneProperties(page)
-  await expect(page.getByTestId('property-row-type')).toContainText('Procedure')
-  await page.getByTestId('phone-top-bar').getByTestId('phone-back-action').click()
-  await expect(page.getByTestId('phone-editor-screen')).toBeVisible()
 }
 
 async function addAndRemovePhoneNoteFavorite(page: Page) {
@@ -75,35 +60,6 @@ async function addAndRemovePhoneNoteFavorite(page: Page) {
   await expect(page.getByTestId('sidebar-item-favorite-phone-action-source.md')).toBeHidden()
   await page.getByTestId('sidebar-item-all-notes').click()
   await phoneActionRow(page).click()
-}
-
-async function setAndRemovePhoneNoteIcon(page: Page) {
-  await expect(page.getByTestId('editor-toolbar-note-icon')).toBeHidden()
-  await page.getByTestId('editor-more-action').click()
-  await page.getByTestId('workspace-action-set-note-icon').click()
-  await expect(page.getByTestId('workspace-note-icon-input')).toHaveValue('')
-  await page.getByTestId('workspace-note-icon-input').fill('rocket')
-  await page.getByTestId('workspace-action-sheet-setNoteIcon').getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-  await expect(page.getByTestId('editor-toolbar-note-icon')).toBeVisible()
-
-  await openPhoneProperties(page)
-  await expect(page.getByTestId('property-row-icon')).toContainText('rocket')
-  await page.getByTestId('property-row-icon-edit').click()
-  await expect(page.getByTestId('workspace-action-sheet-toolbar')).toContainText('icon')
-  await expect(page.getByTestId('workspace-property-value-input')).toHaveValue('rocket')
-  await page.getByTestId('workspace-property-value-input').fill('sparkle')
-  await page.getByTestId('workspace-action-sheet-editProperty').getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-  await expect(page.getByTestId('property-row-icon')).toContainText('sparkle')
-  await page.getByTestId('phone-top-bar').getByTestId('phone-back-action').click()
-  await expect(page.getByTestId('phone-editor-screen')).toBeVisible()
-
-  await page.getByTestId('editor-more-action').click()
-  await expect(page.getByTestId('workspace-action-remove-note-icon')).toBeVisible()
-  await page.getByTestId('workspace-action-remove-note-icon').click()
-  await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-  await expect(page.getByTestId('editor-toolbar-note-icon')).toBeHidden()
 }
 
 async function moveAndRenamePhoneNote(page: Page) {
@@ -183,7 +139,7 @@ async function expectBodyOnlyPhoneNote(page: Page, title: string) {
 }
 
 function phoneActionRow(page: Page) {
-  return page.getByRole('button', { name: 'Phone Action Source' }).first()
+  return page.getByTestId('phone-note-list-screen').getByRole('button', { name: 'Phone Action Source', exact: true })
 }
 
 function noteRowSlug(title: string) {

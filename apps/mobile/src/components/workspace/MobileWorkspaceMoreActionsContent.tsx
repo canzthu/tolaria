@@ -20,6 +20,7 @@ import { MobileTypeIcon } from './MobileWorkspaceIcons'
 import { NoteMoreActionRows, type NoteActionGroup } from './MobileNoteMoreActions'
 import { isMobileMarkdownActionNote, isMobileTextLikeActionNote } from './MobileNoteMoreActionsModel'
 import { chipTone } from './mobileWorkspaceTone'
+import { useMobileDeviceLayout } from '../../ui/useMobileDeviceLayout'
 
 export function MoreActionsContent(props: MobileWorkspaceActionSheetProps) {
   const { styles } = useMobileStyles(createThemeStyles)
@@ -90,14 +91,11 @@ function SelectedNoteActionRows({
       onCopyFilePath={props.onCopyFilePath}
       onDeleteNote={props.onDeleteNote}
       onEnterNeighborhood={props.onEnterNeighborhood}
-      onOpenChangeNoteType={props.onOpenChangeNoteType}
       onOpenFileInDefaultApp={props.onOpenFileInDefaultApp}
       onOpenFindInNote={props.onOpenFindInNote}
       onOpenMoveNoteToFolder={props.onOpenMoveNoteToFolder}
       onOpenReplaceInNote={props.onOpenReplaceInNote}
       onOpenRenameNoteFile={props.onOpenRenameNoteFile}
-      onOpenSetNoteIcon={props.onOpenSetNoteIcon}
-      onRevealFile={props.onRevealFile}
       onRenameNoteFileToTitle={props.onRenameNoteFileToTitle}
       onRedoWorkspaceEdit={props.onRedoWorkspaceEdit}
       onRemoveNoteIcon={props.onRemoveNoteIcon}
@@ -120,6 +118,7 @@ function MarkdownNoteMoreActionRows({
   props: MobileWorkspaceActionSheetProps
 }) {
   const { mobileColors } = useMobileStyles(createThemeStyles)
+  const phone = useMobileDeviceLayout() === 'phone'
   if (group === 'note') return null
   if (group === 'file') return <MoreActionRow
     icon={<FilePlus color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
@@ -132,12 +131,12 @@ function MarkdownNoteMoreActionRows({
   />
   return (
     <>
-      <MoreActionRow
+      {!phone ? <MoreActionRow
         icon={<ListBullets color={mobileColors.textMuted} size={desktopToolbarActionParity.iconSize} />}
         label={mobileText('tableOfContents.title')}
         testID="workspace-action-table-of-contents"
         onPress={props.onOpenTableOfContents}
-      />
+      /> : null}
       <MobileTableMoreActions
         editorBlocks={props.editorBlocks}
         editorBullets={props.editorBullets}

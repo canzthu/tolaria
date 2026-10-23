@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 
 const mobileClipboardAttemptsGlobalKey = '__TOLARIA_MOBILE_CLIPBOARD_ATTEMPTS__'
-const mobileFileRevealAttemptsGlobalKey = '__TOLARIA_MOBILE_FILE_REVEAL_ATTEMPTS__'
 
 test.describe('phone note utility actions', () => {
   test('opens a selected note neighborhood from the phone editor more sheet', async ({ page }, testInfo) => {
@@ -39,7 +38,7 @@ test.describe('phone note utility actions', () => {
     )
   })
 
-  test('reveals the selected note file from the phone editor more sheet', async ({ page }, testInfo) => {
+  test('does not expose reveal-in-Finder from the phone editor more sheet', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'phone-portrait', 'Phone utility actions run on the phone editor shell.')
 
     await page.goto('/')
@@ -47,16 +46,6 @@ test.describe('phone note utility actions', () => {
     await expect(page.getByTestId('phone-editor-screen')).toBeVisible()
     await page.getByTestId('editor-more-action').click()
     await page.getByTestId('workspace-action-group-file').click()
-    await page.getByTestId('workspace-action-reveal-file').click()
-
-    await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
-    await expect(page.evaluate((key) => {
-      const attempts = (window as unknown as Record<string, unknown>)[key]
-      return Array.isArray(attempts) ? attempts.at(-1) : null
-    }, mobileFileRevealAttemptsGlobalKey)).resolves.toEqual({
-      noteId: 'workflow-orchestration',
-      path: 'Tolaria/Mobile UI/Workflow Orchestration Essay.md',
-      title: 'Workflow Orchestration Essay',
-    })
+    await expect(page.getByTestId('workspace-action-reveal-file')).toHaveCount(0)
   })
 })

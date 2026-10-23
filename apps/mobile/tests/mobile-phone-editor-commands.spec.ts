@@ -16,17 +16,15 @@ test.describe('phone editor command parity', () => {
     await assertPhoneSourceFrontmatterWarning(page)
     await applyPhoneFormattingCommands(page)
     await assertRenderedPhoneMarkdown(page)
-    await openPhoneTableOfContents(page)
   })
 })
 
 async function createPhonePersonNote(page: Page) {
   await createPhoneNote(page, 'Phone Person Target')
-  await page.getByTestId('editor-more-action').click()
-  await page.getByTestId('workspace-action-change-note-type').click()
-  await page.getByTestId('workspace-change-type-input').fill('Person')
-  await page.getByTestId('workspace-action-sheet-changeNoteType').getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
+  await page.getByTestId('editor-source-action').click()
+  const input = page.getByTestId('editor-markdown-input')
+  await input.fill('---\ntype: Person\n---\n\n# Phone Person Target')
+  await expect(input).toHaveValue(/type: Person/u)
   await phoneBack(page)
   await expect(page.getByTestId('phone-note-list-screen')).toBeVisible()
 }
@@ -85,6 +83,7 @@ async function applyPhoneFormattingCommands(page: Page) {
   await expect(input).toHaveValue(/\*\*bold text\*\*/u)
 
   await input.fill('# Phone Editor Commands\n\nSection title')
+  await page.getByLabel('Headings').click()
   await page.getByTestId('editor-format-heading-2').click()
   await expect(input).toHaveValue(/## Section title/u)
 
@@ -96,6 +95,7 @@ async function applyPhoneFormattingCommands(page: Page) {
   await input.fill('# Phone Editor Commands\n\nPaste: ')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate(() => navigator.clipboard.writeText('Plain\nClipboard'))
+  await page.getByTestId('editor-format-menu-more').click()
   await page.getByTestId('editor-format-paste-plain-text').click()
   await expect(input).toHaveValue('# Phone Editor Commands\n\nPaste: Plain\nClipboard')
 
@@ -108,26 +108,26 @@ async function applyPhoneFormattingCommands(page: Page) {
       path: 'attachments/project brief.pdf',
     }
   }, MOBILE_ATTACHMENT_IMPORTS_GLOBAL_KEY)
-  await page.getByTestId('editor-format-attachment').scrollIntoViewIfNeeded()
+  await page.getByTestId('editor-format-menu-insert').click()
   await page.getByTestId('editor-format-attachment').click()
   await expect(input).toHaveValue('# Phone Editor Commands\n\nAttachment: \n\n[Project Brief.pdf](<attachments/project brief.pdf>)')
 
   await input.fill('# Phone Editor Commands\n\nFollow up')
-  await page.getByTestId('editor-format-task-list').scrollIntoViewIfNeeded()
+  await page.getByTestId('editor-format-menu-lists').click()
   await page.getByTestId('editor-format-task-list').click()
   await expect(input).toHaveValue(/- \[ \] Follow up/u)
 
   const listDraft = '# Phone Editor Commands\n\n- One\n- Two'
   await input.fill(listDraft)
-  await page.getByTestId('editor-format-indent').scrollIntoViewIfNeeded()
+  await page.getByTestId('editor-format-menu-lists').click()
   await page.getByTestId('editor-format-indent').click()
   await expect(input).toHaveValue('# Phone Editor Commands\n\n- One\n  - Two')
-  await page.getByTestId('editor-format-outdent').scrollIntoViewIfNeeded()
+  await page.getByTestId('editor-format-menu-lists').click()
   await page.getByTestId('editor-format-outdent').click()
   await expect(input).toHaveValue(listDraft)
 
   await input.fill('# Phone Editor Commands\n\n')
-  await page.getByTestId('editor-format-table').scrollIntoViewIfNeeded()
+  await page.getByTestId('editor-format-menu-insert').click()
   await page.getByTestId('editor-format-table').click()
   await expect(input).toHaveValue(/\| Column \| Value \|/u)
 
@@ -136,12 +136,12 @@ async function applyPhoneFormattingCommands(page: Page) {
   await expect(input).toHaveValue('# Phone Editor Commands\n\n/table')
 
   await input.fill('# Phone Editor Commands\n\n')
-  await page.getByTestId('editor-format-math-block').scrollIntoViewIfNeeded()
+  await page.getByTestId('editor-format-menu-insert').click()
   await page.getByTestId('editor-format-math-block').click()
   await expect(input).toHaveValue('# Phone Editor Commands\n\n$$\n\\sqrt{a^2 + b^2}\n$$')
 
   await input.fill('# Phone Editor Commands\n\n')
-  await page.getByTestId('editor-format-mermaid').scrollIntoViewIfNeeded()
+  await page.getByTestId('editor-format-menu-insert').click()
   await page.getByTestId('editor-format-mermaid').click()
   await expect(input).toHaveValue('# Phone Editor Commands\n\n```mermaid\nflowchart TD\n    edit["Switch to the raw editor to edit"]\n```')
 }
@@ -168,17 +168,6 @@ async function assertRenderedPhoneMarkdown(page: Page) {
   await expect(input).toHaveValue(/- \[ \] Follow up/u)
   await expect(input).toHaveValue(/\| Phone \| Parity \|/u)
   await page.waitForTimeout(300)
-}
-
-async function openPhoneTableOfContents(page: Page) {
-  await page.getByTestId('editor-more-action').click()
-  await page.getByTestId('workspace-action-group-edit').click()
-  await page.getByTestId('workspace-action-table-of-contents').click()
-  await expect(page.getByTestId('table-of-contents-panel')).toBeVisible()
-  await expect(page.getByTestId('table-of-contents-row-toc-title')).toContainText('Phone Editor Commands')
-  await expect(page.getByTestId('table-of-contents-row-toc-heading-0')).toContainText('Section title')
-  await page.getByTestId('workspace-action-sheet-toolbar').getByRole('button', { name: 'Cancel' }).click()
-  await expect(page.getByTestId('workspace-action-sheet')).toBeHidden()
 }
 
 async function expectBodyOnlyPhoneNote(page: Page, title: string) {
