@@ -225,8 +225,10 @@ Expo's filesystem on the booted iOS simulator, using disposable repositories onl
 Standalone probes use the existing QA-only native launch arguments, without
 depending on delivery of a cold-start URL. The native capability and loopback
 endpoint checks remain required. Set `TOLARIA_GIT_QA_FILES=6000` for the opt-in
-large-vault fixture and separate clone/push/pull/unchanged-sync timings; routine
-checks retain the fast two-note fixture.
+large-vault fixture and separate clone/push/pull/unchanged-sync timings. Large
+fixtures require `--device <UDID>` to select an explicitly booted disposable
+simulator; they never target an ambiguous `booted` simulator. Routine checks
+retain the fast two-note fixture and its existing booted-device default.
 `TOLARIA_GIT_QA_HISTORY_MIB=128` additionally creates incompressible historical
 attachment revisions, removed from the current tree but retained in Git history.
 This checks that current-tree clone cost is independent of deleted attachment
