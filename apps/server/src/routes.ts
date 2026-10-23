@@ -20,6 +20,7 @@ import type { DocIndex } from './docIndex.ts'
 import { VaultError } from './errors.ts'
 import { entityTag, errorReply, quoted, type Reply, singleHeader } from './httpIo.ts'
 import { isNote, type VaultPath, vaultPath } from './paths.ts'
+import type { SearchIndex } from './searchIndex.ts'
 import type { TimedWriteResult, Timings, Vault, WritePrecondition } from './vault.ts'
 import type { VaultIndex } from './vaultIndex.ts'
 
@@ -27,6 +28,7 @@ export interface Services {
   vault: Vault
   docs: DocIndex
   index: VaultIndex
+  search: SearchIndex
   /** True once the collaboration channel is served, not only reserved. */
   collab: boolean
   /** Present when the collaboration channel is served. */
@@ -176,9 +178,9 @@ function searchQuery(query: string): string {
   throw invalidRequest(`q must be one line of 1 to ${MAX_QUERY_CHARS} characters`)
 }
 
-async function search({ url }: ApiRequest, { vault }: Services): Promise<Reply> {
+async function search({ url }: ApiRequest, { search }: Services): Promise<Reply> {
   const query = searchQuery(url.searchParams.get('q') ?? '')
-  return { status: 200, body: await vault.search(query, searchLimit(url.searchParams.get('limit'))) }
+  return { status: 200, body: await search.search(query, searchLimit(url.searchParams.get('limit'))) }
 }
 
 async function sync(_request: ApiRequest, { vault }: Services): Promise<Reply> {
