@@ -7,17 +7,30 @@ function isTauriRuntime(): boolean {
   return '__TAURI__' in window || '__TAURI_INTERNALS__' in window;
 }
 
+function isWebBuild(): boolean {
+  // Web build has remote backend configured
+  return typeof window !== 'undefined' &&
+    'TOLARIA_REMOTE_URL' in window &&
+    !!(window as { TOLARIA_REMOTE_URL?: string }).TOLARIA_REMOTE_URL;
+}
+
 function isServiceWorkerSupported(): boolean {
   return 'serviceWorker' in navigator;
 }
 
 /**
  * Registers the service worker for offline caching. Safe to call multiple times;
- * registration is idempotent. Only registers when running in a browser (not Tauri).
+ * registration is idempotent. Only registers in the web build with remote backend,
+ * never in Tauri desktop app or desktop browser harness.
  */
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (isTauriRuntime()) {
     // Desktop app uses local files; service worker is not needed
+    return null;
+  }
+
+  if (!isWebBuild()) {
+    // Desktop browser harness or local development without remote backend
     return null;
   }
 
