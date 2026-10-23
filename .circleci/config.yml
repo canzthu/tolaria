@@ -343,6 +343,9 @@ jobs:
     executor: node
     steps:
       - checkout
+      - skip_unless_changed:
+          scope: mobile-ota-quality
+          paths: "^(apps/mobile/|src/utils/|src/shared/|src/lib/|packages/|pnpm-lock\\.yaml|\\.circleci/)"
       - install_frontend_dependencies
       - run:
           name: Verify mobile source and publishing safeguards
@@ -785,6 +788,9 @@ jobs:
           key: playwright-v1-{{ checksum "pnpm-lock.yaml" }}
           paths:
             - ~/.cache/ms-playwright
+      - run:
+          name: Web typecheck
+          command: pnpm typecheck:web
       - run:
           name: Server tests with coverage
           command: pnpm test:server
