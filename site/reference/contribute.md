@@ -19,6 +19,10 @@ Tolaria is supported by a panel of tools Luca uses every day to keep the project
 
 Use the [product board](https://tolaria.canny.io/) for feature ideas. Search first, upvote existing ideas, and create a new post when the request is genuinely new.
 
+## Community
+
+Join the [Tolaria Discord server](https://discord.gg/tRBC2u428B) to connect with other users, request mobile beta access, share tips, and stay updated on development.
+
 ## Discussions
 
 Use [GitHub Discussions](https://github.com/refactoringhq/tolaria/discussions) for questions, conversations, show and tell, and broader community context.
