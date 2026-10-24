@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "まずはボードで検索し、既存のアイデアに賛成票を投じてください。本当に新しいアイデアの場合は、新しい投稿を作成してください！",
   "feedback.featureRequests.cta": "製品ボードを開く",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "ディスカッション",
-  "feedback.discussions.description": "ディスカッションは、質問、会話、ショー＆テル、コミュニティのコンテキストに使用してください。",
-  "feedback.discussions.cta": "ディスカッションを開く",
-  "feedback.discussions.linkLabel": "GitHub Discussions",
   "feedback.contributeCode.title": "コードを投稿する",
   "feedback.contributeCode.description": "小規模で焦点を絞ったPRを歓迎します。まずはボードを確認して、適切なものを作成してください！",
   "feedback.contributeCode.cta": "オープンPR",
@@ -995,6 +991,8 @@
   "status.conflict.count": "{count}件の競合{plural}",
   "status.offline.title": "インターネット接続なし",
   "status.offline.label": "オフライン",
+  "status.offline.readOnlyTitle": "インターネットに接続されていません。再接続するまで、ノートは読み取り専用になります。",
+  "status.offline.readOnlyLabel": "オフライン · 読み取り専用",
   "status.changes.view": "保留中の変更を表示",
   "status.changes.label": "変更",
   "status.commit.local": "変更をローカルでコミット",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "ローカルでコミット",
   "mobile.sync.action": "同期",
   "mobile.sync.failedAt": "{time}に失敗しました",
-  "mobile.properties.addRelationships": "リレーションシップを追加"
+  "mobile.properties.addRelationships": "リレーションシップを追加",
+  "feedback.community.title": "TolariaのDiscordに参加する",
+  "feedback.community.description": "チームや他のユーザーとチャットしたり、サポートを受けたり、アルファ版やモバイル版のビルドを試したりできます。",
+  "feedback.community.cta": "Discordに参加する",
+  "feedback.community.linkLabel": "Discordに参加する",
+  "communityBanner.invite": "Tolariaコミュニティに参加して、Discordで私たちとチャットしましょう。",
+  "communityBanner.dismiss": "コミュニティへの招待を閉じる"
 }

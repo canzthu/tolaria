@@ -43,3 +43,28 @@ it('foreground return retries after an expired lease, without background polling
   expect(run).toHaveBeenCalledOnce()
   scheduler.dispose()
 })
+
+it('starts the initial background sync as soon as a restored vault becomes ready', async () => {
+  const run = vi.fn().mockResolvedValue(undefined)
+  const scheduler = createMobileAutoGit(run, 30_000)
+  let blocked = true
+  const lifecycle = createWorkspaceSyncLifecycle(scheduler, () => ({ enabled: true, blocked }), 'active')
+  lifecycle.poll()
+  await Promise.resolve()
+  expect(run).not.toHaveBeenCalled()
+
+  blocked = false
+  lifecycle.refresh()
+  await vi.waitFor(() => expect(run).toHaveBeenCalledOnce())
+  scheduler.dispose()
+})
+
+it('starts a foreground-return sync immediately instead of waiting for the idle debounce', async () => {
+  const run = vi.fn().mockResolvedValue(undefined)
+  const scheduler = createMobileAutoGit(run, 30_000)
+  const lifecycle = createWorkspaceSyncLifecycle(scheduler, () => ({ enabled: true, blocked: false }), 'background')
+
+  lifecycle.change('active')
+  await vi.waitFor(() => expect(run).toHaveBeenCalledOnce())
+  scheduler.dispose()
+})

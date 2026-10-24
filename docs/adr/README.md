@@ -277,3 +277,4 @@ proposed → active → superseded
 | [0278](0278-desktop-note-save-byte-transport.md) | Desktop note saves use UTF-8 byte transport | active |
 | [0279](0279-mobile-preview-configuration-tolerance.md) | Mobile preview configuration tolerance | active |
 | [0280](0280-debounced-push-and-background-fetch.md) | Debounced push and background fetch for Tolaria remote | active |
+| [0282](0282-web-offline-read-service-worker.md) | Web offline read with a hand-written, per-account service worker | active |

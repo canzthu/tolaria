@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Suche zuerst im Board, stimme für bestehende Ideen ab und erstelle neue Beiträge, wenn sie wirklich neu sind!",
   "feedback.featureRequests.cta": "Product Board öffnen",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Diskussionen",
-  "feedback.discussions.description": "Nutze Diskussionen für Fragen, Gespräche, Show & Tell und Community-Kontext.",
-  "feedback.discussions.cta": "Offene Diskussionen",
-  "feedback.discussions.linkLabel": "GitHub-Diskussionen",
   "feedback.contributeCode.title": "Code beisteuern",
   "feedback.contributeCode.description": "Kleine, fokussierte PRs sind willkommen. Schau dir zuerst das Board an, damit du die richtigen Dinge baust!",
   "feedback.contributeCode.cta": "Offene PRs",
@@ -995,6 +991,8 @@
   "status.conflict.count": "{count} Konflikt{plural}",
   "status.offline.title": "Keine Internetverbindung",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Keine Internetverbindung. Notizen sind schreibgeschützt, bis Sie die Verbindung wiederherstellen.",
+  "status.offline.readOnlyLabel": "Offline · schreibgeschützt",
   "status.changes.view": "Ausstehende Änderungen anzeigen",
   "status.changes.label": "Änderungen",
   "status.commit.local": "Änderungen lokal committen",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Lokal committen",
   "mobile.sync.action": "Synchronisieren",
   "mobile.sync.failedAt": "Fehlgeschlagen {time}",
-  "mobile.properties.addRelationships": "Beziehungen hinzufügen"
+  "mobile.properties.addRelationships": "Beziehungen hinzufügen",
+  "feedback.community.title": "Dem Tolaria-Discord beitreten",
+  "feedback.community.description": "Chatten Sie mit dem Team und anderen Nutzern, erhalten Sie Hilfe und testen Sie Alpha- und Mobile-Builds.",
+  "feedback.community.cta": "Discord beitreten",
+  "feedback.community.linkLabel": "Discord beitreten",
+  "communityBanner.invite": "Treten Sie der Tolaria-Community bei und chatten Sie mit uns auf Discord.",
+  "communityBanner.dismiss": "Community-Einladung verwerfen"
 }

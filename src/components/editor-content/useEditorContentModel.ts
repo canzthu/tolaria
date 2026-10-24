@@ -7,6 +7,7 @@ import { useEditorTheme } from '../../hooks/useTheme'
 import { updateVaultConfigField } from '../../utils/vaultConfigStore'
 import type { BlockNoteRenderRecoveryReason } from '../blockNoteRenderRecovery'
 import { deriveEditorContentState } from './editorContentState'
+import { useOfflineReadOnly } from '../../hooks/useOfflineReadOnly'
 import type { RawEditorFindRequest } from '../RawEditorFindBar'
 import type { ImageImportError } from '../../hooks/useImageDrop'
 
@@ -109,6 +110,7 @@ export function useEditorContentModel(props: EditorContentProps) {
   }, [toggleRaw])
 
   const breadcrumbBarRef = useRef<HTMLDivElement | null>(null)
+  const readOnly = useOfflineReadOnly()
 
   return {
     ...props,
@@ -125,5 +127,6 @@ export function useEditorContentModel(props: EditorContentProps) {
     path,
     breadcrumbBarRef,
     wordCount,
+    readOnly,
   }
 }

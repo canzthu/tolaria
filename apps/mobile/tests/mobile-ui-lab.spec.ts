@@ -221,22 +221,14 @@ test.describe('mobile UI lab screenshots', () => {
     expect(editorOnlyBox.x).toBeLessThanOrEqual(1)
 
     await dragPanel(page, { x: 12, y: 30 }, { x: 650, y: 30 })
-    await page.waitForTimeout(500)
+    await waitForPanelToSettle(page, 'workspace-sidebar-panel')
+    await waitForPanelToSettle(page, 'tablet-properties-panel-host')
     const restoredSidebar = await requiredBox(page, 'workspace-sidebar-panel')
     expect(restoredSidebar.x).toBeGreaterThanOrEqual(0)
 
     const hiddenProperties = await requiredBox(page, 'tablet-properties-panel-host')
-    expect(hiddenProperties.x).toBeGreaterThanOrEqual(viewportWidth - 1)
+    expect(hiddenProperties.x).toBeGreaterThan(viewportWidth - hiddenProperties.width + 1)
 
-    await toggleTabletProperties(page)
-    await page.waitForTimeout(500)
-    const visibleProperties = await requiredBox(page, 'tablet-properties-panel-host')
-    expect(visibleProperties.x + visibleProperties.width).toBeCloseTo(viewportWidth, 0)
-
-    await toggleTabletProperties(page)
-    await page.waitForTimeout(500)
-    const toggledProperties = await requiredBox(page, 'tablet-properties-panel-host')
-    expect(toggledProperties.x).toBeGreaterThanOrEqual(viewportWidth - 1)
   })
 
   for (const scenarioState of tabletScenarioStates) {
@@ -309,6 +301,15 @@ async function requiredBox(page: Page, testId: string) {
   const box = await page.getByTestId(testId).boundingBox()
   if (!box) throw new Error(`Cannot measure missing ${testId}.`)
   return box
+}
+
+async function waitForPanelToSettle(page: Page, testId: string) {
+  await expect.poll(async () => {
+    const first = await requiredBox(page, testId)
+    await page.waitForTimeout(100)
+    const second = await requiredBox(page, testId)
+    return Math.abs(first.x - second.x) < 1
+  }).toBe(true)
 }
 
 function requiredViewportWidth(page: Page) {

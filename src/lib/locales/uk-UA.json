@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Спершу пошукайте на дошці, проголосуйте за наявні ідеї та створюйте нові дописи, лише коли ідея справді нова!",
   "feedback.featureRequests.cta": "Відкрити дошку продукту",
   "feedback.featureRequests.linkLabel": "Дошка продукту",
-  "feedback.discussions.title": "Обговорення",
-  "feedback.discussions.description": "Використовуйте «Обговорення» для запитань, розмов, демонстрацій і контексту спільноти.",
-  "feedback.discussions.cta": "Відкрити обговорення",
-  "feedback.discussions.linkLabel": "GitHub Discussions",
   "feedback.contributeCode.title": "Зробити внесок кодом",
   "feedback.contributeCode.description": "Невеликі, сфокусовані PR вітаються. Спершу перевірте дошку, щоб створювати правильні речі!",
   "feedback.contributeCode.cta": "Відкриті PR",
@@ -995,6 +991,8 @@
   "status.conflict.count": "Конфлікти: {count}{plural}",
   "status.offline.title": "Немає підключення до інтернету",
   "status.offline.label": "Офлайн",
+  "status.offline.readOnlyTitle": "Немає підключення до Інтернету. Нотатки доступні лише для читання, доки ви не відновите підключення.",
+  "status.offline.readOnlyLabel": "Офлайн · лише для читання",
   "status.changes.view": "Переглянути незавершені зміни",
   "status.changes.label": "Зміни",
   "status.commit.local": "Закомітити зміни локально",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Виконати коміт локально",
   "mobile.sync.action": "Синхронізація",
   "mobile.sync.failedAt": "Помилка {time}",
-  "mobile.properties.addRelationships": "Додати зв'язки"
+  "mobile.properties.addRelationships": "Додати зв'язки",
+  "feedback.community.title": "Приєднуйтесь до Discord-сервера Tolaria",
+  "feedback.community.description": "Спілкуйтеся з командою та іншими користувачами, отримуйте допомогу та випробовуйте альфа-версії й мобільні збірки.",
+  "feedback.community.cta": "Приєднатися до Discord",
+  "feedback.community.linkLabel": "Приєднатися до Discord",
+  "communityBanner.invite": "Приєднуйтеся до спільноти Tolaria та спілкуйтеся з нами в Discord.",
+  "communityBanner.dismiss": "Відхилити запрошення до спільноти"
 }

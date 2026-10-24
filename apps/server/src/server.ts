@@ -92,10 +92,10 @@ export async function createVaultServer(options: ServerOptions): Promise<Server>
   const { files } = await vault.list()
   await docs.reconcile(files.map((file) => file.path as VaultPath).filter(isNote))
   vault.onChange((vaultChanges) => docs.apply(vaultChanges))
-  const index = await VaultIndex.open(vault, options.store)
+  const index = await VaultIndex.open(vault, options.store, log)
   vault.onChange((vaultChanges) => index.apply(vaultChanges))
   const { SearchIndex } = await import('./searchIndex.ts')
-  const search = await SearchIndex.open(vault, options.store)
+  const search = await SearchIndex.open(vault, options.store, log)
   vault.onChange((vaultChanges) => search.apply(vaultChanges))
   const tickets = options.collab === false ? undefined : new TicketBook()
   const services: Services = { vault, docs, index, search, collab: tickets !== undefined, tickets, changes }

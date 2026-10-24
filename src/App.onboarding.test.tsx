@@ -23,6 +23,7 @@ describe("App.onboarding", () => {
 			active_vault: null,
 			hidden_defaults: [],
 		};
+		mockCommandResults.get_ai_agents_status = () => new Promise(() => {});
 		mockCommandResults.check_vault_exists = (args?: { path?: string }) =>
 			args?.path === expectedDefaultVaultPath;
 
@@ -51,42 +52,45 @@ describe("App.onboarding", () => {
 	it.each([
 		["telemetry-accept", "Allow anonymous reporting"],
 		["telemetry-decline", "No thanks"],
-	])("ignores a remembered default vault after %s when onboarding was never completed", async (buttonTestId) => {
-		const rememberedDefaultVaultPath = expectedDefaultVaultPath;
-		localStorage.setItem("tolaria_welcome_dismissed", "1");
-		mockCommandResults.get_default_vault_path = rememberedDefaultVaultPath;
-		mockCommandResults.get_settings = createSettings({
-			telemetry_consent: null,
-		});
-		mockCommandResults.load_vault_list = {
-			vaults: [],
-			active_vault: rememberedDefaultVaultPath,
-			hidden_defaults: [],
-		};
-		mockCommandResults.check_vault_exists = (args?: { path?: string }) =>
-			args?.path === rememberedDefaultVaultPath;
+	])(
+		"ignores a remembered default vault after %s when onboarding was never completed",
+		async (buttonTestId) => {
+			const rememberedDefaultVaultPath = expectedDefaultVaultPath;
+			localStorage.setItem("tolaria_welcome_dismissed", "1");
+			mockCommandResults.get_default_vault_path = rememberedDefaultVaultPath;
+			mockCommandResults.get_settings = createSettings({
+				telemetry_consent: null,
+			});
+			mockCommandResults.load_vault_list = {
+				vaults: [],
+				active_vault: rememberedDefaultVaultPath,
+				hidden_defaults: [],
+			};
+			mockCommandResults.check_vault_exists = (args?: { path?: string }) =>
+				args?.path === rememberedDefaultVaultPath;
 
-		render(<App />);
+			render(<App />);
 
-		await waitFor(
-			() => {
-				expect(screen.getByText("Help improve Tolaria")).toBeInTheDocument();
-			},
-			{ timeout: SLOW_APP_READY_TIMEOUT_MS },
-		);
+			await waitFor(
+				() => {
+					expect(screen.getByText("Help improve Tolaria")).toBeInTheDocument();
+				},
+				{ timeout: SLOW_APP_READY_TIMEOUT_MS },
+			);
 
-		fireEvent.click(screen.getByTestId(buttonTestId));
+			fireEvent.click(screen.getByTestId(buttonTestId));
 
-		await waitFor(
-			() => {
-				expect(screen.getByTestId("welcome-screen")).toBeInTheDocument();
-			},
-			{ timeout: SLOW_APP_READY_TIMEOUT_MS },
-		);
-		expect(screen.getByTestId("welcome-open-folder")).toHaveTextContent(
-			"Open existing vault",
-		);
-	});
+			await waitFor(
+				() => {
+					expect(screen.getByTestId("welcome-screen")).toBeInTheDocument();
+				},
+				{ timeout: SLOW_APP_READY_TIMEOUT_MS },
+			);
+			expect(screen.getByTestId("welcome-open-folder")).toHaveTextContent(
+				"Open existing vault",
+			);
+		},
+	);
 
 	it("keeps one startup shell visible while the last vault is still resolving", async () => {
 		localStorage.setItem("tolaria_welcome_dismissed", "1");
@@ -195,7 +199,7 @@ describe("App.onboarding", () => {
 		};
 		mockCommandResults.check_vault_exists = (args?: { path?: string }) =>
 			args?.path === selectedVaultPath;
-		mockCommandResults.get_ai_agents_status = {};
+		mockCommandResults.get_ai_agents_status = () => new Promise(() => {});
 		mockCommandResults.save_vault_list = (args?: {
 			list?: {
 				vaults?: Array<{ label: string; path: string }>;
@@ -246,7 +250,14 @@ describe("App.onboarding", () => {
 			},
 			{ timeout: SLOW_APP_READY_TIMEOUT_MS },
 		);
-		expect(screen.getByText("AI setup is optional")).toBeInTheDocument();
+		expect(screen.getByText("Checking AI setup")).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Set up later" }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId("status-settings")).toBeInTheDocument();
+		});
+		fireEvent.click(screen.getByTestId("status-settings"));
+		expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
 
 		promptSpy.mockRestore();
 	});

@@ -1,227 +1,220 @@
+import {
+	type APIRequestContext,
+	type BrowserContext,
+	expect,
+	type Page,
+	test,
+} from "@playwright/test";
+import { COLLAB_TOKEN } from "../playwright.config";
+import { OFFLINE_ORIGIN, OfflineOrigin } from "./offlineOrigin";
+
 /**
- * Offline mode tests: service worker caching, offline state visibility,
- * and read-only editor behavior when the network is unavailable.
+ * TOL-198: a note opened in an earlier session opens with the network gone, from the
+ * service worker's cache, read-only and marked offline. A note never opened fails, which
+ * proves the worker's own fetches are cut too. An edit attempted offline is not kept
+ * anywhere to send later, and one account's cached notes never reach another.
  */
 
-import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+const CACHED = { path: "projects/heron.md", title: "Heron", body: "Owned by" };
+const OFFLINE_EDIT = "typed-while-offline";
 
-const TEST_TOKEN = 'e2e-token-not-a-secret-0123456789';
+test.describe.configure({ mode: "serial", retries: 0 });
+test.use({ baseURL: OFFLINE_ORIGIN });
 
-async function configureRemoteVault(page: Page): Promise<void> {
-  await page.addInitScript((token) => {
-    window.TOLARIA_REMOTE_URL = window.location.origin;
-    window.TOLARIA_REMOTE_TOKEN = token;
-  }, TEST_TOKEN);
+const origin = new OfflineOrigin();
+
+test.beforeEach(async () => {
+	await origin.start();
+});
+
+test.afterEach(async () => {
+	await origin.stop().catch(() => {});
+});
+
+/**
+ * The remote vault, and what the device reports about its connection: `navigator.onLine`
+ * and the online/offline events, as a phone in airplane mode would.
+ */
+async function configurePage(page: Page, online: boolean): Promise<void> {
+	await page.addInitScript(
+		({ token, startOnline }) => {
+			window.TOLARIA_REMOTE_URL = window.location.origin;
+			window.TOLARIA_REMOTE_TOKEN = token;
+			window.localStorage.setItem("tolaria:claude-code-onboarding-dismissed", "1");
+			let onLine = startOnline;
+			Object.defineProperty(Navigator.prototype, "onLine", {
+				configurable: true,
+				get: () => onLine,
+			});
+			Reflect.set(window, "__setDeviceOnline", (next: boolean) => {
+				onLine = next;
+				window.dispatchEvent(new Event(next ? "online" : "offline"));
+			});
+		},
+		{ token: COLLAB_TOKEN, startOnline: online },
+	);
 }
 
-async function waitForAppReady(page: Page) {
-  await expect(
-    page
-      .getByTestId('note-list-container')
-      .getByText('Welcome', { exact: true }),
-  ).toBeVisible({ timeout: 10000 });
-  // Wait a bit for the service worker to register
-  await page.waitForTimeout(1000);
+async function setDeviceOnline(page: Page, online: boolean): Promise<void> {
+	await page.evaluate((next) => {
+		(Reflect.get(window, "__setDeviceOnline") as (value: boolean) => void)(next);
+	}, online);
 }
 
-async function openNote(page: Page, noteTitle: string) {
-  // Click on note list
-  await page.click('[data-testid="note-list"]');
-  await page.waitForTimeout(200);
-  
-  // Search for the note
-  await page.keyboard.type(noteTitle);
-  await page.waitForTimeout(300);
-  
-  // Click the first result
-  const firstNote = page.locator('[data-testid^="note-item-"]').first();
-  await firstNote.click();
-  await page.waitForTimeout(500);
+function noteList(page: Page) {
+	return page.getByTestId("note-list-container");
 }
 
-test.describe('Offline mode', () => {
-  test.beforeEach(async ({ page }) => {
-    await configureRemoteVault(page);
-    await page.goto('/');
-    await waitForAppReady(page);
-  });
+function editor(page: Page) {
+	return page.locator(".bn-editor");
+}
 
-  test('service worker registers successfully in web build', async ({ page }) => {
-    // Check that service worker is registered
-    const registration = await page.evaluate(() => {
-      return navigator.serviceWorker.getRegistration().then((reg) => ({
-        hasRegistration: !!reg,
-        active: reg?.active?.state,
-      }));
-    });
+async function openNote(page: Page, title: string): Promise<void> {
+	await noteList(page).getByText(title, { exact: true }).click();
+}
 
-    expect(registration.hasRegistration).toBe(true);
-    expect(registration.active).toBe('activated');
-  });
+/** Status of an authorized note request made by the page, through the service worker. */
+async function pageFetchStatus(
+	page: Page,
+	path: string,
+	token = COLLAB_TOKEN,
+): Promise<number | "failed"> {
+	return page.evaluate(
+		async ({ url, bearer }) => {
+			try {
+				const response = await fetch(url, {
+					headers: { authorization: `Bearer ${bearer}` },
+				});
+				return response.status;
+			} catch {
+				return "failed" as const;
+			}
+		},
+		{ url: `/v1/files/${path}`, bearer: token },
+	);
+}
 
-  test('shows offline badge when network is unavailable', async ({ page, context }) => {
-    // Go offline
-    await context.setOffline(true);
-    await page.waitForTimeout(1000);
+async function isCached(page: Page, path: string): Promise<boolean> {
+	return page.evaluate(
+		async (url) => !!(await caches.match(new URL(url, location.origin).href)),
+		`/v1/files/${path}`,
+	);
+}
 
-    // Check for offline badge in status bar
-    const offlineBadge = page.locator('[data-testid="status-offline"]');
-    await expect(offlineBadge).toBeVisible();
-    
-    // Check that it says "Offline"
-    await expect(offlineBadge).toContainText('Offline');
-  });
+const AUTHORIZATION = { authorization: `Bearer ${COLLAB_TOKEN}` };
 
-  test('opens previously cached notes when offline', async ({ page, context }) => {
-    // First, open a note while online to cache it
-    await openNote(page, 'Getting Started');
-    await page.waitForTimeout(1000);
+async function serverContent(request: APIRequestContext, path: string) {
+	const response = await request.get(`/v1/files/${path}`, {
+		headers: AUTHORIZATION,
+	});
+	expect(response.status()).toBe(200);
+	return response.text();
+}
 
-    // Verify the note is open
-    const editorTitle = page.locator('[data-testid="editor-breadcrumb-title"]');
-    await expect(editorTitle).toContainText('Getting Started');
+/**
+ * A note that exists on the server but that no session ever loaded: the app may prefetch
+ * any note of the list, so the uncached one is written after the first session.
+ */
+async function createUnopenedNote(
+	request: APIRequestContext,
+	project: string,
+): Promise<string> {
+	const path = `offline-probe/${project}-${Date.now()}.md`;
+	const response = await request.put(`/v1/files/${path}`, {
+		headers: { ...AUTHORIZATION, "if-none-match": "*" },
+		data: "# Never opened\n",
+	});
+	expect(response.ok()).toBe(true);
+	return path;
+}
 
-    // Now go offline
-    await context.setOffline(true);
-    await page.waitForTimeout(1000);
+async function deleteNote(request: APIRequestContext, path: string) {
+	const current = await request.get(`/v1/files/${path}`, {
+		headers: AUTHORIZATION,
+	});
+	const etag = current.headers().etag;
+	if (!current.ok() || !etag) return;
+	await request.delete(`/v1/files/${path}`, {
+		headers: { ...AUTHORIZATION, "if-match": etag },
+	});
+}
 
-    // Reload the page (simulating app restart)
-    await page.reload();
-    await waitForAppReady(page);
+/** First session, online: the worker takes over, and one note is opened. */
+async function visitOnline(context: BrowserContext): Promise<void> {
+	const page = await context.newPage();
+	await configurePage(page, true);
+	await page.goto("/", { waitUntil: "networkidle" });
+	await expect(noteList(page).getByText(CACHED.title, { exact: true })).toBeVisible({
+		timeout: 10_000,
+	});
+	await expect
+		.poll(() => page.evaluate(() => !!navigator.serviceWorker?.controller), {
+			timeout: 15_000,
+		})
+		.toBe(true);
+	await openNote(page, CACHED.title);
+	await expect(editor(page)).toContainText(CACHED.body, { timeout: 10_000 });
+	await expect.poll(() => isCached(page, CACHED.path), { timeout: 10_000 }).toBe(true);
+	await page.close();
+}
 
-    // Try to open the same note again
-    await openNote(page, 'Getting Started');
-    
-    // The note should still open from cache
-    await expect(editorTitle).toContainText('Getting Started');
-    
-    // Offline badge should be visible
-    const offlineBadge = page.locator('[data-testid="status-offline"]');
-    await expect(offlineBadge).toBeVisible();
-  });
+/** Next session, with the network gone: the shell and the list come from the device. */
+async function startOffline(context: BrowserContext): Promise<Page> {
+	await origin.stop();
+	const page = await context.newPage();
+	await configurePage(page, false);
+	await page.goto("/");
+	await expect(noteList(page).getByText(CACHED.title, { exact: true })).toBeVisible({
+		timeout: 10_000,
+	});
+	return page;
+}
 
-  test('editor is read-only when offline', async ({ page, context }) => {
-    // Open a note while online
-    await openNote(page, 'Getting Started');
-    await page.waitForTimeout(1000);
+test("opens the last vault read-only with the network gone", async ({
+	context,
+	request,
+}, testInfo) => {
+	await visitOnline(context);
+	const unopened = await createUnopenedNote(request, testInfo.project.name);
+	const page = await startOffline(context);
 
-    // Go offline
-    await context.setOffline(true);
-    await page.waitForTimeout(1000);
+	const offlinePill = page.getByTestId("status-offline");
+	await expect(offlinePill).toBeVisible();
+	await expect(offlinePill).toHaveAttribute("data-read-only", "true");
+	await expect(page.getByTestId("vault-loading-skeleton")).toHaveCount(0);
 
-    // Try to edit the note
-    const editor = page.locator('[data-content-type]').first();
-    
-    // Click into the editor
-    await editor.click();
-    await page.waitForTimeout(200);
+	// The note opened in the earlier session reads from the cache, and cannot change.
+	await openNote(page, CACHED.title);
+	await expect(editor(page)).toContainText(CACHED.body, { timeout: 10_000 });
+	await expect(editor(page)).toHaveAttribute("contenteditable", "false");
+	await editor(page).getByText(CACHED.body).click();
+	await page.keyboard.type(OFFLINE_EDIT);
+	await expect(editor(page)).not.toContainText(OFFLINE_EDIT);
 
-    // Try to type - should not work because editor is read-only
-    await page.keyboard.type('This should not appear');
-    await page.waitForTimeout(300);
+	// A note never opened is not there: the worker cannot reach the network either.
+	expect(await pageFetchStatus(page, CACHED.path)).toBe(200);
+	expect(await pageFetchStatus(page, unopened)).toBe("failed");
 
-    // The text should not have been added (editor is read-only)
-    const editorContent = await editor.textContent();
-    expect(editorContent).not.toContain('This should not appear');
-  });
+	// Back online, the same request reaches the server, and nothing typed offline did.
+	await origin.start();
+	await setDeviceOnline(page, true);
+	await expect(offlinePill).toHaveCount(0);
+	expect(await pageFetchStatus(page, unopened)).toBe(200);
+	await page.waitForTimeout(2_000);
+	expect(await serverContent(request, CACHED.path)).not.toContain(OFFLINE_EDIT);
+	await deleteNote(request, unopened);
+	await page.close();
+});
 
-  test('sync status shows offline state', async ({ page, context }) => {
-    // Go offline
-    await context.setOffline(true);
-    await page.waitForTimeout(1000);
+test("another account never gets this account's cached notes", async ({
+	context,
+}) => {
+	await visitOnline(context);
+	const page = await startOffline(context);
 
-    // Check that sync badge or offline indicator is visible
-    const offlineBadge = page.locator('[data-testid="status-offline"]');
-    await expect(offlineBadge).toBeVisible();
-
-    // The sync badge should not be spinning or showing "syncing"
-    const syncBadge = page.locator('[data-testid="status-sync"]');
-    if (await syncBadge.isVisible()) {
-      const syncText = await syncBadge.textContent();
-      expect(syncText?.toLowerCase()).not.toContain('syncing');
-    }
-  });
-
-  test('no spinner blocks note list or editor when offline', async ({ page, context }) => {
-    // Go offline
-    await context.setOffline(true);
-    await page.waitForTimeout(1000);
-
-    // Reload to test offline startup
-    await page.reload();
-    await waitForAppReady(page);
-
-    // Check that there's no blocking spinner over the note list
-    const noteList = page.locator('[data-testid="note-list"]');
-    await expect(noteList).toBeVisible();
-    
-    // Check that note list is interactive (not blocked by a spinner)
-    const firstNote = page.locator('[data-testid^="note-item-"]').first();
-    if (await firstNote.isVisible()) {
-      await expect(firstNote).toBeEnabled();
-    }
-
-    // Check that there's no blocking spinner over the editor
-    const editor = page.locator('.app__editor');
-    await expect(editor).toBeVisible();
-    
-    // Offline badge should be present
-    const offlineBadge = page.locator('[data-testid="status-offline"]');
-    await expect(offlineBadge).toBeVisible();
-  });
-
-  test('entries list loads from cache when offline', async ({ page, context }) => {
-    // First visit while online to populate cache
-    await page.waitForTimeout(2000);
-    
-    // Count entries while online
-    const onlineEntryCount = await page.locator('[data-testid^="note-item-"]').count();
-    expect(onlineEntryCount).toBeGreaterThan(0);
-
-    // Go offline and reload
-    await context.setOffline(true);
-    await page.reload();
-    await waitForAppReady(page);
-
-    // Entries should still be visible from cache
-    const offlineEntryCount = await page.locator('[data-testid^="note-item-"]').count();
-    expect(offlineEntryCount).toBeGreaterThan(0);
-    
-    // Should have similar count (allowing for some variance)
-    expect(Math.abs(offlineEntryCount - onlineEntryCount)).toBeLessThan(5);
-  });
-
-  test('returns to editable mode when back online', async ({ page, context }) => {
-    // Start offline
-    await context.setOffline(true);
-    await page.waitForTimeout(1000);
-
-    // Open a note
-    await openNote(page, 'Getting Started');
-    
-    // Verify offline badge is visible
-    const offlineBadge = page.locator('[data-testid="status-offline"]');
-    await expect(offlineBadge).toBeVisible();
-
-    // Go back online
-    await context.setOffline(false);
-    await page.waitForTimeout(2000);
-
-    // Offline badge should disappear
-    await expect(offlineBadge).not.toBeVisible();
-
-    // Editor should now be editable
-    const editor = page.locator('[data-content-type]').first();
-    await editor.click();
-    await page.waitForTimeout(200);
-
-    // Should be able to type
-    await page.keyboard.type('Online edit test');
-    await page.waitForTimeout(300);
-
-    // The text should appear (editor is now editable)
-    const editorContent = await editor.textContent();
-    expect(editorContent).toContain('Online edit test');
-  });
+	expect(await pageFetchStatus(page, CACHED.path)).toBe(200);
+	expect(await pageFetchStatus(page, CACHED.path, "another-account-token")).toBe(
+		"failed",
+	);
+	await page.close();
 });

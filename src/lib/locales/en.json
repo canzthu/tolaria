@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Search on the board first, upvote existing ideas, and create new posts when genuinely new!",
   "feedback.featureRequests.cta": "Open Product Board",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Discussions",
-  "feedback.discussions.description": "Use Discussions for questions, conversations, show & tell, and community context.",
-  "feedback.discussions.cta": "Open Discussions",
-  "feedback.discussions.linkLabel": "GitHub Discussions",
   "feedback.contributeCode.title": "Contribute code",
   "feedback.contributeCode.description": "Small, focused PRs are welcome. Check the board first so you build the right things!",
   "feedback.contributeCode.cta": "Open PRs",
@@ -995,6 +991,8 @@
   "status.conflict.count": "{count} conflict{plural}",
   "status.offline.title": "No internet connection",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "No internet connection. Notes are read-only until you reconnect.",
+  "status.offline.readOnlyLabel": "Offline · read-only",
   "status.changes.view": "View pending changes",
   "status.changes.label": "Changes",
   "status.commit.local": "Commit changes locally",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Commit locally",
   "mobile.sync.action": "Sync",
   "mobile.sync.failedAt": "Failed {time}",
-  "mobile.properties.addRelationships": "Add relationships"
+  "mobile.properties.addRelationships": "Add relationships",
+  "feedback.community.title": "Join the Tolaria Discord",
+  "feedback.community.description": "Chat with the team and other users, get help, and try alpha and mobile builds.",
+  "feedback.community.cta": "Join Discord",
+  "feedback.community.linkLabel": "Join Discord",
+  "communityBanner.invite": "Join the Tolaria community and chat with us on Discord.",
+  "communityBanner.dismiss": "Dismiss community invitation"
 }

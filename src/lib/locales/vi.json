@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Trước tiên, hãy tìm kiếm trên bảng, bình chọn cho các ý tưởng hiện có và tạo bài đăng mới khi ý tưởng thực sự mới!",
   "feedback.featureRequests.cta": "Mở Product Board",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Thảo luận",
-  "feedback.discussions.description": "Sử dụng Discussions để đặt câu hỏi, trò chuyện, chia sẻ và tìm hiểu bối cảnh cộng đồng.",
-  "feedback.discussions.cta": "Mở Thảo luận",
-  "feedback.discussions.linkLabel": "Thảo luận trên GitHub",
   "feedback.contributeCode.title": "Đóng góp mã",
   "feedback.contributeCode.description": "Chúng tôi hoan nghênh các PR nhỏ, tập trung. Trước tiên, hãy kiểm tra bảng để bạn xây dựng đúng thứ!",
   "feedback.contributeCode.cta": "PR đang mở",
@@ -995,6 +991,8 @@
   "status.conflict.count": "{count} xung đột{plural}",
   "status.offline.title": "Không có kết nối internet",
   "status.offline.label": "Ngoại tuyến",
+  "status.offline.readOnlyTitle": "Không có kết nối internet. Ghi chú ở chế độ chỉ đọc cho đến khi bạn kết nối lại.",
+  "status.offline.readOnlyLabel": "Ngoại tuyến · chỉ đọc",
   "status.changes.view": "Xem các thay đổi đang chờ",
   "status.changes.label": "Thay đổi",
   "status.commit.local": "Commit các thay đổi cục bộ",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Gửi commit cục bộ",
   "mobile.sync.action": "Đồng bộ",
   "mobile.sync.failedAt": "Thất bại {time}",
-  "mobile.properties.addRelationships": "Thêm mối quan hệ"
+  "mobile.properties.addRelationships": "Thêm mối quan hệ",
+  "feedback.community.title": "Tham gia Discord của Tolaria",
+  "feedback.community.description": "Trò chuyện với nhóm và những người dùng khác, nhận trợ giúp và thử các bản dựng alpha cũng như bản dựng dành cho thiết bị di động.",
+  "feedback.community.cta": "Tham gia Discord",
+  "feedback.community.linkLabel": "Tham gia Discord",
+  "communityBanner.invite": "Tham gia cộng đồng Tolaria và trò chuyện với chúng tôi trên Discord.",
+  "communityBanner.dismiss": "Bỏ qua lời mời tham gia cộng đồng"
 }

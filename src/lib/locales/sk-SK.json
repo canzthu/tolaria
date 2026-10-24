@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Najprv vyhľadávajte na nástenke, hlasujte za existujúce nápady a vytvárajte nové príspevky, keď sú skutočne nové!",
   "feedback.featureRequests.cta": "Otvoriť nástenku produktu",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Diskusie",
-  "feedback.discussions.description": "Používajte Diskusie na otázky, konverzácie, prezentácie a kontext komunity.",
-  "feedback.discussions.cta": "Otvoriť diskusie",
-  "feedback.discussions.linkLabel": "Diskusie na GitHub",
   "feedback.contributeCode.title": "Prispieť kódom",
   "feedback.contributeCode.description": "Malé, cielené PR sú vítané. Najprv skontrolujte nástenku, aby ste vytvorili tie správne veci!",
   "feedback.contributeCode.cta": "Otvorené PR",
@@ -995,6 +991,8 @@
   "status.conflict.count": "{count} konflikt{plural}",
   "status.offline.title": "Žiadne internetové pripojenie",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Žiadne internetové pripojenie. Poznámky sú iba na čítanie, kým sa znova nepripojíte.",
+  "status.offline.readOnlyLabel": "Offline · iba na čítanie",
   "status.changes.view": "Zobraziť čakajúce zmeny",
   "status.changes.label": "Zmeny",
   "status.commit.local": "Lokálne potvrdiť zmeny",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Zaviesť lokálne",
   "mobile.sync.action": "Synchronizovať",
   "mobile.sync.failedAt": "Zlyhalo {time}",
-  "mobile.properties.addRelationships": "Pridať vzťahy"
+  "mobile.properties.addRelationships": "Pridať vzťahy",
+  "feedback.community.title": "Pripojte sa k Discordu Tolaria",
+  "feedback.community.description": "Chatujte s tímom a ďalšími používateľmi, získajte pomoc a vyskúšajte alfa verzie a mobilné zostavy.",
+  "feedback.community.cta": "Pripojte sa na Discord",
+  "feedback.community.linkLabel": "Pripojte sa na Discord",
+  "communityBanner.invite": "Pripojte sa ku komunite Tolaria a porozprávajte sa s nami na Discorde.",
+  "communityBanner.dismiss": "Odmietnuť pozvánku do komunity"
 }

@@ -14,7 +14,10 @@ import {
 	type VaultWriteOptions,
 	type VaultWriteResult,
 } from "../../../src/lib/vaultBackend/types";
-import type { SearchResult as AppSearchResult, VaultEntry as AppVaultEntry } from "../../../src/types";
+import type {
+	SearchResult as AppSearchResult,
+	VaultEntry as AppVaultEntry,
+} from "../../../src/types";
 import {
 	COLLAB_TICKET_PARAM,
 	type CollabTicketResponse,
@@ -22,19 +25,38 @@ import {
 	DOC_ID_HEADER,
 	type EntriesDeltaResponse,
 	type EntriesResponse,
-	ROUTES,
-	type SearchResponse,
 	type SearchResult as ProtocolSearchResult,
 	type VaultEntry as ProtocolVaultEntry,
+	ROUTES,
+	type SearchResponse,
+	type WriteResult,
 } from "../../protocol/src/index.ts";
 import { CollabProvider, type SocketLike } from "./collabProvider.ts";
 import { readCache, writeCache } from "./entriesCache.ts";
+import {
+	assertVaultPath,
+	encoded,
+	etagOf,
+	jsonWithStrings,
+	malformed,
+	ok,
+	RemoteError,
+	type Request,
+	released,
+} from "./remoteHttp.ts";
+import {
+	followRenames,
+	renameNote,
+	trackCreate,
+	whenCreated,
+} from "./remoteNoteLifecycle.ts";
+
+export { RemoteError };
 
 /**
  * The Tolaria remote behind the `VaultBackend` seam: files over the HTTP protocol, and notes
- * as live documents over the collaboration channel. The spike implements what the
- * collaborative editor needs (read, write, open a document); the operations that depend on
- * the server's note index, which does not exist yet, are refused by name.
+ * as live documents over the collaboration channel. Notes are listed, read, created, written,
+ * renamed and deleted; the operations the server does not offer yet are refused by name.
  */
 
 export interface RemoteBindings extends VaultCollabBindings {
@@ -53,34 +75,6 @@ export interface RemoteOptions {
 	createSocket?: (url: string) => SocketLike;
 }
 
-type Request = (path: string, init?: RequestInit) => Promise<Response>;
-
-export class RemoteError extends Error {
-	readonly status: number;
-
-	constructor(status: number, message: string) {
-		super(message);
-		this.name = "RemoteError";
-		this.status = status;
-	}
-}
-
-function encoded(path: string): string {
-	return path.split("/").map(encodeURIComponent).join("/");
-}
-
-function etagOf(response: Response): string {
-	return (response.headers.get("etag") ?? "").replaceAll('"', "");
-}
-
-async function ok(response: Response): Promise<Response> {
-	if (response.ok) return response;
-	throw new RemoteError(
-		response.status,
-		`the server answered ${response.status} for ${new URL(response.url).pathname}`,
-	);
-}
-
 function precondition({
 	baseRevision,
 }: VaultWriteOptions): Record<string, string> {
@@ -96,18 +90,23 @@ function unsupported(operation: string): () => Promise<never> {
 		);
 }
 
-function mapProtocolEntryToApp(entry: ProtocolVaultEntry): AppVaultEntry {
+/** What the app's entry holds for fields the server's index leaves out. */
+type AppEntryDefaults = Omit<
+	AppVaultEntry,
+	"path" | "filename" | "title" | "fileSize" | "snippet" | "wordCount" | "hasH1"
+>;
+
+function appEntryDefaults(): AppEntryDefaults {
 	return {
-		...entry,
-		isA: entry.isA ?? null,
-		aliases: entry.aliases ?? [],
-		belongsTo: entry.belongsTo ?? [],
+		isA: null,
+		aliases: [],
+		belongsTo: [],
 		relatedTo: [],
-		status: entry.status ?? null,
+		status: null,
 		archived: false,
 		modifiedAt: null,
 		createdAt: null,
-		relationships: entry.relationships ?? {},
+		relationships: {},
 		icon: null,
 		color: null,
 		order: null,
@@ -120,10 +119,30 @@ function mapProtocolEntryToApp(entry: ProtocolVaultEntry): AppVaultEntry {
 		favorite: false,
 		favoriteIndex: null,
 		listPropertiesDisplay: [],
-		outgoingLinks: entry.outgoingLinks ?? [],
+		outgoingLinks: [],
 		properties: {},
-		fileKind: entry.fileKind ?? "markdown",
+		fileKind: "markdown",
 	};
+}
+
+/** The fields that are set: an index entry omits what a note does not have. */
+function definedFields<T extends object>(value: T): Partial<T> {
+	return Object.fromEntries(
+		Object.entries(value).filter(([, field]) => field !== undefined),
+	) as Partial<T>;
+}
+
+function mapProtocolEntryToApp(entry: ProtocolVaultEntry): AppVaultEntry {
+	return { ...appEntryDefaults(), ...definedFields(entry) } as AppVaultEntry;
+}
+
+/** Empty lists, maps and nulls are left out of the cached index, as the server does. */
+function presentOrUndefined<T>(value: T | null): T | undefined {
+	if (value === null) return undefined;
+	const empty = Array.isArray(value)
+		? value.length === 0
+		: typeof value === "object" && Object.keys(value as object).length === 0;
+	return empty ? undefined : value;
 }
 
 function mapAppEntryToProtocol(entry: AppVaultEntry): ProtocolVaultEntry {
@@ -131,21 +150,23 @@ function mapAppEntryToProtocol(entry: AppVaultEntry): ProtocolVaultEntry {
 		path: entry.path,
 		filename: entry.filename,
 		title: entry.title,
-		isA: entry.isA ?? undefined,
-		aliases: entry.aliases.length > 0 ? entry.aliases : undefined,
-		belongsTo: entry.belongsTo.length > 0 ? entry.belongsTo : undefined,
-		status: entry.status ?? undefined,
+		isA: presentOrUndefined(entry.isA),
+		aliases: presentOrUndefined(entry.aliases),
+		belongsTo: presentOrUndefined(entry.belongsTo),
+		status: presentOrUndefined(entry.status),
 		fileSize: entry.fileSize,
 		snippet: entry.snippet,
 		wordCount: entry.wordCount,
-		relationships: Object.keys(entry.relationships).length > 0 ? entry.relationships : undefined,
-		outgoingLinks: entry.outgoingLinks.length > 0 ? entry.outgoingLinks : undefined,
+		relationships: presentOrUndefined(entry.relationships),
+		outgoingLinks: presentOrUndefined(entry.outgoingLinks),
 		hasH1: entry.hasH1,
 		fileKind: entry.fileKind ?? "markdown",
 	};
 }
 
-function mapProtocolSearchResult(result: ProtocolSearchResult): AppSearchResult {
+function mapProtocolSearchResult(
+	result: ProtocolSearchResult,
+): AppSearchResult {
 	return {
 		path: result.path,
 		title: result.path.split("/").pop()?.replace(/\.md$/, "") ?? "",
@@ -165,7 +186,7 @@ async function listEntries(request: Request): Promise<AppVaultEntry[]> {
 		const cached = await readCache();
 		if (cached) {
 			cachedEntries = new Map(
-				cached.entries.map((e) => [e.path, mapProtocolEntryToApp(e)])
+				cached.entries.map((e) => [e.path, mapProtocolEntryToApp(e)]),
 			);
 			// Start background revalidation
 			if (!revalidating) {
@@ -179,7 +200,7 @@ async function listEntries(request: Request): Promise<AppVaultEntry[]> {
 	const response = await ok(await request(ROUTES.entries));
 	const body = (await response.json()) as EntriesResponse;
 	const entries = body.entries.map(mapProtocolEntryToApp);
-	
+
 	// Update cache for next time (web only)
 	if (typeof indexedDB !== "undefined") {
 		cachedEntries = new Map(entries.map((e) => [e.path, e]));
@@ -187,15 +208,35 @@ async function listEntries(request: Request): Promise<AppVaultEntry[]> {
 			// Cache write failures are silent
 		});
 	}
-	
+
 	return entries;
+}
+
+const DELTA_CHUNK_SIZE = 50;
+
+function yieldToMainThread(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Applies `apply` to every item, yielding to the main thread between chunks to avoid long tasks. */
+async function applyInChunks<T>(
+	items: T[],
+	apply: (item: T) => void,
+): Promise<void> {
+	for (let start = 0; start < items.length; start += DELTA_CHUNK_SIZE) {
+		if (start > 0) await yieldToMainThread();
+		items.slice(start, start + DELTA_CHUNK_SIZE).forEach(apply);
+	}
 }
 
 /**
  * Revalidates cached entries in the background by fetching deltas since the cached HEAD.
  * Chunks the work to avoid blocking the main thread.
  */
-async function revalidateInBackground(request: Request, since: string): Promise<void> {
+async function revalidateInBackground(
+	request: Request,
+	since: string,
+): Promise<void> {
 	if (revalidating) return;
 	revalidating = true;
 
@@ -204,35 +245,18 @@ async function revalidateInBackground(request: Request, since: string): Promise<
 		const response = await ok(await request(url));
 		const delta = (await response.json()) as EntriesDeltaResponse;
 
-		// Yield to the main thread before applying changes
-		await new Promise((resolve) => setTimeout(resolve, 0));
-
-		// Apply changes in chunks to avoid long tasks
-		const CHUNK_SIZE = 50;
-		for (let i = 0; i < delta.changed.length; i += CHUNK_SIZE) {
-			const chunk = delta.changed.slice(i, i + CHUNK_SIZE);
-			for (const entry of chunk) {
-				cachedEntries.set(entry.path, mapProtocolEntryToApp(entry));
-			}
-			// Yield after each chunk
-			if (i + CHUNK_SIZE < delta.changed.length) {
-				await new Promise((resolve) => setTimeout(resolve, 0));
-			}
-		}
-
-		// Apply deletions in chunks
-		for (let i = 0; i < delta.deleted.length; i += CHUNK_SIZE) {
-			const chunk = delta.deleted.slice(i, i + CHUNK_SIZE);
-			for (const path of chunk) {
-				cachedEntries.delete(path);
-			}
-			if (i + CHUNK_SIZE < delta.deleted.length) {
-				await new Promise((resolve) => setTimeout(resolve, 0));
-			}
-		}
+		await yieldToMainThread();
+		await applyInChunks(delta.changed, (entry) => {
+			cachedEntries.set(entry.path, mapProtocolEntryToApp(entry));
+		});
+		await applyInChunks(delta.deleted, (path) => {
+			cachedEntries.delete(path);
+		});
 
 		// Update cache with new HEAD and entries
-		const protocolEntries = Array.from(cachedEntries.values()).map(mapAppEntryToProtocol);
+		const protocolEntries = Array.from(cachedEntries.values()).map(
+			mapAppEntryToProtocol,
+		);
 		await writeCache(delta.head, protocolEntries);
 	} catch {
 		// Revalidation failures are silent; the cached data remains valid
@@ -251,7 +275,10 @@ async function searchFiles(
 	const response = await ok(await request(url));
 	const body = (await response.json()) as SearchResponse;
 	const start = performance.now();
-	return { results: body.results.map(mapProtocolSearchResult), elapsedMs: performance.now() - start };
+	return {
+		results: body.results.map(mapProtocolSearchResult),
+		elapsedMs: performance.now() - start,
+	};
 }
 
 async function deleteFiles(
@@ -261,12 +288,15 @@ async function deleteFiles(
 	const deleted: string[] = [];
 	for (const path of paths) {
 		try {
+			assertVaultPath(path);
 			const file = await readFile(request, path);
 			const init = {
 				method: "DELETE",
 				headers: { "if-match": `"${file.revision}"` },
 			};
-			await ok(await request(`${ROUTES.files}/${encoded(path)}`, init));
+			await released(
+				await ok(await request(`${ROUTES.files}/${encoded(path)}`, init)),
+			);
 			deleted.push(path);
 		} catch {
 			// File doesn't exist or delete failed - skip it and continue
@@ -292,11 +322,22 @@ async function readFile(request: Request, path: string): Promise<VaultFile> {
 	return { path, content: await response.text(), revision: etagOf(response) };
 }
 
+async function conflictCopyPath(
+	response: Response,
+): Promise<string | undefined> {
+	try {
+		return ((await response.json()) as WriteResult).path;
+	} catch {
+		return undefined;
+	}
+}
+
 async function writeFile(
 	request: Request,
 	file: { path: string; content: string },
 	options: VaultWriteOptions,
 ): Promise<VaultWriteResult> {
+	assertVaultPath(file.path);
 	const init = {
 		method: "PUT",
 		body: file.content,
@@ -307,9 +348,23 @@ async function writeFile(
 	if (response.status === 409)
 		return {
 			status: "conflict",
+			copyPath: await conflictCopyPath(response),
 			current: await readFile(request, file.path).catch(() => null),
 		};
-	return { status: "written", revision: etagOf(await ok(response)) };
+	return {
+		status: "written",
+		revision: etagOf(await released(await ok(response))),
+	};
+}
+
+/** A create is tracked, so the note's live document waits for its file to exist. */
+function writeOrCreate(
+	request: Request,
+	file: { path: string; content: string },
+	options: VaultWriteOptions,
+): Promise<VaultWriteResult> {
+	const write = writeFile(request, file, options);
+	return options.baseRevision === null ? trackCreate(file.path, write) : write;
 }
 
 async function reloadEntries(request: Request): Promise<AppVaultEntry[]> {
@@ -317,7 +372,7 @@ async function reloadEntries(request: Request): Promise<AppVaultEntry[]> {
 	const response = await ok(await request(ROUTES.entries));
 	const body = (await response.json()) as EntriesResponse;
 	const entries = body.entries.map(mapProtocolEntryToApp);
-	
+
 	// Update cache (web only)
 	if (typeof indexedDB !== "undefined") {
 		cachedEntries = new Map(entries.map((e) => [e.path, e]));
@@ -325,7 +380,7 @@ async function reloadEntries(request: Request): Promise<AppVaultEntry[]> {
 			// Cache write failures are silent
 		});
 	}
-	
+
 	return entries;
 }
 
@@ -333,11 +388,11 @@ function fileOps(request: Request): VaultFileOps {
 	return {
 		read: (path) => readFile(request, path),
 		write: (path, content, options = {}) =>
-			writeFile(request, { path, content }, options),
+			writeOrCreate(request, { path, content }, options),
 		list: () => listEntries(request),
 		reload: () => reloadEntries(request),
 		reloadEntry: unsupported("reloading a single entry"),
-		rename: unsupported("renaming with link updates"),
+		rename: (renameRequest) => renameNote(request, renameRequest),
 		delete: (paths) => deleteFiles(request, paths),
 		search: (query, options = {}) => searchFiles(request, query, options),
 		saveAttachment: unsupported("uploading attachments"),
@@ -356,7 +411,11 @@ function socketOrigin(baseUrl: string): string {
 }
 
 async function docIdOf(request: Request, path: string): Promise<string> {
-	const response = await ok(await request(`${ROUTES.files}/${encoded(path)}`));
+	assertVaultPath(path);
+	await whenCreated(path);
+	const response = await released(
+		await ok(await request(`${ROUTES.files}/${encoded(path)}`)),
+	);
 	const docId = response.headers.get(DOC_ID_HEADER);
 	if (!docId) throw new RemoteError(404, `${path} is not a note`);
 	return docId;
@@ -374,7 +433,14 @@ async function ticketUrl(
 			body: JSON.stringify(grant),
 		}),
 	);
-	const { path, ticket } = (await response.json()) as CollabTicketResponse;
+	const { path, ticket } = await jsonWithStrings<keyof CollabTicketResponse>(
+		response,
+		["path", "ticket"],
+		"collaboration ticket",
+	);
+	// A server-relative path only: the socket must go to the server's own origin.
+	if (!path.startsWith("/") || path.startsWith("//"))
+		throw malformed("collaboration ticket");
 	return `${socketOrigin(options.baseUrl)}${path}?${COLLAB_TICKET_PARAM}=${encodeURIComponent(ticket)}`;
 }
 
@@ -398,7 +464,7 @@ async function openDoc(
 			createSocket(await ticketUrl(request, options, grant)),
 	});
 	if (user) provider.awareness.setLocalStateField("user", user);
-	return {
+	const opened: VaultCollabDoc<RemoteBindings> = {
 		path,
 		doc,
 		provider,
@@ -406,10 +472,13 @@ async function openDoc(
 		awareness: provider.awareness,
 		synced: provider.whenSynced(),
 		close: () => {
+			release();
 			provider.destroy();
 			doc.destroy();
 		},
 	};
+	const release = followRenames(opened);
+	return opened;
 }
 
 export function createRemoteVaultBackend(

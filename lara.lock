@@ -69,10 +69,6 @@ files:
     feedback.featureRequests.description: 9583575bdef16e12927b0a5acfa84307
     feedback.featureRequests.cta: c19ef0158349da249920b0d9f67d7d48
     feedback.featureRequests.linkLabel: d125f38d1dc8dbdc7dae3f1778df3a3a
-    feedback.discussions.title: 560f23c77d499c21038c0b4487f03cb2
-    feedback.discussions.description: 2e4da4c5f54c7af3b8db9f3d93ed63c5
-    feedback.discussions.cta: 61ccb6a90ec8037f2926c48c0a90caa3
-    feedback.discussions.linkLabel: 4f85e3343c5e21d2b11812b2baa8ed83
     feedback.contributeCode.title: 8f93fd72b63620711cc118403b85133e
     feedback.contributeCode.description: 53230626356951578842a8cd7233d1f1
     feedback.contributeCode.cta: 900156c5b6af50ce83d772fb8675c3d0
@@ -997,6 +993,8 @@ files:
     status.conflict.count: 46293d20ed2071fb30762b71fdaa5894
     status.offline.title: 3bf45a7003646cc4f963810b0b7ac0f5
     status.offline.label: 8d9da4bc0e49a50e09ac9f7e56789d39
+    status.offline.readOnlyTitle: 08ebb02c7326c7e5cf59ae1ed6b166e2
+    status.offline.readOnlyLabel: 4ccb24e416cc4616a63df3e8a128a5ff
     status.changes.view: 6d60d24d8f475ddaef94bbbc58514b5a
     status.changes.label: c112bb3542e98308d12d5ecb10a67abc
     status.commit.local: 6474fe7e2ed525df3da3eb447943bfcd
@@ -1307,3 +1305,9 @@ files:
     mobile.sync.action: d8e87c0927539672f54462c837be0b7f
     mobile.sync.failedAt: 3f2a955506277e0a541b9dbf8c4283e0
     mobile.properties.addRelationships: 56cd8370bfb1fdb0d0286f625fab354b
+    feedback.community.title: 531631ae7d07851aa53abf507b9a5020
+    feedback.community.description: d1fa9eb431f008ec1f02b24e28ec6351
+    feedback.community.cta: 5c7ef8c320c94884cd78974ecc493846
+    feedback.community.linkLabel: 5c7ef8c320c94884cd78974ecc493846
+    communityBanner.invite: b1bc4d7f121a3f5f7e8eb38197eb4956
+    communityBanner.dismiss: df9374f4356460c586a8e9c3bae697dc

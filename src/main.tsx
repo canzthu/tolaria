@@ -31,21 +31,13 @@ import { isRecoveredActionTooltipError } from './components/ui/actionTooltipReco
 import { isMac, shouldUseCustomWindowChrome } from './utils/platform'
 import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 import { markStartupPhase } from './lib/startupPerformance'
-import { registerServiceWorker } from './lib/serviceWorker'
+import {
+  clearOfflineDataOnAccountExit,
+  hasOfflineRead,
+  scheduleOfflineServiceWorkerRegistration,
+} from './lib/offline/offlineMode'
 
 markStartupPhase('renderer_module_loaded')
-
-// Register service worker after first paint to avoid blocking startup
-// (web build only, not Tauri)
-if (typeof requestIdleCallback !== 'undefined') {
-  requestIdleCallback(() => {
-    void registerServiceWorker()
-  })
-} else {
-  setTimeout(() => {
-    void registerServiceWorker()
-  }, 1)
-}
 
 const TLDRAW_CONTEXT_MENU_SELECTOR = '.tldraw-whiteboard'
 const MACOS_FULLSCREEN_CHROME_CLASS = 'mac-chrome-fullscreen'
@@ -290,3 +282,12 @@ createRoot(getRequiredRootElement(), {
     </TooltipProvider>
   </StrictMode>,
 )
+
+// Web only (TOL-198): offline read. Inert on desktop, where neither the capability nor the
+// web build flag is set; registration waits until the app has painted.
+if (hasOfflineRead()) clearOfflineDataOnAccountExit(window)
+scheduleOfflineServiceWorkerRegistration({
+  isWebBuild: import.meta.env.VITE_TOLARIA_WEB_BUILD === 'true',
+  isTauri: isTauriRuntime(),
+  window,
+})

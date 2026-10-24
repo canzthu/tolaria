@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Primero busca en el tablero, vota a favor de las ideas existentes y crea nuevas publicaciones cuando sean realmente nuevas.",
   "feedback.featureRequests.cta": "Abrir el Tablero de productos",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Discusiones",
-  "feedback.discussions.description": "Utiliza Discussions para preguntas, conversaciones, presentaciones y contexto de la comunidad.",
-  "feedback.discussions.cta": "Abrir Discussions",
-  "feedback.discussions.linkLabel": "Discusiones de GitHub",
   "feedback.contributeCode.title": "Contribuir con código",
   "feedback.contributeCode.description": "Las PR pequeñas y específicas son bienvenidas. ¡Revisa primero el tablero para que desarrolles lo correcto!",
   "feedback.contributeCode.cta": "PR abiertas",
@@ -995,6 +991,8 @@
   "status.conflict.count": "{count} conflicto{plural}",
   "status.offline.title": "Sin conexión a Internet",
   "status.offline.label": "Sin conexión",
+  "status.offline.readOnlyTitle": "No hay conexión a Internet. Las notas están en modo de solo lectura hasta que te vuelvas a conectar.",
+  "status.offline.readOnlyLabel": "Sin conexión · solo lectura",
   "status.changes.view": "Ver cambios pendientes",
   "status.changes.label": "Cambios",
   "status.commit.local": "Confirmar cambios localmente",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Hacer commit localmente",
   "mobile.sync.action": "Sincronizar",
   "mobile.sync.failedAt": "Error {time}",
-  "mobile.properties.addRelationships": "Agregar relaciones"
+  "mobile.properties.addRelationships": "Agregar relaciones",
+  "feedback.community.title": "Únase al Discord de Tolaria",
+  "feedback.community.description": "Chatea con el equipo y con otros usuarios, obtén ayuda y prueba las versiones alfa y móviles.",
+  "feedback.community.cta": "Unirse a Discord",
+  "feedback.community.linkLabel": "Unirse a Discord",
+  "communityBanner.invite": "Únete a la comunidad de Tolaria y chatea con nosotros en Discord.",
+  "communityBanner.dismiss": "Descartar invitación a la comunidad"
 }

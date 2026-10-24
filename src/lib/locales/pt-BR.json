@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Pesquise no fórum primeiro, vote nas ideias existentes e crie novos posts quando forem genuinamente novos!",
   "feedback.featureRequests.cta": "Abrir Product Board",
   "feedback.featureRequests.linkLabel": "Product Board",
-  "feedback.discussions.title": "Discussões",
-  "feedback.discussions.description": "Use Discussions para perguntas, conversas, show & tell e contexto da comunidade.",
-  "feedback.discussions.cta": "Abrir Discussions",
-  "feedback.discussions.linkLabel": "Discussões do GitHub",
   "feedback.contributeCode.title": "Contribuir com código",
   "feedback.contributeCode.description": "PRs pequenas e focadas são bem-vindas. Verifique o quadro primeiro para criar as coisas certas!",
   "feedback.contributeCode.cta": "PRs abertas",
@@ -995,6 +991,8 @@
   "status.conflict.count": "{count} conflito{plural}",
   "status.offline.title": "Sem conexão com a Internet",
   "status.offline.label": "Offline",
+  "status.offline.readOnlyTitle": "Sem conexão com a Internet. As notas estarão somente para leitura até que você se reconecte.",
+  "status.offline.readOnlyLabel": "Offline · somente leitura",
   "status.changes.view": "Ver alterações pendentes",
   "status.changes.label": "Alterações",
   "status.commit.local": "Fazer commit das alterações localmente",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Confirmar localmente",
   "mobile.sync.action": "Sincronizar",
   "mobile.sync.failedAt": "Falhou {time}",
-  "mobile.properties.addRelationships": "Adicionar relacionamentos"
+  "mobile.properties.addRelationships": "Adicionar relacionamentos",
+  "feedback.community.title": "Participe do Discord da Tolaria",
+  "feedback.community.description": "Converse com a equipe e com outros usuários, obtenha ajuda e teste as versões alfa e móveis.",
+  "feedback.community.cta": "Entrar no Discord",
+  "feedback.community.linkLabel": "Entrar no Discord",
+  "communityBanner.invite": "Junte-se à comunidade do Tolaria e converse conosco no Discord.",
+  "communityBanner.dismiss": "Ignorar convite da comunidade"
 }

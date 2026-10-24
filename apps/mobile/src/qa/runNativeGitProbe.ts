@@ -1,17 +1,17 @@
-import { Directory, File, Paths } from 'expo-file-system'
 import { requireOptionalNativeModule } from 'expo'
-import { nativeGitHttp } from '../workspace/git/nativeGitHttp'
+import { Directory, File, Paths } from 'expo-file-system'
 import git, { type GitProgressEvent, type HttpClient } from 'isomorphic-git'
-import { cloneGitVault, syncGitVault } from '../workspace/git/gitRemote'
-import { gitFileSystemSession } from '../workspace/git/gitFileSystemSessions'
 import { gitVirtualRoot } from '../workspace/git/gitFileSystemPaths'
-import { assertNativeWorkspaceWriteErrors } from './nativeWorkspaceWriteErrors'
-import { nativeVaultReadBenchmark } from './nativeVaultReadBenchmark'
-import { assertNativeGitRecovery } from './nativeGitRecoveryProbe'
+import { gitFileSystemSession } from '../workspace/git/gitFileSystemSessions'
+import { cloneGitVault, syncGitVault } from '../workspace/git/gitRemote'
+import { nativeGitHttp } from '../workspace/git/nativeGitHttp'
 import { assertGitReadFailureSafety } from './assertGitReadFailureSafety'
 import { measureEventLoopDelay } from './measureEventLoopDelay'
 import { measureGitFileSystem } from './measureGitFileSystem'
+import { assertNativeGitRecovery } from './nativeGitRecoveryProbe'
 import { postNativeQaEvent, setNativeQaSinkUrl } from './nativeQaSink'
+import { createNativeLargeVaultFixture, nativeVaultReadBenchmark } from './nativeVaultReadBenchmark'
+import { assertNativeWorkspaceWriteErrors } from './nativeWorkspaceWriteErrors'
 
 let running = false
 
@@ -30,10 +30,22 @@ export async function runNativeGitProbe(endpoint: string) {
     readSafety.create()
     const readErrorsVerified = await assertGitReadFailureSafety({ fs: gitFileSystemSession(readSafety.uri), dir: gitVirtualRoot })
     const checkoutRecovery = await assertNativeGitRecovery(root)
-    const { result: proof, eventLoop, phases } = await measureEventLoopDelay(enter => roundTrip(root, endpoint, enter))
+    const largeVault = new Directory(root, 'large-vault')
+    const generated = await createNativeLargeVaultFixture(largeVault.uri, {
+      createDirectory: path => new Directory(path).create(),
+      writeText: (path, content) => new File(path).write(content),
+    })
+    const { result, eventLoop, phases } = await measureEventLoopDelay(enter => {
+      enter('git-sync+6000-note-index')
+      return Promise.all([
+        roundTrip(root, endpoint, () => undefined),
+        nativeVaultReadBenchmark(largeVault.uri),
+      ])
+    })
+    const [proof, benchmark] = result
     const elapsedMs = Date.now() - started
-    const fixtureVault = nativeFiles
-      ? await measureEventLoopDelay(() => nativeVaultReadBenchmark(new Directory(root, 'second').uri)) : null
+    const fixtureVault = benchmark ? { ...benchmark, marker: generated.marker, markerPath: generated.markerPath,
+      inputQueueLatencyMs: eventLoop.maxDelayMs, longInputQueueDelayCount: eventLoop.longDelayCount } : null
     publishProof(endpoint, { ...proof, eventLoop, phases, nativeFiles, nativeDigestVerified, readErrorsVerified, checkoutRecovery, fixtureVault, elapsedMs })
   } catch (error) {
     publishProof(endpoint, { error: error instanceof Error ? error.message : 'unknown', stack: error instanceof Error ? error.stack : null, passed: false })

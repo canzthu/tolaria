@@ -7,9 +7,9 @@ import { resolveEntry } from '../utils/wikilink'
 import { trackEvent } from '../lib/telemetry'
 import { cacheNoteContent } from './useTabManagement'
 import { createVaultBackend } from '../lib/vaultBackend'
+import { createRemoteNote, entryAtStoredPath, hasRemoteVault, newNotePath } from '../lib/remoteNotes'
 import {
   findByCollidingNotePath,
-  joinVaultPath,
   normalizeVaultRelativePath,
   notePathFilename,
 } from '../utils/notePathIdentity'
@@ -339,7 +339,7 @@ export function resolveNewNote(options: NewNoteParams): {
   const status = null
   const entry = {
     ...buildNewEntry({
-      path: joinVaultPath(creationVaultPath, relativePath),
+      path: newNotePath(creationVaultPath, relativePath),
       slug,
       title,
       type,
@@ -384,7 +384,7 @@ export function resolveNewType({ typeName, vaultPath, defaultWorkspacePath, vaul
   const slug = slugify(normalizedTypeName)
   const entry = {
     ...buildNewEntry({
-      path: joinVaultPath(creationVaultPath, `${slug}.md`),
+      path: newNotePath(creationVaultPath, `${slug}.md`),
       slug,
       title: normalizedTypeName,
       type: 'Type',
@@ -558,11 +558,12 @@ function createNoteContentArgs({ path, content, vaultPath }: PersistNewNoteReque
   return vaultPath ? { path, content, vaultPath } : { path, content }
 }
 
-/** Persist a newly created note to disk. Returns a Promise for error handling. */
-export function persistNewNote(request: PersistNewNoteRequest): Promise<void> {
+/** Persist a newly created note. Resolves with where it was stored (a conflict copy on a remote). */
+export function persistNewNote(request: PersistNewNoteRequest): Promise<string> {
   const args = createNoteContentArgs(request)
-  if (!isTauri()) return mockInvoke<void>('save_note_content', args).then(() => {})
-  return invoke<void>('create_note_content', args).then(() => {})
+  if (hasRemoteVault()) return createRemoteNote(request.path, request.content)
+  if (!isTauri()) return mockInvoke<void>('save_note_content', args).then(() => request.path)
+  return invoke<void>('create_note_content', args).then(() => request.path)
 }
 
 async function typeTargetExistsOnDisk({
@@ -622,11 +623,12 @@ interface PersistCallbacks {
 }
 
 /** Persist to disk; track pending state via onStart/onEnd. */
-function persistOptimistic(request: PersistNewNoteRequest, cbs: PersistCallbacks): Promise<void> {
+function persistOptimistic(request: PersistNewNoteRequest, cbs: PersistCallbacks): Promise<string> {
   cbs.onStart?.(request.path)
   return persistNewNote(request)
-    .then(() => {
-    cbs.onPersisted?.(request.path)
+    .then((storedPath) => {
+      cbs.onPersisted?.(storedPath)
+      return storedPath
     })
     .finally(() => {
     cbs.onEnd?.(request.path)
@@ -839,9 +841,9 @@ function generateUntitledFilename(entries: VaultEntry[], label: string, pendingS
   return candidate
 }
 
-async function persistImmediateEntry(deps: ImmediateCreateDeps, entry: VaultEntry, content: string): Promise<boolean> {
+async function persistImmediateEntry(deps: ImmediateCreateDeps, entry: VaultEntry, content: string): Promise<string | null> {
   try {
-    await persistOptimistic(
+    return await persistOptimistic(
       {
       path: entry.path,
       content,
@@ -853,10 +855,9 @@ async function persistImmediateEntry(deps: ImmediateCreateDeps, entry: VaultEntr
       onPersisted: deps.onNewNotePersisted,
       },
     )
-    return true
   } catch (error) {
     deps.setToastMessage(createPersistFailureMessage(entry, error))
-    return false
+    return null
   }
 }
 
@@ -887,7 +888,7 @@ async function createNoteImmediate(deps: ImmediateCreateDeps, request: Immediate
   const relativePath = immediateNoteRelativePath(slug, request.folderPath)
   const entry = {
     ...buildNewEntry({
-      path: joinVaultPath(creationVaultPath, relativePath),
+      path: newNotePath(creationVaultPath, relativePath),
       slug,
       title,
       type: noteType,
@@ -908,13 +909,14 @@ async function createNoteImmediate(deps: ImmediateCreateDeps, request: Immediate
     }),
     defaults,
   })
-  const didPersist = await persistImmediateEntry(deps, resolved.entry, resolved.content)
-  if (!didPersist) return false
+  const storedPath = await persistImmediateEntry(deps, resolved.entry, resolved.content)
+  if (storedPath === null) return false
 
-  cacheNoteContent(resolved.entry.path, resolved.content, resolved.entry)
-  deps.openTabWithContent(resolved.entry, resolved.content)
-  addEntryWithMock(resolved.entry, resolved.content, deps.addEntry)
-  signalFocusEditor({ path: resolved.entry.path, selectTitle: true })
+  const created = entryAtStoredPath(resolved.entry, storedPath)
+  cacheNoteContent(created.path, resolved.content, created)
+  deps.openTabWithContent(created, resolved.content)
+  addEntryWithMock(created, resolved.content, deps.addEntry)
+  signalFocusEditor({ path: created.path, selectTitle: true })
   return true
 }
 

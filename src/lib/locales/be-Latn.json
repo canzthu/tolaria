@@ -67,10 +67,6 @@
   "feedback.featureRequests.description": "Spačatku pašukajcie na došcy, prahalasujcie za isnuiučyja idei i stvarajcie novyja zapisy toĺki kali idea sapraŭdy novaja!",
   "feedback.featureRequests.cta": "Adkryć praduktavuju došku",
   "feedback.featureRequests.linkLabel": "Praduktavaja doška",
-  "feedback.discussions.title": "Dyskussii",
-  "feedback.discussions.description": "Vykarystoŭvajcie Discussions dlia pytanniaŭ, razmoŭ, show & tell i kantêkstu supoĺnaści.",
-  "feedback.discussions.cta": "Adkryć dyskussii",
-  "feedback.discussions.linkLabel": "GitHub Discussions",
   "feedback.contributeCode.title": "Dalučycca kodam",
   "feedback.contributeCode.description": "Malenkija, dakladnyja PR vitajucca. Spačatku pravierycie došku, kab budavać praviĺnyja rečy!",
   "feedback.contributeCode.cta": "Adkryć PRs",
@@ -946,6 +942,8 @@
   "status.conflict.count": "{count} {plural} kanflikt(aŭ)",
   "status.offline.title": "Niama internetu",
   "status.offline.label": "Aflajn",
+  "status.offline.readOnlyTitle": "Niama padklučennia da internetu. Natatki dastupnyja toĺki dlia čytannia, pakuĺ vy nie padklučyciesia znoŭ.",
+  "status.offline.readOnlyLabel": "Aflajn · toĺki dlia čytannia",
   "status.changes.view": "Prahliedzieć zmieny",
   "status.changes.label": "Zmieny",
   "status.commit.local": "Zakamicić lakaĺna",
@@ -1304,5 +1302,11 @@
   "mobile.git.commitLocal": "Zrabić kamit lakaĺna",
   "mobile.sync.action": "Sinchranizavać",
   "mobile.sync.failedAt": "Nie atrymalasia {time}",
-  "mobile.properties.addRelationships": "Dadać suviazi"
+  "mobile.properties.addRelationships": "Dadać suviazi",
+  "feedback.community.title": "Daluchyciesia da Tolaria Discord",
+  "feedback.community.description": "Razmaŭliajcie z kamandaj i inšymi karystalnikami, atrymajcie dapamohu i pasprabujcie alpha i mobile zborki.",
+  "feedback.community.cta": "Daluchycca da Discord",
+  "feedback.community.linkLabel": "Daluchycca da Discord",
+  "communityBanner.invite": "Daluchajciesia da supolku Tolaria i razmaŭliajcie z nami ŭ Discord.",
+  "communityBanner.dismiss": "Słonić zaprasheńnie da supolki"
 }

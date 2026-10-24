@@ -21,6 +21,11 @@ export interface ServerConfig {
   collab: { policy: FlushPolicy; lingerMs: number } | null
   /** Blob store configuration */
   blobStore: { type: 'local'; stateDir: string } | { type: 'r2'; config: R2Config }
+  /**
+   * Where index snapshots are kept for a server on a fresh disk (`TOLARIA_INDEX_SNAPSHOTS=r2`),
+   * under `prefix` (one per vault). Null: indexes are only kept in the blob store.
+   */
+  indexSnapshots: { r2: R2Config; prefix: string } | null
 }
 
 type Env = Record<string, string | undefined>
@@ -82,6 +87,34 @@ function collabSettings(env: Env): ServerConfig['collab'] {
   }
 }
 
+function r2Settings(env: Env, purpose: string): R2Config {
+  const bucket = setting(env, 'TOLARIA_R2_BUCKET')
+  const endpoint = setting(env, 'TOLARIA_R2_ENDPOINT')
+  const region = setting(env, 'TOLARIA_R2_REGION')
+  const accessKeyId = setting(env, 'TOLARIA_R2_ACCESS_KEY_ID')
+  const secretAccessKey = setting(env, 'TOLARIA_R2_SECRET_ACCESS_KEY')
+  
+  if (!bucket) throw new Error(`TOLARIA_R2_BUCKET is required when ${purpose}`)
+  if (!endpoint) throw new Error(`TOLARIA_R2_ENDPOINT is required when ${purpose}`)
+  if (!region) throw new Error(`TOLARIA_R2_REGION is required when ${purpose}`)
+  if (!accessKeyId) throw new Error(`TOLARIA_R2_ACCESS_KEY_ID is required when ${purpose}`)
+  if (!secretAccessKey) throw new Error(`TOLARIA_R2_SECRET_ACCESS_KEY is required when ${purpose}`)
+  
+  try {
+    const endpointUrl = new URL(endpoint)
+    if (!['http:', 'https:'].includes(endpointUrl.protocol)) {
+      throw new Error('TOLARIA_R2_ENDPOINT must be an HTTP or HTTPS URL')
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('TOLARIA_R2_ENDPOINT must be a valid URL')
+    }
+    throw error
+  }
+  
+  return { bucket, endpoint, region, accessKeyId, secretAccessKey }
+}
+
 function blobStoreSettings(env: Env, stateDir: string): ServerConfig['blobStore'] {
   const blobStoreType = setting(env, 'TOLARIA_BLOBSTORE') ?? 'local'
   
@@ -90,37 +123,24 @@ function blobStoreSettings(env: Env, stateDir: string): ServerConfig['blobStore'
   }
   
   if (blobStoreType === 'r2') {
-    const bucket = setting(env, 'TOLARIA_R2_BUCKET')
-    const endpoint = setting(env, 'TOLARIA_R2_ENDPOINT')
-    const region = setting(env, 'TOLARIA_R2_REGION')
-    const accessKeyId = setting(env, 'TOLARIA_R2_ACCESS_KEY_ID')
-    const secretAccessKey = setting(env, 'TOLARIA_R2_SECRET_ACCESS_KEY')
-    
-    if (!bucket) throw new Error('TOLARIA_R2_BUCKET is required when TOLARIA_BLOBSTORE=r2')
-    if (!endpoint) throw new Error('TOLARIA_R2_ENDPOINT is required when TOLARIA_BLOBSTORE=r2')
-    if (!region) throw new Error('TOLARIA_R2_REGION is required when TOLARIA_BLOBSTORE=r2')
-    if (!accessKeyId) throw new Error('TOLARIA_R2_ACCESS_KEY_ID is required when TOLARIA_BLOBSTORE=r2')
-    if (!secretAccessKey) throw new Error('TOLARIA_R2_SECRET_ACCESS_KEY is required when TOLARIA_BLOBSTORE=r2')
-    
-    try {
-      const endpointUrl = new URL(endpoint)
-      if (!['http:', 'https:'].includes(endpointUrl.protocol)) {
-        throw new Error('TOLARIA_R2_ENDPOINT must be an HTTP or HTTPS URL')
-      }
-    } catch (error) {
-      if (error instanceof TypeError) {
-        throw new Error('TOLARIA_R2_ENDPOINT must be a valid URL')
-      }
-      throw error
-    }
-    
-    return {
-      type: 'r2',
-      config: { bucket, endpoint, region, accessKeyId, secretAccessKey }
-    }
+    return { type: 'r2', config: r2Settings(env, 'TOLARIA_BLOBSTORE=r2') }
   }
   
   throw new Error(`invalid TOLARIA_BLOBSTORE value: ${blobStoreType} (must be 'local' or 'r2')`)
+}
+
+const SNAPSHOT_PREFIX = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$/
+
+function indexSnapshotSettings(env: Env): ServerConfig['indexSnapshots'] {
+  const type = setting(env, 'TOLARIA_INDEX_SNAPSHOTS')
+  if (type === undefined) return null
+  if (type !== 'r2') throw new Error(`invalid TOLARIA_INDEX_SNAPSHOTS value: ${type} (must be 'r2' or unset)`)
+  const prefix = setting(env, 'TOLARIA_INDEX_SNAPSHOT_PREFIX')
+  if (!prefix) throw new Error('TOLARIA_INDEX_SNAPSHOT_PREFIX is required when TOLARIA_INDEX_SNAPSHOTS=r2')
+  if (!SNAPSHOT_PREFIX.test(prefix)) {
+    throw new Error('TOLARIA_INDEX_SNAPSHOT_PREFIX must be /-separated letters, digits, ".", "_" and "-"')
+  }
+  return { r2: r2Settings(env, 'TOLARIA_INDEX_SNAPSHOTS=r2'), prefix }
 }
 
 /** Reads the configuration from the environment. Throws with a message fit for the operator. */
@@ -139,5 +159,6 @@ export function loadConfig(env: Env): ServerConfig {
     maxBodyBytes: positiveInteger(env, 'TOLARIA_SERVER_MAX_BODY_BYTES', DEFAULT_MAX_BODY_BYTES, 2 ** 31),
     collab: collabSettings(env),
     blobStore: blobStoreSettings(env, stateDir),
+    indexSnapshots: indexSnapshotSettings(env),
   }
 }

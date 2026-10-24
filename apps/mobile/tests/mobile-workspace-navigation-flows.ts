@@ -5,9 +5,10 @@ import { ensureMarkdownInput } from './mobile-workspace-property-flows'
 
 export async function navigatePhoneSidebarSection(page: PageLike) {
   await expect(page.getByTestId('phone-note-list-screen')).toBeVisible()
-  await expectToolbarLeadingActionBeforeTitle(page)
+  await expect(page.getByTestId('phone-note-list-screen').getByTestId('phone-command-palette-action')).toHaveCount(0)
   await openPhoneSidebar(page)
   await expect(page.getByTestId('phone-sidebar-screen')).toBeVisible()
+  await expect(page.getByTestId('phone-sidebar-screen').getByTestId('sidebar-command-palette-action')).toBeVisible()
   await swipeHorizontally(page, { x: 220, y: 300 }, { x: 40, y: 300 })
   await expect(page.getByTestId('phone-note-list-screen')).toBeVisible()
   await openPhoneSidebar(page)
@@ -16,14 +17,6 @@ export async function navigatePhoneSidebarSection(page: PageLike) {
   await expect(page.getByTestId('phone-note-list-screen')).toBeVisible()
   await expect(page.getByTestId('note-list-toolbar-title')).toHaveText('All Notes')
   await openPhoneFavoriteNeighborhood(page)
-}
-
-async function expectToolbarLeadingActionBeforeTitle(page: PageLike) {
-  const actionBox = await page.getByTestId('phone-command-palette-action').boundingBox()
-  const titleBox = await page.getByTestId('note-list-toolbar-title').boundingBox()
-  if (!actionBox || !titleBox) throw new Error('Cannot measure phone note-list toolbar.')
-
-  expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(titleBox.x)
 }
 
 export async function openPhoneEditorAndProperties(page: PageLike) {

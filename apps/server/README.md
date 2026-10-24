@@ -26,11 +26,13 @@ Use `pnpm run server`: bare `pnpm server` is a pnpm built-in command.
 | `TOLARIA_VAULT_BRANCH` | the remote's default | Branch to serve |
 | `TOLARIA_SERVER_DATA_DIR` | `./data` | Holds `vault/` (the clone) and `state/` (doc index) |
 | `TOLARIA_BLOBSTORE` | `local` | Blob store for doc index and Yjs snapshots: `local` (disk under `state/`) or `r2` (S3-compatible) |
-| `TOLARIA_R2_BUCKET` | none | R2 bucket name (required when `TOLARIA_BLOBSTORE=r2`) |
-| `TOLARIA_R2_ENDPOINT` | none | R2 endpoint URL (required when `TOLARIA_BLOBSTORE=r2`) |
-| `TOLARIA_R2_REGION` | none | R2 region (required when `TOLARIA_BLOBSTORE=r2`) |
-| `TOLARIA_R2_ACCESS_KEY_ID` | none | R2 access key (required when `TOLARIA_BLOBSTORE=r2`) |
-| `TOLARIA_R2_SECRET_ACCESS_KEY` | none | R2 secret key (required when `TOLARIA_BLOBSTORE=r2`) |
+| `TOLARIA_R2_BUCKET` | none | R2 bucket name (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
+| `TOLARIA_R2_ENDPOINT` | none | R2 endpoint URL (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
+| `TOLARIA_R2_REGION` | none | R2 region (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
+| `TOLARIA_R2_ACCESS_KEY_ID` | none | R2 access key (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
+| `TOLARIA_R2_SECRET_ACCESS_KEY` | none | R2 secret key (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
+| `TOLARIA_INDEX_SNAPSHOTS` | unset | `r2`: keep gzipped snapshots of the entry and search indexes in the R2 bucket above, so a server on a fresh disk loads them instead of reading every note. Fetched while the vault clones, caught up with the commits since (or rebuilt when more than 500 files changed, or when unreadable), published after startup and on shutdown |
+| `TOLARIA_INDEX_SNAPSHOT_PREFIX` | none | Key prefix of one vault's snapshots (required with `TOLARIA_INDEX_SNAPSHOTS`), e.g. `vaults/<id>`. The server adds a digest of its own code, so it never reads snapshots of other code |
 | `TOLARIA_SERVER_HOST` | `127.0.0.1` | Bind address |
 | `TOLARIA_SERVER_PORT` | `8787` | Port |
 | `TOLARIA_SERVER_ALLOW_NON_LOOPBACK` | unset | Set to `1` to bind a non-loopback address. The server speaks plain HTTP: only do this behind a TLS-terminating proxy |

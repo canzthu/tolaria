@@ -25,7 +25,7 @@ async function addOpenSourceProjectToFavorites(page: Page) {
   await page.getByTestId('note-row-open-source-project').click()
   await expect(page.getByTestId('phone-editor-screen')).toBeVisible()
   await page.getByTestId('editor-favorite-action').click()
-  await expect(page.getByLabel('Remove from Favorites')).toBeVisible()
+  await expect(page.getByTestId('editor-favorite-action')).toHaveAccessibleName('Remove from Favorites')
   await phoneBack(page)
 }
 

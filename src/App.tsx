@@ -76,15 +76,14 @@ import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog'
 import { DeleteProgressNotice } from './components/DeleteProgressNotice'
 import { UpdateBanner } from './components/UpdateBanner'
 import { invoke } from '@tauri-apps/api/core'
-import { createVaultBackend } from './lib/vaultBackend'
+import type { VaultBackend } from './lib/vaultBackend/types'
+import { createRemoteVaultBackend, type RemoteBindings } from '../packages/collab-client/src/remoteVaultBackend'
 import { isTauri, mockInvoke } from './mock-tauri'
 import { resolvePlatformCapabilities } from './lib/platformCapabilities'
 import type { AiWorkspaceConversationSetting, GitSetupPreference, SidebarSelection, InboxPeriod, VaultEntry, WorkspaceIdentity } from './types'
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
 import type { NoteListFilter } from './utils/noteListHelpers'
 import { openNoteInNewWindow } from './utils/openNoteWindow'
-import { refreshPulledVaultState } from './utils/pulledVaultRefresh'
-import { refreshNoteWindowVaultChanges } from './utils/noteWindowVaultRefresh'
 import { viewMatchesSelection } from './utils/viewIdentity'
 import { isAiWorkspaceWindow, isNoteWindow, getNoteWindowParams, type NoteWindowParams } from './utils/windowMode'
 import { GitSetupDialog } from './components/GitRequiredModal'
@@ -101,6 +100,7 @@ import { areGitFeaturesEnabled } from './lib/gitSettings'
 import { useAppCommandAiActions } from './hooks/useAppCommandAiActions'
 import { TOLARIA_DOCS_URL } from './constants/feedback'
 import { openExternalUrl } from './utils/url'
+import { createVaultFolder } from './utils/vaultFolderCreation'
 import {
   translate,
 } from './lib/i18n'
@@ -119,7 +119,6 @@ import { SETTINGS_SECTION_IDS } from './components/settingsSectionIds'
 import {
   vaultPathForEntry,
 } from './utils/workspaces'
-import { notePathsMatch } from './utils/notePathIdentity'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { entrySupportsPreviewSourceToggle } from './utils/filePreview'
 import { isMarkdownEntry } from './utils/typeDefinitions'
@@ -131,6 +130,7 @@ import { AppPreferencesProvider, useAppPreferences } from './hooks/useAppPrefere
 import { useInboxOrganizeAdvance } from './hooks/useInboxOrganizeAdvance'
 import { syncVaultAssetScope, useNoteWindowLifecycle } from './hooks/useNoteWindowLifecycle'
 import { useVaultRenameDetection } from './hooks/useVaultRenameDetection'
+import { useVaultRefreshHandlers } from './hooks/useVaultRefreshHandlers'
 import { useVaultOpenedTelemetry } from './hooks/useVaultOpenedTelemetry'
 import { useStartupScreenState } from './hooks/useStartupScreenState'
 import { useStartupStateMilestones } from './hooks/useStartupStateMilestones'
@@ -173,22 +173,31 @@ function App() {
   return <MainApp noteWindowParams={noteWindowParams} />
 }
 
+/** The remote server the web build talks to, when one is configured on window. */
+function remoteVaultConfig(): { baseUrl: string; token: string } | null {
+  if (typeof window === 'undefined') return null
+  const { TOLARIA_REMOTE_URL: baseUrl, TOLARIA_REMOTE_TOKEN: token } = window as {
+    TOLARIA_REMOTE_URL?: string
+    TOLARIA_REMOTE_TOKEN?: string
+  }
+  return baseUrl && token ? { baseUrl, token } : null
+}
+
+// Platform capabilities: desktop shows all features, web/remote hide desktop-only features
+function resolveShellPlatformCapabilities() {
+  if (isTauri()) return resolvePlatformCapabilities('tauri')
+  return resolvePlatformCapabilities(remoteVaultConfig() ? 'remote' : 'mock')
+}
+
 function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | null }) {
   const aiWorkspaceWindow = false
-  // Platform capabilities: desktop shows all features, web/remote hide desktop-only features
-  const platformCapabilities = useMemo(() => {
-    if (isTauri()) return resolvePlatformCapabilities('tauri')
-    
-    // Check if remote backend is configured (web build with server)
-    const hasRemoteConfig = typeof window !== 'undefined' &&
-      'TOLARIA_REMOTE_URL' in window &&
-      'TOLARIA_REMOTE_TOKEN' in window &&
-      !!(window as { TOLARIA_REMOTE_URL?: string }).TOLARIA_REMOTE_URL &&
-      !!(window as { TOLARIA_REMOTE_TOKEN?: string }).TOLARIA_REMOTE_TOKEN
-    
-    const backendKind = hasRemoteConfig ? 'remote' : 'mock'
-    return resolvePlatformCapabilities(backendKind)
-  }, [])
+  const platformCapabilities = useMemo(() => resolveShellPlatformCapabilities(), [])
+  // Create VaultBackend for web collaboration
+  const vaultBackend = useMemo((): VaultBackend<RemoteBindings> | null => {
+    if (!platformCapabilities.perNoteEditors) return null
+    const remote = remoteVaultConfig()
+    return remote ? createRemoteVaultBackend(remote) : null
+  }, [platformCapabilities.perNoteEditors])
   const [selection, setSelection] = useState<SidebarSelection>(DEFAULT_SELECTION)
   const [noteListFilter, setNoteListFilter] = useState<NoteListFilter>('open')
   const [pendingNoteListPdfExportPath, setPendingNoteListPdfExportPath] = useState<string | null>(null)
@@ -345,7 +354,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     [vaultSwitcher.allVaults],
   )
   const { config: vaultConfig, updateConfig } = useVaultConfig(resolvedPath)
-  const gitFeaturesEnabled = areGitFeaturesEnabled(settings)
+  // Git runs on the server for the web build: the shell's git status would be mock data.
+  const gitFeaturesEnabled = platformCapabilities.git && areGitFeaturesEnabled(settings)
   const automaticGitEnabled = gitFeaturesEnabled && !noteWindowParams
   const handleGitSetupPreferenceChange = useCallback((preference: GitSetupPreference) => {
     updateConfig('git_setup_preference', preference)
@@ -599,28 +609,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     isVaultLoading: vault.isLoading || !vaultSwitcher.loaded || !resolvedPath,
     openNote: handleSelectNote,
   })
-  const noteTabsRef = useRef(notes.tabs)
-  useEffect(() => {
-    noteTabsRef.current = notes.tabs
-  }, [notes.tabs])
-  const refocusActiveEditor = useCallback((path: string) => {
-    window.dispatchEvent(new CustomEvent('laputa:focus-editor', { detail: { path } }))
-  }, [])
-  const isActiveTabContentCurrent = useCallback(async (path: string) => {
-    const activeTab = noteTabsRef.current.find((tab) => notePathsMatch(tab.entry.path, path))
-    if (!activeTab) return false
-
-    const vaultPath = vaultPathForEntry(activeTab.entry, resolvedPath)
-
-    try {
-      const backend = createVaultBackend(vaultPath)
-      const { content } = await backend.files.read(activeTab.entry.path)
-      return content === activeTab.content
-    } catch (error) {
-      console.warn('Failed to compare active tab content before vault refresh:', error)
-      return false
-    }
-  }, [resolvedPath])
   useNoteWindowLifecycle({
     activeTabPath: notes.activeTabPath,
     handleSelectNote,
@@ -629,92 +617,21 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setToastMessage,
     tabs: notes.tabs,
   })
-  const handleVaultUpdate = useCallback(async (
-    updatedFiles: string[],
-    options: { vaultPath?: string } = {},
-  ) => {
-    const updateVaultPath = options.vaultPath ?? resolvedPath
-    const entries = await refreshPulledVaultState({
-      activeTabPath: noteActiveTabPath,
-      closeAllTabs,
-      getActiveTabPath: () => noteActiveTabPathRef.current,
-      hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
-      isActiveTabContentCurrent,
-      reloadFolders: vault.reloadFolders,
-      reloadVault: vault.reloadVault,
-      reloadViews: vault.reloadViews,
-      replaceActiveTab: handleReplaceActiveTab,
-      refocusActiveEditor,
-      shouldRefocusActiveEditor: isActiveElementInsideEditorSurface,
-      updatedFiles,
-      vaultPath: updateVaultPath,
-    })
-    await refreshGitModifiedFiles()
-    return entries
-  }, [
-      closeAllTabs,
-      handleReplaceActiveTab,
-      isActiveTabContentCurrent,
-      noteActiveTabPath,
-      noteActiveTabPathRef,
-      refocusActiveEditor,
-      refreshGitModifiedFiles,
-      resolvedPath,
-      vault.reloadFolders,
-      vault.reloadVault,
-      vault.reloadViews,
-      vault.unsavedPaths,
-    ])
-  const handlePulledVaultUpdate = useCallback(async (updatedFiles: string[], vaultPath: string) => {
-    await handleVaultUpdate(updatedFiles, { vaultPath })
-  }, [handleVaultUpdate])
-  const refreshGitHistorySurfaces = useCallback(() => {
-    setGitHistoryRefreshKey((key) => key + 1)
-  }, [])
-  const handleFocusedVaultUpdate = useCallback(async (updatedFiles: string[]) => {
-    if (!noteWindowParams) {
-      await handleVaultUpdate(updatedFiles)
-      return
-    }
-
-    await refreshNoteWindowVaultChanges({
-      activeTabPath: noteActiveTabPath,
-      applyEntry: (entry) => {
-        if (visibleEntries.some((current) => notePathsMatch(current.path, entry.path))) {
-          vault.updateEntry(entry.path, entry)
-        } else {
-          vault.addEntry(entry)
-        }
-      },
-      closeAllTabs,
-      currentEntries: visibleEntries,
-      getActiveTabPath: () => noteActiveTabPathRef.current,
-      hasUnsavedChanges: (path) => vault.unsavedPaths.has(path),
-      isActiveTabContentCurrent,
-      paths: updatedFiles,
-      refreshFullVault: handleVaultUpdate,
-      reloadEntry: async (path) => {
-        const backend = createVaultBackend(resolvedPath)
-        return backend.files.reloadEntry(path)
-      },
-      replaceActiveTab: handleReplaceActiveTab,
-      refocusActiveEditor,
-      shouldRefocusActiveEditor: isActiveElementInsideEditorSurface,
-      vaultPath: resolvedPath,
-    })
-  }, [
+  const { handleFocusedVaultUpdate, handlePulledVaultUpdate, refocusActiveEditor } = useVaultRefreshHandlers({
     closeAllTabs,
     handleReplaceActiveTab,
-    handleVaultUpdate,
-    isActiveTabContentCurrent,
     noteActiveTabPath,
     noteActiveTabPathRef,
     noteWindowParams,
-    refocusActiveEditor,
+    refreshGitModifiedFiles,
     resolvedPath,
+    tabs: notes.tabs,
     vault,
     visibleEntries,
-  ])
+  })
+  const refreshGitHistorySurfaces = useCallback(() => {
+    setGitHistoryRefreshKey((key) => key + 1)
+  }, [])
   useEffect(() => {
     if (watchedVaultPaths.length === 0) return
     let cancelled = false
@@ -941,14 +858,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     parent?: { path: string; rootPath?: string },
   ) => {
     try {
-      const vaultPath = parent?.rootPath?.trim() ? parent.rootPath : resolvedPath
-      const parentPath = parent?.path && parent.path.length > 0 ? parent.path : null
-      const args = { vaultPath, folderName: name, parentPath }
-      if (isTauri()) {
-        await invoke('create_vault_folder', args)
-      } else {
-        await mockInvoke('create_vault_folder', args)
-      }
+      await createVaultFolder({ name, parent, defaultVaultPath: resolvedPath })
       await vault.reloadFolders()
       setToastMessage(`Created folder "${name}"`)
       return true
@@ -1864,8 +1774,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               flushPendingRawContentRef={flushPendingRawContentRef}
               onToast={setToastMessage}
               platformCapabilities={platformCapabilities}
+              vaultBackend={vaultBackend}
               locale={appLocale}
-              editable={platformCapabilities.git || !networkStatus.isOffline}
             />
           </div>
         </div>
