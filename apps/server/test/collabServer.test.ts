@@ -17,6 +17,7 @@ const NOTE = 'projects/alpha.md'
 
 let fixture: Fixture
 let vault: Vault
+let store: GatedStore
 let server: Server
 let origin: string
 let providers: CollabProvider[]
@@ -28,7 +29,27 @@ interface Call {
 
 /** Every request goes to the server this test started on loopback, with the test token. */
 function call({ path, init }: Call): Promise<Response> {
-  return fetch(new URL(path, origin), { ...init, headers: { authorization: `Bearer ${TOKEN}` } })
+  const authorized = { ...init, headers: { authorization: `Bearer ${TOKEN}` } }
+  return fetch(new URL(path, origin), authorized)
+}
+
+/** The disk store, able to hold the collaboration snapshots back: a document then stays opening. */
+class GatedStore extends LocalDiskStore {
+  private gate: Promise<void> = Promise.resolve()
+
+  /** Holds every snapshot read until the returned function is called. */
+  hold(): () => void {
+    let release = () => {}
+    this.gate = new Promise((resolve) => {
+      release = resolve
+    })
+    return release
+  }
+
+  override async get(key: string): Promise<Uint8Array | null> {
+    if (key.startsWith('collab/')) await this.gate
+    return super.get(key)
+  }
 }
 
 function api(path: string, init: RequestInit = {}): Promise<Response> {
@@ -85,9 +106,10 @@ async function converged(a: CollabProvider, b: CollabProvider): Promise<void> {
 }
 
 async function start(collab?: false): Promise<void> {
+  store = new GatedStore(join(fixture.root, 'server', 'state'))
   server = await createVaultServer({
     vault,
-    store: new LocalDiskStore(join(fixture.root, 'server', 'state')),
+    store,
     token: TOKEN,
     maxBodyBytes: 1024 * 1024,
     collab: collab ?? { policy: { idleMs: 30, maxWaitMs: 5_000 }, lingerMs: 10 },
@@ -223,12 +245,15 @@ describe('the collaboration channel over websockets', () => {
     const socket = new NodeWebSocket(socketUrl(`/v1/collab/docs/${docId}`), { headers: { authorization: `Bearer ${TOKEN}` } })
     const closed = new Promise<number>((resolve) => socket.on('close', resolve))
     socket.on('error', () => {})
+    const releaseDocument = store.hold()
 
     socket.on('open', () => {
       for (let sent = 0; sent < 3; sent++) socket.send(new Uint8Array(512 * 1024))
     })
+    const code = await closed
+    releaseDocument()
 
-    expect(await closed).toBe(1009)
+    expect(code).toBe(1009)
   })
 
   it('frees the room of a client that disconnects before the document has opened', async () => {
