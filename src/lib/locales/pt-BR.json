@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Cancelar",
   "editor.empty.selectNote": "Selecione uma nota para começar a editar",
   "editor.empty.shortcuts": "{quickOpen} para buscar · {newNote} para criar",
+  "editor.empty.tapNote": "Toque em uma nota para começar a editar",
   "editor.raw.label": "Editor Raw",
   "editor.sheet.loading": "Carregando planilha...",
   "editor.sheet.unavailable": "Pasta de trabalho do IronCalc indisponível: {error}",

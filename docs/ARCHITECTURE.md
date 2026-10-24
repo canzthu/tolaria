@@ -1127,6 +1127,8 @@ Phone layout on the web (ADR 0286): at `(max-width: 640px)` the web build shows 
 
 Tablet layout on the web (ADR 0287): at `(min-width: 641px) and (max-width: 1366px) and (pointer: coarse)` the web build shows the note list and the note. `useTabletSidebar` (inside `useAppWindowControls`) keeps the sidebar collapsed until a view mode asks for it, for the session only, and marks `<html>` with `data-tablet-layout`; in portrait `App.css` floats the open sidebar over the list and a tap beside it closes it. In the web build `findShortcutCommandIdForEvent` and `getAppCommandShortcutDisplay` go through `webShortcuts`: browser-owned shortcuts are left to the browser and new note, quick open and the view modes move to ⌥⌘ (Ctrl+Alt elsewhere).
 
+Touch input on the web (ADR 0288): `main.tsx` calls `installTouchInput` (`src/lib/touchInput.ts`) for the web build before the first render. While the primary pointer is coarse it marks `<html>` with `data-touch-input`, from which `App.css` sizes key targets to 44 px, and it turns a touch long press in the sidebar or the note list into a `contextmenu` event at the finger, so the existing right-click menus open unchanged. `EditorLayout` shows `TouchEmptyState` instead of the keyboard hints when `useTouchInput` is true.
+
 ```mermaid
 flowchart LR
   B1[Browser: BlockNote + CollabProvider] <-->|sync, awareness| R[Room per docId]

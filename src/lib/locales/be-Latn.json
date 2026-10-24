@@ -674,6 +674,7 @@
   "editor.callout.defaultHeading": "Zaŭvaha",
   "editor.empty.selectNote": "Abiarycie natatku dlia redahavannia",
   "editor.empty.shortcuts": "{quickOpen} dlia pošuku · {newNote} kab stvaryć",
+  "editor.empty.tapNote": "Naciśnicie na natatku, kab pačać redahavannie",
   "editor.raw.label": "Redaktar zychodnaha koda",
   "editor.sheet.loading": "Zahruzka arkuša...",
   "editor.sheet.unavailable": "Kniha IronCalc niedastupnaja: {error}",

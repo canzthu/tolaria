@@ -37,6 +37,7 @@ import {
   scheduleOfflineServiceWorkerRegistration,
 } from './lib/offline/offlineMode'
 import { prefetchCache } from '../packages/collab-client/src/entriesCachePrefetch'
+import { installTouchInput } from './lib/touchInput'
 
 markStartupPhase('renderer_module_loaded')
 // Web only (TOL-206): the cached note list is read while the rest of the shell loads.
@@ -310,6 +311,8 @@ function renderWebRoot(): void {
   )
 }
 
+// Web only (TOL-24): touch targets and long-press menus, set before the first paint.
+if (IS_WEB_BUILD) installTouchInput()
 if (IS_WEB_BUILD) renderWebRoot()
 else renderLazyRoot()
 

@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Avbryt",
   "editor.empty.selectNote": "Välj en anteckning för att börja redigera",
   "editor.empty.shortcuts": "{quickOpen} för att söka · {newNote} för att skapa",
+  "editor.empty.tapNote": "Tryck på en anteckning för att börja redigera",
   "editor.raw.label": "Råredigerare",
   "editor.sheet.loading": "Laddar blad...",
   "editor.sheet.unavailable": "IronCalc-arbetsbok är inte tillgänglig: {error}",

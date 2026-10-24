@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "取消",
   "editor.empty.selectNote": "選擇一條筆記開始編輯",
   "editor.empty.shortcuts": "{quickOpen} 搜尋 · {newNote} 建立",
+  "editor.empty.tapNote": "點選筆記即可開始編輯",
   "editor.raw.label": "原始碼編輯器",
   "editor.sheet.loading": "正在載入工作表...",
   "editor.sheet.unavailable": "IronCalc 活頁簿無法使用：{error}",

@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Скасувати",
   "editor.empty.selectNote": "Виберіть нотатку, щоб почати редагування",
   "editor.empty.shortcuts": "{quickOpen} для пошуку · {newNote} для створення",
+  "editor.empty.tapNote": "Натисніть нотатку, щоб почати редагування",
   "editor.raw.label": "Редактор Raw",
   "editor.sheet.loading": "Завантаження аркуша...",
   "editor.sheet.unavailable": "Книга IronCalc недоступна: {error}",

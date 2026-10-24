@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "취소",
   "editor.empty.selectNote": "편집을 시작하려면 노트를 선택하세요.",
   "editor.empty.shortcuts": "{quickOpen}으로 검색 · {newNote}으로 생성",
+  "editor.empty.tapNote": "편집을 시작하려면 노트를 탭하세요.",
   "editor.raw.label": "Raw 편집기",
   "editor.sheet.loading": "시트 로드 중...",
   "editor.sheet.unavailable": "IronCalc 통합 문서를 사용할 수 없음: {error}",

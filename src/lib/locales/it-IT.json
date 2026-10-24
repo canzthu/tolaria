@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Annulla",
   "editor.empty.selectNote": "Seleziona una nota per iniziare a modificarla",
   "editor.empty.shortcuts": "{quickOpen} per cercare · {newNote} per creare",
+  "editor.empty.tapNote": "Tocca una nota per iniziare a modificarla",
   "editor.raw.label": "Editor Raw",
   "editor.sheet.loading": "Caricamento foglio in corso...",
   "editor.sheet.unavailable": "Cartella di lavoro IronCalc non disponibile: {error}",

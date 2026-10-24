@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Abbrechen",
   "editor.empty.selectNote": "Wählen Sie eine Notiz aus, um mit der Bearbeitung zu beginnen",
   "editor.empty.shortcuts": "{quickOpen} zum Suchen · {newNote} zum Erstellen",
+  "editor.empty.tapNote": "Tippen Sie auf eine Notiz, um mit der Bearbeitung zu beginnen",
   "editor.raw.label": "Raw-Editor",
   "editor.sheet.loading": "Blatt wird geladen …",
   "editor.sheet.unavailable": "IronCalc-Arbeitsmappe nicht verfügbar: {error}",

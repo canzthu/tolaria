@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Zrušiť",
   "editor.empty.selectNote": "Vyberte poznámku a začnite upravovať",
   "editor.empty.shortcuts": "{quickOpen} na vyhľadávanie · {newNote} na vytvorenie",
+  "editor.empty.tapNote": "Ťuknutím na poznámku začnite upravovať",
   "editor.raw.label": "Raw editor",
   "editor.sheet.loading": "Načítava sa hárok...",
   "editor.sheet.unavailable": "Zošit IronCalc nie je k dispozícii: {error}",

@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "キャンセル",
   "editor.empty.selectNote": "ノートを選択して編集を開始",
   "editor.empty.shortcuts": "{quickOpen} で検索 · {newNote} で作成",
+  "editor.empty.tapNote": "ノートをタップして編集を開始します",
   "editor.raw.label": "Raw エディター",
   "editor.sheet.loading": "シートを読み込み中...",
   "editor.sheet.unavailable": "IronCalcワークブックは利用できません：{error}",

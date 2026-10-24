@@ -145,6 +145,59 @@ html[data-tablet-layout] .app-shell .app__editor {
   }
 }
 
+/*
+ * Touch input on the web (TOL-24): key targets are at least 44 px, the size Apple and Google
+ * ask for. The visual design stays; buttons grow their hit area around the same icon.
+ */
+html[data-touch-input] [data-testid$="context-menu"] [data-slot="button"] {
+  min-height: 44px;
+}
+
+html[data-touch-input] .app-shell .app__sidebar :is(button, [role="button"]) {
+  min-height: 44px;
+}
+
+/*
+ * The note list header's buttons force `!min-w-0` and add TOUCH_TARGET_CLASSNAME
+ * (src/lib/touchInput.ts) for their width; the sidebar's icon buttons get it from their flex basis.
+ */
+html[data-touch-input] .app-shell .app__phone-back-bar [data-slot="button"],
+html[data-touch-input] .app-shell .app__sidebar [data-slot="button"][data-size^="icon"],
+html[data-touch-input] .app-shell .app__note-list :is([data-slot="button"], [data-slot$="-trigger"], [data-testid^="sort-button"]):not(.absolute) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+html[data-touch-input] .app-shell .app__sidebar [data-slot="button"][data-size^="icon"] {
+  flex: 0 0 44px;
+}
+
+/*
+ * The 44 px hit areas already space the icons apart, so the header drops its gaps, and a group
+ * of buttons never shrinks below them (they would overlap the controls beside it).
+ */
+html[data-touch-input] .app-shell .app__note-list :has(> [data-slot="button"]) {
+  column-gap: 0;
+  min-width: 44px;
+}
+
+/* A browser has no window buttons to clear: the macOS traffic-light inset shrinks to the edge margin. */
+html[data-touch-input] body.mac-chrome {
+  --tolaria-macos-traffic-light-padding: 16px;
+}
+
+/* A long press opens the context menu (src/lib/touchInput.ts), not text selection or a callout. */
+html[data-touch-input] .app-shell :is(.app__sidebar, .app__note-list) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html[data-touch-input] .app-shell .app__note-list :is(input, textarea) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

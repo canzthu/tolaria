@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Annuler",
   "editor.empty.selectNote": "Sélectionner une note pour commencer à la modifier",
   "editor.empty.shortcuts": "{quickOpen} pour rechercher · {newNote} pour créer",
+  "editor.empty.tapNote": "Appuyez sur une note pour commencer à la modifier",
   "editor.raw.label": "Éditeur brut",
   "editor.sheet.loading": "Chargement de la feuille...",
   "editor.sheet.unavailable": "Classeur IronCalc indisponible : {error}",

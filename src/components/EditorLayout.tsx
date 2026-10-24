@@ -6,6 +6,7 @@ import {
 } from "../hooks/appCommandCatalog";
 import type { FrontmatterOpOptions } from "../hooks/frontmatterOps";
 import { useDragRegion } from "../hooks/useDragRegion";
+import { useTouchInput } from "../hooks/useTouchInput";
 import type { AiAgentId, AiAgentReadiness } from "../lib/aiAgents";
 import type { AiTarget } from "../lib/aiTargets";
 import { type AppLocale, translate } from "../lib/i18n";
@@ -25,12 +26,11 @@ import { FilePreview } from "./FilePreview";
 import type { FrontmatterValue } from "./Inspector";
 import type { RawEditorFindRequest } from "./RawEditorFindBar";
 import { ResizeHandle } from "./ResizeHandle";
+import { TouchEmptyState } from "./TouchEmptyState";
 
 import type { ImageImportErrorHandler, Tab } from "./useEditorSetup";
 
-function EditorEmptyState({ locale = "en" }: { locale?: AppLocale }) {
-	const breadcrumbBarHeight = 52;
-	const { onMouseDown } = useDragRegion();
+function KeyboardEmptyState({ locale }: { locale: AppLocale }) {
 	// The web build shows its browser-safe shortcuts (TOL-194).
 	const quickOpenShortcut = getAppCommandShortcutDisplay(
 		APP_COMMAND_IDS.fileQuickOpen,
@@ -38,6 +38,27 @@ function EditorEmptyState({ locale = "en" }: { locale?: AppLocale }) {
 	const newNoteShortcut = getAppCommandShortcutDisplay(
 		APP_COMMAND_IDS.fileNewNote,
 	) ?? "";
+
+	return (
+		<>
+			<p className="m-0 text-[15px]">
+				{translate(locale, "editor.empty.selectNote")}
+			</p>
+			<span className="text-xs text-muted-foreground">
+				{translate(locale, "editor.empty.shortcuts", {
+					quickOpen: quickOpenShortcut,
+					newNote: newNoteShortcut,
+				})}
+			</span>
+		</>
+	);
+}
+
+function EditorEmptyState({ locale = "en" }: { locale?: AppLocale }) {
+	const breadcrumbBarHeight = 52;
+	const { onMouseDown } = useDragRegion();
+	// A finger on the web build gets buttons instead of chords (TOL-24).
+	const touchInput = useTouchInput();
 
 	return (
 		<div className="flex flex-1 flex-col overflow-hidden">
@@ -50,15 +71,11 @@ function EditorEmptyState({ locale = "en" }: { locale?: AppLocale }) {
 				style={{ height: breadcrumbBarHeight }}
 			/>
 			<div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-				<p className="m-0 text-[15px]">
-					{translate(locale, "editor.empty.selectNote")}
-				</p>
-				<span className="text-xs text-muted-foreground">
-					{translate(locale, "editor.empty.shortcuts", {
-						quickOpen: quickOpenShortcut,
-						newNote: newNoteShortcut,
-					})}
-				</span>
+				{touchInput ? (
+					<TouchEmptyState locale={locale} />
+				) : (
+					<KeyboardEmptyState locale={locale} />
+				)}
 			</div>
 		</div>
 	);

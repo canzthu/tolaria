@@ -4,6 +4,8 @@ Standing rule (Luca, 10 Oct 2026): Tolaria Web reuses the desktop shell, BlockNo
 
 ## Departures made
 
+B3-3 (TOL-24) adapts the shell to touch. It reuses the existing context menus, `Button`, Phosphor icons, tokens and copy; only the input layer, the target sizes and the empty editor change, and only while a finger is the primary pointer. The departures are the first rows of the table. ADR 0288.
+
 B3-2 (TOL-194) gives the shell a tablet layout and browser-safe shortcuts. It reuses the sidebar, its collapse and expand controls, the note list, editor and tokens unchanged; the departures are the first rows of the table. ADR 0287.
 
 B3-1 (TOL-193) gives the shell a phone layout. It reuses the note list, editor, status bar, `Button`, Phosphor icons and tokens unchanged; the departures are the first rows of the table. ADR 0286.
@@ -16,6 +18,11 @@ Spike S1 (TOL-3, TOL-4) builds the existing shell as a static web bundle without
 
 | Date | What changed | Why | Where |
 |---|---|---|---|
+| 24 Oct 2026 | With a finger (`pointer: coarse`), a long press (500 ms) on a note, a type, a view or a folder opens the menu a right click opens; the lifted finger does not also open the note. A mouse keeps the right click | iOS Safari sends no right click for a long press and touch has no hover; the desktop's menus are the only way to rename, archive, delete or customize | `src/lib/touchInput.ts` (installed in `src/main.tsx`) |
+| 24 Oct 2026 | With a finger, the note list header controls, the sidebar's icon buttons and rows, the phone back button and context menu items are at least 44 × 44 px; the header's icons lose their gaps, which the hit areas now provide | Apple and Google ask for 44 px targets; 14–24 px icons are missed by a finger | `src/App.css` (`html[data-touch-input]`) |
+| 24 Oct 2026 | With a finger, the sidebar and note list do not select text or show the iOS callout on a long press; text fields still do | The long press belongs to the menu | `src/App.css` |
+| 24 Oct 2026 | In the browser the macOS traffic-light inset of the note list header shrinks to the 16 px edge margin on touch devices | A browser has no window buttons to clear; the 90 px inset hid the header's title on an iPad | `src/App.css` |
+| 24 Oct 2026 | With a finger, the empty editor reads "Tap a note to start editing" and offers "Search notes" and "Create new note" buttons instead of keyboard chords | A touch screen usually has no keyboard; the chords did nothing for it | `src/components/TouchEmptyState.tsx`, `src/components/EditorLayout.tsx` |
 | 24 Oct 2026 | On a tablet (641–1366 px with a touch pointer) the shell opens with two panes, the note list and the note; the sidebar is collapsed until asked for, for the session, without changing the vault's view mode | The editor was clipped at 834 px; a touch screen of that size reads two panes best | `src/hooks/useTabletSidebar.ts`, `src/App.css` (`html[data-tablet-layout]`) |
 | 24 Oct 2026 | In tablet portrait the open sidebar floats over the note list with a shadow, without a resize handle, and a tap beside it closes it | Three panes do not fit 834 px; iPadOS floats sidebars the same way | `src/hooks/useTabletSidebar.ts`, `src/App.css` |
 | 24 Oct 2026 | On the web, new note, quick open and the view modes are ⌥⌘N, ⌥⌘P and ⌥⌘1/2/3 (Ctrl+Alt off Apple keyboards); ⌘N, ⌘P, ⌘1–3, zoom, ⌘D, ⌘E, ⌘, and the ⌘⇧ panel toggles are left to the browser and no longer shown as hints; the empty editor shows the web chords | The browser owns those shortcuts or users expect its action (print, bookmark, page zoom) | `src/hooks/webShortcuts.ts`, `src/hooks/appCommandCatalog.ts`, `src/components/EditorLayout.tsx` |
@@ -37,8 +44,7 @@ Found while running the unchanged shell in a browser and in iPhone and iPad emul
 | Area | What the unchanged shell does on the web | Likely adaptation |
 |---|---|---|
 | Phone sidebar | Since TOL-193 the phone shows the list or the note; the sidebar (types, saved views, favorites) is hidden and not reachable yet | A sidebar pane before the list in the same stack |
-| Empty state | Since TOL-194 it shows the web shortcuts; it is still keyboard-first | A touch-first empty state |
 | Status bar | Git branch, changes, commit, sync and history controls | Sync and connection status, including offline and conflict states |
 | Web-only surfaces | Absent | Login, account, sharing and permissions dialogs, add to home screen |
 | Multiplayer | Present on the collaborative note page (S4); absent in the shell | Bring the page's presence, cursors and status into the shell; sharing state |
-| Touch | Hover-revealed controls and right-click menus | Touch targets, long-press menus, virtual keyboard and safe-area handling |
+| Touch | Since TOL-24 menus open with a long press and key targets are 44 px; the status bar and the editor toolbars keep their desktop sizes, and hover tooltips appear on tap | Status bar replaced by sync status (above); tooltips off for touch |

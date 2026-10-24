@@ -1475,6 +1475,8 @@ The phone layout on the web (ADR 0286) adds `usePhoneLayout` (`PHONE_LAYOUT_QUER
 
 The tablet layout on the web (ADR 0287) adds `useMediaQueryMatch` (which `usePhoneLayout` now uses), `useTabletSidebar` (`TABLET_LAYOUT_QUERY`, `TABLET_LAYOUT_ATTRIBUTE` on `<html>`; `TabletSidebar`: `sidebarVisible`, `followViewMode`, `collapse`), called by `useAppWindowControls`, `webShortcuts` (`BROWSER_OWNED_SHORTCUT_COMMANDS`, `findWebShortcutCommand`, `webSafeDesktopCommand`, `webShortcutDisplay`), which `appCommandCatalog` consults in the web build, and `isWebBuild` in `src/utils/webBuild.ts`.
 
+Touch input on the web (ADR 0288) adds `installTouchInput` (`TOUCH_INPUT_QUERY`, `TOUCH_INPUT_ATTRIBUTE`, `LONG_PRESS_MS`) in `src/lib/touchInput.ts`, `useTouchInput` (web build and `pointer: coarse`), and `TouchEmptyState`, the editor empty state for a finger.
+
 In `apps/server`:
 
 - `Vault` (`src/vault.ts`) runs every mutation under one lock as pull, change, commit, push. `writeOutcome(current, incoming, precondition)` is the whole write decision.

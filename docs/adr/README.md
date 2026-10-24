@@ -283,3 +283,4 @@ proposed → active → superseded
 | [0285](0285-mobile-disk-authoritative-note-editing-and-index-reconciliation.md) | Disk-authoritative mobile note editing and index reconciliation | active |
 | [0286](0286-web-phone-layout-as-a-url-driven-pane-stack.md) | Web phone layout as a URL-driven pane stack | active |
 | [0287](0287-web-tablet-layout-and-browser-safe-shortcuts.md) | Web tablet layout and browser-safe shortcuts | active |
+| [0288](0288-web-touch-input-long-press-menus-and-touch-targets.md) | Web touch input: long-press menus and 44 px touch targets | active |

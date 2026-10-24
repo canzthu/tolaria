@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Batal",
   "editor.empty.selectNote": "Pilih catatan untuk mulai mengedit",
   "editor.empty.shortcuts": "{quickOpen} untuk mencari · {newNote} untuk membuat",
+  "editor.empty.tapNote": "Ketuk catatan untuk mulai mengedit",
   "editor.raw.label": "Editor mentah",
   "editor.sheet.loading": "Memuat lembar...",
   "editor.sheet.unavailable": "Buku kerja IronCalc tidak tersedia: {error}",

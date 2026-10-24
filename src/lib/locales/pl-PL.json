@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Anuluj",
   "editor.empty.selectNote": "Wybierz notatkę, aby rozpocząć edycję",
   "editor.empty.shortcuts": "{quickOpen} aby wyszukać · {newNote} aby utworzyć",
+  "editor.empty.tapNote": "Dotknij notatki, aby rozpocząć edycję",
   "editor.raw.label": "Edytor surowy",
   "editor.sheet.loading": "Ładowanie arkusza...",
   "editor.sheet.unavailable": "Skoszyt IronCalc jest niedostępny: {error}",

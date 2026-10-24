@@ -645,6 +645,7 @@ files:
     noteList.changes.cancel: ea4788705e6873b424c65e91c2846b19
     editor.empty.selectNote: a71ec7c80aefe49c59f6aba033bf453e
     editor.empty.shortcuts: 1133fdf3ecef6a09dd9e2a185e1bd4ec
+    editor.empty.tapNote: 57bf79c985d8fc57f9032430b81042e2
     editor.raw.label: 7a9754c15264b0604aa31dfea32321ea
     editor.sheet.loading: 59df3a3f0bb3834a820e8fbf6a515114
     editor.sheet.unavailable: f0920deeec857fa2251bb073b956364e

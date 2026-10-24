@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Hủy",
   "editor.empty.selectNote": "Chọn một ghi chú để bắt đầu chỉnh sửa",
   "editor.empty.shortcuts": "{quickOpen} để tìm kiếm · {newNote} để tạo",
+  "editor.empty.tapNote": "Nhấn vào một ghi chú để bắt đầu chỉnh sửa",
   "editor.raw.label": "Trình soạn thảo thô",
   "editor.sheet.loading": "Đang tải trang tính...",
   "editor.sheet.unavailable": "Sổ làm việc IronCalc không khả dụng: {error}",

@@ -643,6 +643,7 @@
   "noteList.changes.cancel": "Скасаваць",
   "editor.empty.selectNote": "Абярыце нататку для рэдагавання",
   "editor.empty.shortcuts": "{quickOpen} для пошуку · {newNote} каб стварыць",
+  "editor.empty.tapNote": "Націсніце на нататку, каб пачаць рэдагаванне",
   "editor.raw.label": "Рэдактар зыходнага кода",
   "editor.sheet.loading": "Загрузка ліста...",
   "editor.sheet.unavailable": "Кніга IronCalc недаступная: {error}",
