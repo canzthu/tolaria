@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { baseRevision } from '../../../packages/markdown-yjs/src/index.ts'
 import type { VaultPath } from '../src/paths.ts'
-import { createHarness, type Harness, NOTE, settle } from './collabHelpers.ts'
+import { codec, createHarness, type Harness, NOTE, settle } from './collabHelpers.ts'
 import { text } from './helpers.ts'
 
 const SEED = '# Alpha\n\nLinks to [[welcome]] and mentions the Heron.\n'
@@ -201,6 +201,34 @@ describe('flushing a document to its file', () => {
     await harness.hub.close()
 
     expect(await harness.file()).toBe(SEED.replace('# Alpha', '# Alpha closing'))
+  })
+})
+
+describe('the layout of a file around its body (TOL-222)', () => {
+  const SPACED = '---\ntype: Note\n---\n\n# Plan\n\nFirst paragraph.\n\n'
+
+  beforeEach(async () => {
+    await harness.fixture.desktop.commit('plan.md', SPACED)
+    await harness.vault.syncNow()
+  })
+
+  it('is not rewritten when a note is opened and closed without an edit', async () => {
+    const ada = await harness.client('plan.md')
+    ada.provider.destroy()
+    await harness.hub.close()
+
+    expect(await harness.file('plan.md')).toBe(SPACED)
+    expect(await harness.commits()).toEqual(['desktop: plan.md'])
+  })
+
+  it('keeps the blank line after the frontmatter and the trailing blank line through edits at both ends', async () => {
+    const ada = await harness.client('plan.md')
+    const edited = ada.markdown().replace('# Plan', 'On top.\n\n# Plan').replace('First paragraph.', 'First paragraph.\n\nAt the end.')
+    await codec.write(ada.doc, { markdown: edited, revision: baseRevision(ada.doc) ?? '' })
+    await settle()
+
+    expect(await (await harness.session('plan.md')).flush()).toBe('written')
+    expect(await harness.file('plan.md')).toBe('---\ntype: Note\n---\n\nOn top.\n\n# Plan\n\nFirst paragraph.\n\nAt the end.\n\n')
   })
 })
 
