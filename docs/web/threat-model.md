@@ -296,6 +296,18 @@ This would make the Codacy finding disappear because the endpoint would be const
 2. **Option B (Defense in depth, small change):** Add private IP range validation at config load (prevents accidental internal endpoint configuration)
 3. **Option C (Eliminates finding, operational overhead):** Implement full allowlist validation as shown above
 
+**Remote image import (TOL-204):**
+
+`POST /v1/attachments/imports` (`apps/server/src/remoteImage.ts`) fetches a client-supplied URL, so it is guarded in code rather than by configuration:
+
+- ✅ Scheme allowlist (`http`, `https`); credentials in the URL are refused
+- ✅ IP literals are checked before connecting; host names are resolved by a lookup that refuses the host when any resolved address is not public, and the socket connects to the checked address (no DNS rebinding window)
+- ✅ Private, loopback, shared, link-local/metadata, documentation, multicast and reserved IPv4; IPv6 outside global unicast (loopback, ULA incl. `fd00:ec2::254`, link-local, IPv4-mapped) and the Teredo, 6to4 and documentation ranges are refused
+- ✅ Each redirect re-checked (max 5); 15 MB and 15 s caps; only raster image content types; the bearer token is required
+- ✅ Negative tests: `apps/server/test/remoteImage.test.ts`, `apps/server/test/attachments.test.ts`, `apps/web/tests/remote-attachments.spec.ts`
+
+Residual risk: **LOW**. The server can still be made to send GET requests to arbitrary public hosts on behalf of an authenticated user.
+
 ### 7. Git Security
 
 **Implementation:** `apps/server/src/gitRepo.ts`, `apps/server/src/git.ts`
@@ -358,6 +370,7 @@ These security concerns span the boundary between the open-source server (this r
 | Security Headers | LOW | ✅ Adequate for JSON API |
 | Rate Limiting | MEDIUM-HIGH | ⚠️ Missing per-client/vault limits |
 | SSRF (R2BlobStore) | LOW-MEDIUM | ⚠️ Operator config, approved exception |
+| SSRF (remote image import) | LOW | ✅ Public-address guard, pinned connection, caps |
 | Git Security | LOW | ✅ Proper hardening |
 | Input Validation | LOW | ✅ Consistent validation |
 
@@ -382,3 +395,4 @@ These security concerns span the boundary between the open-source server (this r
 ## Revision History
 
 - 2026-10-23: Initial threat model created (TOL-200 Part A review)
+- 2026-10-24: Remote image import guard added to the SSRF section (TOL-204)

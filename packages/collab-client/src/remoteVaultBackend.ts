@@ -32,6 +32,7 @@ import {
 	type WriteResult,
 } from "../../protocol/src/index.ts";
 import { CollabProvider, type SocketLike } from "./collabProvider.ts";
+import { type RemoteAttachments, remoteAttachments } from "./remoteAttachments.ts";
 import { readCache, writeCache } from "./entriesCache.ts";
 import {
 	assertVaultPath,
@@ -395,7 +396,7 @@ function fileOps(request: Request): VaultFileOps {
 		rename: (renameRequest) => renameNote(request, renameRequest),
 		delete: (paths) => deleteFiles(request, paths),
 		search: (query, options = {}) => searchFiles(request, query, options),
-		saveAttachment: unsupported("uploading attachments"),
+		saveAttachment: (upload) => remoteAttachments(request).save(upload),
 	};
 }
 
@@ -481,6 +482,13 @@ async function openDoc(
 	return opened;
 }
 
+/** Attachment transfers with the server's credentials, for the shell's image handling. */
+export function createRemoteAttachments(
+	options: RemoteOptions & { now?: () => number },
+): RemoteAttachments {
+	return remoteAttachments(requester(options), options.now);
+}
+
 export function createRemoteVaultBackend(
 	options: RemoteOptions,
 ): VaultBackend<RemoteBindings> {
@@ -490,7 +498,7 @@ export function createRemoteVaultBackend(
 		capabilities: {
 			collaboration: true,
 			atomicRevisions: true,
-			attachments: false,
+			attachments: true,
 		},
 		files: fileOps(requester(options)),
 		chrome: chromeOps(),

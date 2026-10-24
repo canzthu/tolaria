@@ -21,6 +21,7 @@ import type { DocIndex } from './docIndex.ts'
 import { VaultError } from './errors.ts'
 import { entityTag, errorReply, quoted, type Reply, singleHeader } from './httpIo.ts'
 import { isNote, type VaultPath, vaultPath } from './paths.ts'
+import { type RemoteImageFetcher, remoteImageFetcher } from './remoteImage.ts'
 import type { SearchIndex } from './searchIndex.ts'
 import type { TimedWriteResult, Timings, Vault, WritePrecondition } from './vault.ts'
 import type { VaultIndex } from './vaultIndex.ts'
@@ -36,6 +37,8 @@ export interface Services {
   tickets?: TicketBook
   /** SSE emitter for change feed. */
   changes: ChangeEmitter
+  /** Downloads images for `POST /v1/attachments/imports`; public hosts only unless a test swaps it. */
+  remoteImages?: RemoteImageFetcher
 }
 
 export interface ApiRequest {
@@ -237,6 +240,16 @@ async function issueTicket(request: ApiRequest, { docs, tickets }: Services): Pr
   return { status: 201, body: tickets.issue({ docId, access: collabAccess(body.access) }) }
 }
 
+const publicRemoteImages = remoteImageFetcher()
+
+/** Stores a public image under `attachments/`, never over an existing file. */
+async function importAttachment(request: ApiRequest, { vault, docs, remoteImages }: Services): Promise<Reply> {
+  const url = optionalString(jsonObject(await request.body()).url, 'url')
+  if (!url) throw invalidRequest('url is required')
+  const image = await (remoteImages ?? publicRemoteImages)(url)
+  return writeReply(await vault.write(vaultPath(image.path), image.bytes, { kind: 'absent' }), docs)
+}
+
 async function changeFeed(request: ApiRequest, { changes }: Services): Promise<Reply> {
   if (!request.response) throw new VaultError(500, 'internal', 'SSE response not available')
   changes.connect(request.response)
@@ -259,6 +272,7 @@ const EXACT_ROUTES = new Map<string, Methods>([
   [ROUTES.entries, new Map([['GET', listEntries]])],
   [ROUTES.changes, new Map([['GET', changeFeed]])],
   [ROUTES.collabTickets, new Map([['POST', issueTicket]])],
+  [ROUTES.attachmentImports, new Map([['POST', importAttachment]])],
 ])
 
 function decodedPath(encoded: string): VaultPath {

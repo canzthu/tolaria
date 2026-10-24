@@ -1,8 +1,8 @@
-# Tolaria remote protocol, version 1.2
+# Tolaria remote protocol, version 1.3
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else.
 
 ## Design rules
 
@@ -34,6 +34,7 @@ Capabilities:
 | `entries.index` | `GET /v1/entries` provides a parsed vault index (since 1.2). |
 | `entries.delta` | `GET /v1/entries?since=<head>` provides incremental updates (since 1.2). |
 | `changes.feed` | `GET /v1/changes` Server-Sent Events stream of vault changes (since 1.2). |
+| `attachments.import` | `POST /v1/attachments/imports` downloads a public image into `attachments/` (since 1.3). |
 | `collab.yjs`, `collab.awareness` | The collaboration channel is served (since 1.1). |
 | `collab.tickets` | `POST /v1/collab/tickets` issues websocket tickets (since 1.1). |
 
@@ -78,6 +79,7 @@ Every error has the same JSON body. `code` is stable; `message` is for people.
 | 500 | `internal` | Unexpected failure. The cause is logged, not returned. |
 | 426 | `upgrade_required` | A plain HTTP request to the websocket route of the collaboration channel. |
 | 501 | `not_implemented` | The collaboration channel on a server that does not serve it. |
+| 502 | `remote_unavailable` | A remote image import could not be downloaded: the host failed, answered an error, redirected too often or took too long (since 1.3). |
 
 A write that ends in a conflict copy is not an error body: see `PUT` below.
 
@@ -87,8 +89,8 @@ A write that ends in a conflict copy is not an error body: see `PUT` below.
 
 ```json
 {
-  "protocolVersion": "1.2",
-  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "collab.yjs", "collab.awareness", "collab.tickets"],
+  "protocolVersion": "1.3",
+  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "collab.yjs", "collab.awareness", "collab.tickets"],
   "vault": { "name": "my-vault", "branch": "main", "head": "eea2db93a391d110c4707fa1f6c6078c2f39c1ca" },
   "collab": { "available": true, "path": "/v1/collab/docs", "docFormat": "tolaria.blocknote/1", "blocksFragment": "blocks", "frontmatterField": "frontmatter", "metaMap": "meta" }
 }
@@ -232,6 +234,26 @@ data: {"type":"push-failed","head":"a1b2c3d4…","error":"push to remote failed"
 ```
 
 The connection is long-lived. The server sends events as they occur; the client should reconnect on disconnect. Authentication via `Authorization: Bearer <token>` header.
+
+### `POST /v1/attachments/imports` (since 1.3)
+
+Has the server download an image that a pasted page points at and store it as a new file under `attachments/`, the way the desktop app imports remote images. A browser cannot fetch most images across origins, so the web client asks the server.
+
+```json
+{ "url": "https://images.example/cat.png" }
+```
+
+The answer is the `WriteResult` of the stored file (`201`, or `409` with the conflict copy when the name was taken meanwhile). Its `path` is `attachments/<unix millis>-<name>.<ext>`: the name comes from the URL's last segment, the extension from the content type. Notes link that portable path.
+
+The URL comes from a client, so the server refuses anything that is not a public internet host (`400 invalid_request`):
+
+- Only `http` and `https`, with no credentials in the URL.
+- Every address the host resolves to must be public unicast: loopback, private, shared, link-local (which includes the cloud metadata address `169.254.169.254`), documentation, multicast and reserved IPv4, and every IPv6 address outside global unicast (loopback, unique-local, link-local, IPv4-mapped) or in its tunnelling and documentation ranges, are refused. The connection goes to the address that was checked, so the name cannot be rebound to an internal address in between.
+- Every redirect is checked the same way, at most 5 of them.
+- The answer must be `200` with an `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/bmp` or `image/tiff` content type. SVG is refused, as on desktop.
+- At most 15 MB (`413 payload_too_large`) and 15 seconds in total (`502 remote_unavailable`).
+
+Attachments are read and written through the file routes with the bearer token like every other file. The web client shows them through object URLs, because an `<img>` cannot send the token.
 
 ## How the server keeps git consistent
 

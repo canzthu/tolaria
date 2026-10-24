@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import { createRemoteVaultBackend } from "../../../packages/collab-client/src/remoteVaultBackend";
+import type { RemoteAttachments } from "../../../packages/collab-client/src/remoteAttachments";
+import {
+	createRemoteAttachments,
+	createRemoteVaultBackend,
+} from "../../../packages/collab-client/src/remoteVaultBackend";
 import { isTauri, mockInvoke } from "../../mock-tauri";
 import { createCommandVaultBackend } from "./commandVaultBackend";
 import type { VaultBackend } from "./types";
@@ -28,6 +32,16 @@ function getRemoteVaultConfig(): RemoteVaultConfig | null {
 /** True in the web build when a Tolaria remote serves the vault. */
 export function hasRemoteVault(): boolean {
 	return !isTauri() && getRemoteVaultConfig() !== null;
+}
+
+/** Image uploads, reads and imports of the configured remote; null without one. */
+export function createRemoteAttachmentClient(): RemoteAttachments | null {
+	const remoteConfig = hasRemoteVault() ? getRemoteVaultConfig() : null;
+	if (!remoteConfig) return null;
+	return createRemoteAttachments({
+		baseUrl: remoteConfig.serverUrl,
+		token: remoteConfig.token,
+	});
 }
 
 /** The desktop path: Tauri commands backed by the Rust vault crate. */

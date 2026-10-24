@@ -1456,6 +1456,8 @@ The renderer keeps app shortcuts platform-exact where they overlap with native d
 - `updateFrontmatterContent` (`src/lib/frontmatterText/`) is the TypeScript port of the desktop frontmatter writer (`src-tauri/src/frontmatter/ops.rs`, `yaml.rs`, `keys.rs`): same key matching, canonical write keys, YAML quoting and line endings, byte for byte. Both test suites read the golden cases in `tests/fixtures/frontmatter-ops/cases.json`; change the two writers together. The port refuses (`UnsafeFrontmatterEditError`) keys and values the desktop formatter would write as YAML that does not read back as written. On the web with a Tolaria remote, `editRemoteFrontmatter` (`src/lib/remoteFrontmatter.ts`) applies a property edit as one transaction on the bound note's `frontmatter` Y.Text (found through `liveNoteDocument`, registered by `useCollabEditorBinding` while bound), or, for a note that is not open, rewrites the file through `files.write` with the revision it read; a conflict fails the edit instead of overwriting.
 - `remoteNotes` (`src/lib/remoteNotes.ts`) is the note lifecycle of the web build with a Tolaria remote: vault-relative new-note paths (`newNotePath`), create-only writes that resolve with the conflict copy when the path was taken (`createRemoteNote`, `VaultWriteResult.copyPath`), deletes and the untitled rename. Desktop and the mock browser build never reach it (`hasRemoteVault()`).
 
+- Attachments on a Tolaria remote (ADR 0283): `files.saveAttachment` stores an upload as `attachments/<millis>-<name>` through a create-only `PUT`. `createRemoteAttachmentClient()` (`src/lib/vaultBackend/index.ts`) exposes the remote's `RemoteAttachments` (`packages/collab-client/src/remoteAttachments.ts`: `save`, `read` as a typed `Blob`, `importFromUrl`). `src/lib/remoteAttachments.ts`, loaded only when an editor needs it, uploads pasted or dropped images, imports pasted remote images through the server, and resolves `attachments/...` URLs to cached object URLs via `resolveWebAttachmentUrl` and `webAttachmentPath` in `src/utils/vaultAttachments.ts`. `richEditorFileUrlResolver()` gives BlockNote a `resolveFileUrl` only on a remote, and `remoteImageImportTarget` (`src/components/richPasteImageImport.ts`) picks the server import and portable paths there, the native download and asset URLs on desktop.
+
 The desktop and mock backends implement only `files`, through the existing commands. Nothing in the app is routed through the interface yet.
 
 ### Tolaria remote protocol and server
@@ -1473,6 +1475,7 @@ In `apps/server`:
 - `VaultPath` (`src/paths.ts`) is a path that passed validation; only such paths reach the working clone.
 - `DocIndex` (`src/docIndex.ts`) gives each note a stable `docId` that follows renames, for the reserved collaboration channel.
 - `BlobStore` (`src/store.ts`) is the storage interface for server state outside git, with `LocalDiskStore`; it is the seam for Object Storage.
+- `remoteImageFetcher` (`src/remoteImage.ts`) downloads an image for `POST /v1/attachments/imports` from public hosts only: `isPublicAddress` decides, a guarded `lookup` pins the connection to a checked address, and redirects, size and time are capped. `Services.remoteImages` lets a test swap it.
 
 ### Vault Scanning (Rust)
 

@@ -57,7 +57,7 @@ describe('the remote vault backend', () => {
   it('describes itself as a remote with collaboration and store-side revision checks', () => {
     expect(backend).toMatchObject({
       kind: 'remote',
-      capabilities: { collaboration: true, atomicRevisions: true, attachments: false },
+      capabilities: { collaboration: true, atomicRevisions: true, attachments: true },
     })
   })
 
@@ -94,14 +94,11 @@ describe('the remote vault backend', () => {
 
   it('refuses by name what the server does not offer yet', async () => {
     const { files } = backend
-    const refused = [
-      files.reloadEntry('welcome.md'),
-      files.saveAttachment({ filename: 'a.png', bytes: new Uint8Array() }),
-    ]
+    const refused = [files.reloadEntry('welcome.md')]
 
     const outcomes = await Promise.allSettled(refused)
 
-    expect(outcomes.map((outcome) => outcome.status)).toEqual(Array(2).fill('rejected'))
+    expect(outcomes.map((outcome) => outcome.status)).toEqual(['rejected'])
     expect(String((outcomes[0] as PromiseRejectedResult).reason)).toMatch(/not available on the Tolaria remote yet/)
   })
 
