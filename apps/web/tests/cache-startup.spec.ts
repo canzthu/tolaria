@@ -15,6 +15,27 @@ async function measurePaintTime(page: Page): Promise<number> {
 	});
 }
 
+/**
+ * When the cached note list painted, recorded by the page itself (TOL-206): the shell marks
+ * `tolaria:note_list_painted` once its first rows are on screen, so the budget measures the
+ * paint rather than when a polling locator happened to look.
+ */
+async function measureNoteListPaint(page: Page): Promise<number> {
+	return page.evaluate(
+		() =>
+			new Promise<number>((resolve) => {
+				const read = () => {
+					const entry = performance.getEntriesByName(
+						"tolaria:note_list_painted",
+					)[0];
+					if (entry) resolve(entry.startTime);
+					else setTimeout(read, 50);
+				};
+				read();
+			}),
+	);
+}
+
 async function checkForLongTasks(page: Page): Promise<number> {
 	return page.evaluate(() => {
 		const observer = new PerformanceObserver(() => {});
@@ -95,9 +116,11 @@ test("cache-first startup paints under 1s on 4G, no blocking screens", async ({
 
 	// Check that notes render from cache
 	await waitForNoteList(page);
+	const listPaintTime = await measureNoteListPaint(page);
 	const paintTime = await measurePaintTime(page);
 
-	// Cached paint should be under 1 second
+	// The cached list, and the first paint, are under 1 second
+	expect(listPaintTime).toBeLessThan(1000);
 	expect(paintTime).toBeLessThan(1000);
 
 	// No blocking or reloading screens should appear
