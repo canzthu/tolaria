@@ -85,10 +85,13 @@ async function addNumberProperty(
 	await expect(page.getByTestId("add-property-form")).toBeVisible();
 	await page.keyboard.type(key);
 	await page.getByTestId("add-property-type-trigger").click();
-	await page.getByRole("option", { name: "Number", exact: true }).click();
-	await page.getByTestId("add-property-number-input").focus();
-	await page.keyboard.type(String(value));
-	await page.keyboard.press("Enter");
+	const numberOption = page.getByRole("option", { name: "Number", exact: true });
+	await numberOption.click();
+	// WebKit can keep the select open a moment: typing must not go to it.
+	await expect(numberOption).toBeHidden();
+	await page.getByTestId("add-property-number-input").fill(String(value));
+	await page.getByTestId("add-property-confirm").click();
+	await expect(page.getByTestId("add-property-form")).toBeHidden();
 }
 
 test("a property edited on the web changes one hunk, with the desktop's bytes", async ({
