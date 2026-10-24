@@ -22,6 +22,7 @@ import { VaultError } from './errors.ts'
 import { entityTag, errorReply, quoted, type Reply, singleHeader } from './httpIo.ts'
 import { isNote, type VaultPath, vaultPath } from './paths.ts'
 import { type RemoteImageFetcher, remoteImageFetcher } from './remoteImage.ts'
+import type { RenameOptions } from './renameTransaction.ts'
 import type { SearchIndex } from './searchIndex.ts'
 import type { TimedWriteResult, Timings, Vault, WritePrecondition } from './vault.ts'
 import type { VaultIndex } from './vaultIndex.ts'
@@ -165,11 +166,24 @@ function optionalString(value: unknown, name: string): string | undefined {
   return value
 }
 
+function optionalFlag(value: unknown, name: string): boolean | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'boolean') throw invalidRequest(`${name} must be a boolean`)
+  return value
+}
+
+function renameOptions(body: Record<string, unknown>): RenameOptions {
+  return {
+    ifMatch: optionalString(body.ifMatch, 'ifMatch'),
+    rewriteLinks: optionalFlag(body.rewriteLinks, 'rewriteLinks'),
+    title: optionalString(body.title, 'title'),
+    oldTitle: optionalString(body.oldTitle, 'oldTitle'),
+  }
+}
+
 async function renameFile(request: ApiRequest, { vault, docs }: Services): Promise<Reply> {
   const body = jsonObject(await request.body())
-  const from = vaultPath(body.from)
-  const to = vaultPath(body.to)
-  const result = await vault.rename(from, to, optionalString(body.ifMatch, 'ifMatch'))
+  const result = await vault.rename(vaultPath(body.from), vaultPath(body.to), renameOptions(body))
   return { status: 200, body: withDocId(result, docs) }
 }
 

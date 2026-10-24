@@ -3,8 +3,10 @@ import { type NoteCodec, type NoteVersion, reconcile, setRevision } from '../../
 import { DOC_FORMAT, DOC_META, DOC_META_MAP } from '../../../../packages/protocol/src/index.ts'
 import type { DocId } from '../docIndex.ts'
 import { blobEtag, type VaultPath } from '../paths.ts'
+import { type LinkRewrite, rewriteLinks } from '../renameLinks.ts'
 import type { StoredFile, Vault } from '../vault.ts'
 import { type FlushPolicy, FlushScheduler, type Timers } from './flush.ts'
+import { patchLiveLinks } from './liveLinks.ts'
 import { Room } from './room.ts'
 import type { SnapshotStore } from './snapshots.ts'
 
@@ -119,6 +121,31 @@ export class NoteSession {
    */
   async fileChanged(): Promise<void> {
     await this.takeIn(await this.services.vault.read(this.path))
+  }
+
+  /**
+   * A rename rewrote the note's wikilinks in its file. Called with the vault lock held. The
+   * document gets the same rewrite as a targeted patch (see `patchLiveLinks`), so it keeps
+   * any edit not written yet, and moves on to the new file revision. When the patch and the
+   * file rewrite do not line up exactly, the file is reconciled like any other change.
+   */
+  async relink(rewrite: LinkRewrite): Promise<void> {
+    const { codec, vault } = this.services
+    const file = await vault.read(this.path)
+    const markdown = utf8(file.bytes)
+    const canonical = await codec.canonical(markdown)
+    // From here to the rebase only microtasks run: no edit can arrive in between.
+    const live = codec.read(this.doc)
+    this.doc.transact(() => patchLiveLinks(this.doc, rewrite), SERVER_ORIGIN)
+    const exact = codec.read(this.doc) === rewriteLinks(live, rewrite)
+    if (exact && this.rewritesBaseTo({ markdown, canonical }, rewrite)) this.rebaseTo({ markdown, canonical, revision: file.etag })
+    else await this.takeIn(file)
+  }
+
+  /** True when `next` is the file the document was in step with, after the rewrite. */
+  private rewritesBaseTo(next: Omit<Base, 'revision'>, rewrite: LinkRewrite): boolean {
+    const { markdown, canonical } = this.base
+    return rewriteLinks(markdown, rewrite) === next.markdown && rewriteLinks(canonical, rewrite) === next.canonical
   }
 
   /**

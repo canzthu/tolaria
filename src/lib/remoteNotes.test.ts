@@ -118,7 +118,7 @@ describe('deleting and renaming on the remote', () => {
       newPath: 'big-idea.md',
       entry: { path: 'big-idea.md', filename: 'big-idea.md', title: 'Big Idea' },
     })
-    expect(JSON.parse(calls[0].body ?? '')).toEqual({ from: 'untitled-note-1.md', to: 'big-idea.md' })
+    expect(JSON.parse(calls[0].body ?? '')).toEqual({ from: 'untitled-note-1.md', to: 'big-idea.md', rewriteLinks: true, title: 'Big Idea' })
 
     expect(await autoRenameRemoteNote('big-idea.md', 'Big Idea')).toBeNull()
     expect(calls).toHaveLength(1)

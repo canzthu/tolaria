@@ -302,12 +302,23 @@ describe('POST /v1/rename', () => {
     expect((await api('/v1/files/welcome.md')).status).toBe(404)
   })
 
+  it('rewrites the links to the note in the same commit when asked (since 1.4)', async () => {
+    const response = await rename({ from: 'welcome.md', to: 'hello.md', rewriteLinks: true, title: 'Hello', oldTitle: 'Welcome' })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ path: 'hello.md', rewritten: ['projects/alpha.md'] })
+    expect(await fixture.desktop.read('projects/alpha.md')).toBe('# Alpha\n\nLinks to [[hello]] and mentions the Heron.\n')
+    expect(await fixture.desktop.read('hello.md')).toContain('title: Hello')
+    expect((await fixture.desktop.log())[0]).toBe('Rename welcome.md to hello.md')
+  })
+
   it.each([
     ['not json', 400, 'invalid_request'],
     [[], 400, 'invalid_request'],
     [{ from: 'welcome.md' }, 400, 'invalid_path'],
     [{ from: 'welcome.md', to: '../escape.md' }, 400, 'invalid_path'],
     [{ from: 'welcome.md', to: 'x.md', ifMatch: 7 }, 400, 'invalid_request'],
+    [{ from: 'welcome.md', to: 'x.md', rewriteLinks: 'yes' }, 400, 'invalid_request'],
+    [{ from: 'welcome.md', to: 'x.md', title: 3 }, 400, 'invalid_request'],
     [{ from: 'welcome.md', to: 'projects/alpha.md' }, 409, 'destination_exists'],
     [{ from: 'welcome.md', to: 'x.md', ifMatch: 'stale' }, 412, 'precondition_failed'],
   ])('answers %j with %i %s', async (body, status, code) => {

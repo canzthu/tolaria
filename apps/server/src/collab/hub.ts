@@ -4,6 +4,7 @@ import { COLLAB_CLOSE, type CollabAccess } from '../../../../packages/protocol/s
 import type { DocId, DocIndex } from '../docIndex.ts'
 import type { VaultChange } from '../gitSync.ts'
 import type { VaultPath } from '../paths.ts'
+import type { LinkRewrite } from '../renameLinks.ts'
 import type { BlobStore } from '../store.ts'
 import type { Vault } from '../vault.ts'
 import type { FlushPolicy, Timers } from './flush.ts'
@@ -153,8 +154,13 @@ export class CollabHub {
     if (change.kind === 'rename') return this.moved(change.from, change.to)
     const found = await this.byPath(change.path)
     if (!found) return
-    if (change.kind === 'upsert') return found.entry.session.fileChanged()
+    if (change.kind === 'upsert') return this.changed(found.entry.session, change.links)
     await this.gone(found.docId, found.entry)
+  }
+
+  /** A rename's link rewrite is patched into the document; any other change is reconciled. */
+  private changed(session: NoteSession, links: LinkRewrite | undefined): Promise<void> {
+    return links ? session.relink(links) : session.fileChanged()
   }
 
   private async moved(from: VaultPath, to: VaultPath): Promise<void> {

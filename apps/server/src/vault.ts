@@ -13,6 +13,7 @@ import { notFound, stale, VaultError } from './errors.ts'
 import { GitRepo, REMOTE, type RepoOptions } from './gitRepo.ts'
 import { GitSync, type VaultChange } from './gitSync.ts'
 import { blobEtag, conflictCopyPath, type VaultPath } from './paths.ts'
+import { type RenameOptions, RenameTransaction } from './renameTransaction.ts'
 import { searchVault } from './search.ts'
 
 export interface VaultOptions extends RepoOptions {
@@ -117,6 +118,17 @@ function parseTreeRecord(record: string): FileEntry | null {
 const DEFAULT_PUSH_DEBOUNCE_MS = 2000
 const DEFAULT_FETCH_INTERVAL_MS = 30000
 
+type VaultSettings = Required<Pick<VaultOptions, 'now' | 'log' | 'pushDebounceMs' | 'fetchIntervalMs'>>
+
+function vaultSettings(options: VaultOptions): VaultSettings {
+  return {
+    now: options.now ?? (() => new Date()),
+    log: options.log ?? (() => {}),
+    pushDebounceMs: options.pushDebounceMs ?? DEFAULT_PUSH_DEBOUNCE_MS,
+    fetchIntervalMs: options.fetchIntervalMs ?? DEFAULT_FETCH_INTERVAL_MS,
+  }
+}
+
 /**
  * One vault = one git working clone owned by this process. Every mutation runs under a
  * single lock as: fetch + integrate upstream, change files, commit. Push happens
@@ -136,11 +148,12 @@ export class Vault {
   private queue: Promise<unknown> = Promise.resolve()
 
   private constructor(repo: GitRepo, options: VaultOptions) {
+    const settings = vaultSettings(options)
     this.repo = repo
-    this.now = options.now ?? (() => new Date())
-    this.log = options.log ?? (() => {})
-    this.pushDebounceMs = options.pushDebounceMs ?? DEFAULT_PUSH_DEBOUNCE_MS
-    this.fetchIntervalMs = options.fetchIntervalMs ?? DEFAULT_FETCH_INTERVAL_MS
+    this.now = settings.now
+    this.log = settings.log
+    this.pushDebounceMs = settings.pushDebounceMs
+    this.fetchIntervalMs = settings.fetchIntervalMs
     this.onVaultEvent = options.onVaultEvent
     this.sync = new GitSync(repo, {
       log: this.log,
@@ -249,36 +262,37 @@ export class Vault {
     return { ...(await this.writeResult(path, bytes, placed, false)), timings }
   }
 
-  rename(from: VaultPath, to: VaultPath, ifMatch?: Etag): Promise<RenameResult> {
+  /**
+   * Moves a note in one commit; with `rewriteLinks`, the wikilinks to it in every other note
+   * are rewritten in that same commit (see `RenameTransaction`).
+   */
+  rename(from: VaultPath, to: VaultPath, options: RenameOptions = {}): Promise<RenameResult> {
     return this.locked(async () => {
       await this.sync.pull()
-      const etag = await this.currentEtag(from, ifMatch)
-      if (this.repo.exists(to)) throw new VaultError(409, 'destination_exists', `${to} already exists`)
-      await this.repo.makeParent(to)
-      await this.repo.run(['mv', '--', from, to])
-      await this.repo.run(['commit', '-q', '-m', `Rename ${from} to ${to}`])
-      await this.emit([{ kind: 'rename', from, to }])
-      
+      const { files } = await this.list()
+      const staged = await new RenameTransaction(this.repo, { ...options, from, to }).stage(files.map((file) => file.path as VaultPath))
+      await this.repo.commitStaged(staged.message)
+      await this.emit(staged.changes)
       const head = await this.repo.head()
-      this.onVaultEvent?.({ type: 'commit', head, paths: [from, to] })
-      
-      if (this.pushDebounceMs === 0) {
-        this.sync.relocated.clear()
-        const pushed = await this.sync.push()
-        const path = this.sync.relocated.get(to) ?? to
-        if (pushed) {
-          this.onVaultEvent?.({ type: 'push-success', head: await this.repo.head() })
-        } else {
-          this.onVaultEvent?.({ type: 'push-failed', head, error: 'push to remote failed' })
-        }
-        return { from, path, etag, commit: await this.repo.head(), pushed }
-      }
-      
-      this.schedulePush()
-      this.sync.relocated.clear()
+      this.onVaultEvent?.({ type: 'commit', head, paths: [from, to, ...staged.rewritten] })
+      const pushed = await this.pushNow(head)
       const path = this.sync.relocated.get(to) ?? to
-      return { from, path, etag, commit: await this.repo.head(), pushed: false }
+      const result: RenameResult = { from, path, etag: staged.etag, commit: await this.repo.head(), pushed }
+      return options.rewriteLinks ? { ...result, rewritten: staged.rewritten } : result
     })
+  }
+
+  /** Pushes at once when there is no push debounce; otherwise schedules it. True once pushed. */
+  private async pushNow(head: string): Promise<boolean> {
+    this.sync.relocated.clear()
+    if (this.pushDebounceMs !== 0) {
+      this.schedulePush()
+      return false
+    }
+    const pushed = await this.sync.push()
+    if (pushed) this.onVaultEvent?.({ type: 'push-success', head: await this.repo.head() })
+    else this.onVaultEvent?.({ type: 'push-failed', head, error: 'push to remote failed' })
+    return pushed
   }
 
   remove(path: VaultPath, ifMatch: Etag): Promise<DeleteResult> {

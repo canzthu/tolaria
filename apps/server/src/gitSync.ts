@@ -2,9 +2,11 @@ import { rm } from 'node:fs/promises'
 import { GitError, type GitResult } from './git.ts'
 import { type GitRepo, REMOTE } from './gitRepo.ts'
 import type { VaultPath } from './paths.ts'
+import type { LinkRewrite } from './renameLinks.ts'
 
 export type VaultChange =
-  | { kind: 'upsert'; path: VaultPath }
+  /** `links` is set when a rename rewrote the wikilinks in the file, and nothing else. */
+  | { kind: 'upsert'; path: VaultPath; links?: LinkRewrite }
   | { kind: 'delete'; path: VaultPath }
   | { kind: 'rename'; from: VaultPath; to: VaultPath }
 

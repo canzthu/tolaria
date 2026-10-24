@@ -2,7 +2,7 @@
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0.
 
 ## Design rules
 
@@ -35,6 +35,7 @@ Capabilities:
 | `entries.delta` | `GET /v1/entries?since=<head>` provides incremental updates (since 1.2). |
 | `changes.feed` | `GET /v1/changes` Server-Sent Events stream of vault changes (since 1.2). |
 | `attachments.import` | `POST /v1/attachments/imports` downloads a public image into `attachments/` (since 1.3). |
+| `files.rename.links` | `POST /v1/rename` rewrites the wikilinks to the renamed note on request (since 1.4). |
 | `collab.yjs`, `collab.awareness` | The collaboration channel is served (since 1.1). |
 | `collab.tickets` | `POST /v1/collab/tickets` issues websocket tickets (since 1.1). |
 
@@ -89,8 +90,8 @@ A write that ends in a conflict copy is not an error body: see `PUT` below.
 
 ```json
 {
-  "protocolVersion": "1.3",
-  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "collab.yjs", "collab.awareness", "collab.tickets"],
+  "protocolVersion": "1.4",
+  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "files.rename.links", "collab.yjs", "collab.awareness", "collab.tickets"],
   "vault": { "name": "my-vault", "branch": "main", "head": "eea2db93a391d110c4707fa1f6c6078c2f39c1ca" },
   "collab": { "available": true, "path": "/v1/collab/docs", "docFormat": "tolaria.blocknote/1", "blocksFragment": "blocks", "frontmatterField": "frontmatter", "metaMap": "meta" }
 }
@@ -189,6 +190,24 @@ Requires `If-Match: "<etag>"`; `*` is not accepted. `412 precondition_failed` wh
 ```
 
 `404 not_found` when `from` is missing, `409 destination_exists` when `to` exists, `412 precondition_failed` when `ifMatch` is stale. The route is not `/v1/files/<path>/rename` because a vault path may itself end in `/rename`. Version 1.0 moves the file only; it does not rewrite wikilinks in other notes.
+
+Since 1.4 the body may also carry:
+
+| Field | Meaning |
+|---|---|
+| `rewriteLinks` | `true`: rewrite the wikilinks to the note in every other tracked `.md` file, in the same commit. The answer lists those files in `rewritten`. |
+| `title` | The note's new title: set as its `title` property when it differs from the old title, as the desktop's title rename does. With a `title`, `to` may equal `from` (the file name already fits; only the property changes). Empty: `400 invalid_request`. |
+| `oldTitle` | The title that links use, when the note's heading already changed; read from the note (H1, then `title`, then the file name) when omitted. |
+
+```json
+{ "from": "people/ada.md", "to": "people/ada-lovelace.md", "rewriteLinks": true, "title": "Ada Lovelace" }
+```
+
+```json
+{ "from": "people/ada.md", "path": "people/ada-lovelace.md", "etag": "b5fa61f2…", "commit": "…", "pushed": true, "docId": "ecc6f1fe-…", "rewritten": ["projects/heron.md"] }
+```
+
+The rewrite is the desktop's (`src-tauri/src/vault/rename.rs`): links to the old title, the old path without `.md` or the old file name without `.md`, case-sensitive, become links to the new path without `.md`; an alias after `|` is kept; `[[old#heading]]` and other spellings are left alone; links in frontmatter and code are rewritten too, the renamed note's own links are not. A note open as a live document gets the same rewrite as a Yjs transaction on its `wikilink` targets and text, so edits that are not written yet are kept and its `meta.baseRevision` moves to the rewritten file. The golden cases are in `apps/server/test/fixtures/rename-golden.json` (ADR 0289).
 
 ### `GET /v1/search?q=<text>[&limit=<n>]`
 
@@ -341,6 +360,6 @@ Measured cadence and the reasons are in `docs/web/s4-spike-report.md`.
 |---|---|---|
 | `PUT` with no precondition is last-write-wins | `428`; `If-Match: *` asks for last-write-wins | An absent header should not silently overwrite. |
 | A stale `PUT` is rejected, conflict copy on request | Always a conflict copy, answered with `409` | The save is never lost, also when the client goes away. |
-| `POST /v1/files/{path}/rename`, rewrites wikilinks | `POST /v1/rename`, moves the file only | Unambiguous paths; link rewriting needs the note index. |
+| `POST /v1/files/{path}/rename`, rewrites wikilinks | `POST /v1/rename`, rewrites wikilinks on request since 1.4 | Unambiguous paths; protocol 1.0 to 1.3 clients keep a move that only moves. |
 | `GET /v1/entries`, `GET /v1/changes`, attachments routes | Not in 1.1 | Additive; listed as next steps in the spike reports. Attachments already work as plain files through `/v1/files`. |
 | Collab tickets | `POST /v1/collab/tickets`, since 1.1 | As sketched. |

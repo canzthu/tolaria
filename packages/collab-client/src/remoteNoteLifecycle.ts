@@ -3,7 +3,7 @@ import type {
 	VaultRenameResult,
 } from "../../../src/lib/vaultBackend/types";
 import { slugifyNoteStem } from "../../../src/utils/noteSlug";
-import { ROUTES } from "../../protocol/src/index.ts";
+import { type RenameRequest, ROUTES } from "../../protocol/src/index.ts";
 import {
 	assertVaultPath,
 	jsonWithStrings,
@@ -60,6 +60,15 @@ interface Move {
 	to: string;
 }
 
+/** `POST /v1/rename`: the move, with the wikilinks to the note rewritten (protocol 1.4). */
+type RenameBody = Move & Pick<RenameRequest, "rewriteLinks" | "title" | "oldTitle">;
+
+/** Where the note went and how many other notes had their links rewritten. */
+interface Moved {
+	path: string;
+	updatedFiles: number;
+}
+
 function moveOpenDocs({ from, to }: Move): void {
 	for (const doc of openDocs) if (doc.path === from) doc.path = to;
 }
@@ -93,35 +102,57 @@ export function renameCandidate(
 	return `${folder}${stem}${suffix}.md`;
 }
 
-/** Resolves with the note's new path, or null when `to` is taken. */
-async function moveTo(request: Request, move: Move): Promise<string | null> {
+/** A title rename whose file name already fits still sets the title, when it is a new one. */
+function retitles(rename: VaultRenameRequest): boolean {
+	return "newTitle" in rename && rename.oldTitle !== undefined && rename.oldTitle !== rename.newTitle;
+}
+
+function renameBody(rename: VaultRenameRequest, to: string): RenameBody {
+	const body: RenameBody = { from: rename.path, to, rewriteLinks: true };
+	if (!("newTitle" in rename)) return body;
+	return { ...body, title: rename.newTitle, oldTitle: rename.oldTitle };
+}
+
+function rewrittenCount(result: Record<string, unknown>): number {
+	return Array.isArray(result.rewritten) ? result.rewritten.length : 0;
+}
+
+/** Resolves with where the note went, or null when `to` is taken. */
+async function moveTo(request: Request, body: RenameBody): Promise<Moved | null> {
 	const response = await request(ROUTES.rename, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
-		body: JSON.stringify(move),
+		body: JSON.stringify(body),
 	});
 	if (response.status === 409) return null;
 	const result = await jsonWithStrings(await ok(response), ["path"], "rename result");
 	assertVaultPath(result.path);
-	return result.path;
+	return { path: result.path, updatedFiles: rewrittenCount(result) };
 }
 
-/** Renames a note within its folder to the first free name for the requested title or stem. */
+/**
+ * Renames a note within its folder to the first free name for the requested title or stem.
+ * The server rewrites the wikilinks to it in every other note in the same commit, and sets
+ * the new title as the note's `title` property when it changed, as the desktop does. A title
+ * rename that keeps the file name still updates that property when the old title is known.
+ */
 export async function renameNote(
 	request: Request,
 	rename: VaultRenameRequest,
 ): Promise<VaultRenameResult> {
 	assertVaultPath(rename.path);
 	const target = renameTarget(rename);
-	// Protocol 1.x moves the file only: wikilinks in other notes are not rewritten.
-	const renamed = (newPath: string) => ({ newPath, updatedFiles: 0, failedUpdates: 0 });
 	for (let attempt = 0; attempt < RENAME_ATTEMPTS; attempt++) {
 		const to = renameCandidate(target, attempt);
-		if (to === rename.path) return renamed(to);
-		const moved = await moveTo(request, { from: rename.path, to });
+		if (to === rename.path && !retitles(rename)) return renamed({ path: to, updatedFiles: 0 });
+		const moved = await moveTo(request, renameBody(rename, to));
 		if (!moved) continue;
-		moveOpenDocs({ from: rename.path, to: moved });
+		moveOpenDocs({ from: rename.path, to: moved.path });
 		return renamed(moved);
 	}
 	throw new RemoteError(409, `no free name for ${rename.path}`);
+}
+
+function renamed({ path, updatedFiles }: Moved): VaultRenameResult {
+	return { newPath: path, updatedFiles, failedUpdates: 0 };
 }

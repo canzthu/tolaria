@@ -284,3 +284,4 @@ proposed → active → superseded
 | [0286](0286-web-phone-layout-as-a-url-driven-pane-stack.md) | Web phone layout as a URL-driven pane stack | active |
 | [0287](0287-web-tablet-layout-and-browser-safe-shortcuts.md) | Web tablet layout and browser-safe shortcuts | active |
 | [0288](0288-web-touch-input-long-press-menus-and-touch-targets.md) | Web touch input: long-press menus and 44 px touch targets | active |
+| [0289](0289-server-rename-transaction-with-live-link-patches.md) | Server rename transaction with live wikilink patches | active |

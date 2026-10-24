@@ -157,6 +157,29 @@ describe('renaming a note on the web', () => {
   })
 })
 
+describe('renaming a note on the web rewrites links to it (TOL-22)', () => {
+  it('rewrites other notes in the rename commit, and their open documents follow', async () => {
+    const linking = await open('projects/alpha.md')
+
+    const result = await backend.files.rename({ path: 'welcome.md', newFilenameStem: 'hello' })
+    await expect.poll(() => codec.read(linking.doc)).toContain('[[hello]]')
+
+    expect(result).toEqual({ newPath: 'hello.md', updatedFiles: 1, failedUpdates: 0 })
+    expect(await fixture.desktop.read('projects/alpha.md')).toBe('# Alpha\n\nLinks to [[hello]] and mentions the Heron.\n')
+    expect((await fixture.desktop.log())[0]).toBe('Rename welcome.md to hello.md')
+  })
+
+  it('sets the new title as the title property, also when the file name already fits', async () => {
+    await backend.files.write('ideas.md', '# Ideas\n', { baseRevision: null })
+
+    const result = await backend.files.rename({ path: 'ideas.md', newTitle: 'Ideas', oldTitle: 'Old ideas' })
+
+    expect(result).toEqual({ newPath: 'ideas.md', updatedFiles: 0, failedUpdates: 0 })
+    expect(await fixture.desktop.read('ideas.md')).toBe('---\ntitle: Ideas\n---\n# Ideas\n')
+    expect((await fixture.desktop.log())[0]).toBe('Retitle ideas.md')
+  })
+})
+
 describe('rename naming', () => {
   it('follows the desktop: the slug, then numbered candidates in the same folder', () => {
     expect([0, 1, 2].map((attempt) => renameCandidate({ path: 'a/b/untitled-note-1.md', stem: 'idea' }, attempt))).toEqual([
@@ -186,6 +209,16 @@ describe('rename naming', () => {
     const answer = () => Promise.resolve(new Response(JSON.stringify(body)))
 
     await expect(renameNote(answer, { path: 'x.md', newTitle: 'Idea' })).rejects.toMatchObject({ status: expect.any(Number) })
+  })
+
+  it.each([undefined, 'Idea'])('sends nothing when the name fits and the old title is %j', async (oldTitle) => {
+    const request = () => Promise.reject(new Error('no request expected'))
+
+    await expect(renameNote(request, { path: 'idea.md', newTitle: 'Idea', oldTitle })).resolves.toEqual({
+      newPath: 'idea.md',
+      updatedFiles: 0,
+      failedUpdates: 0,
+    })
   })
 
   it('gives up when every candidate is taken', async () => {

@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.3'
+export const PROTOCOL_VERSION = '1.4'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -99,6 +99,7 @@ export const FILE_CAPABILITIES = [
   'entries.delta',
   'changes.feed',
   'attachments.import',
+  'files.rename.links',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
@@ -165,6 +166,12 @@ export interface RenameRequest {
   to: string
   /** Etag of `from` the client last saw; omit to rename whatever is there. */
   ifMatch?: string
+  /** Since 1.4: rewrite the wikilinks to the note across the vault, in the rename's commit. */
+  rewriteLinks?: boolean
+  /** Since 1.4: the note's new title, set as its `title` property when it differs from the old one. */
+  title?: string
+  /** Since 1.4: the old title that links use; the title read from the note when omitted. */
+  oldTitle?: string
 }
 
 export interface RenameResult {
@@ -174,6 +181,8 @@ export interface RenameResult {
   commit: string
   pushed: boolean
   docId?: string
+  /** Since 1.4, with `rewriteLinks`: the other notes whose wikilinks were rewritten. */
+  rewritten?: string[]
 }
 
 export interface DeleteResult {
