@@ -31,6 +31,10 @@ test.afterEach(async () => {
 	await origin.stop().catch(() => {});
 });
 
+test.afterAll(async () => {
+	await origin.dispose();
+});
+
 /**
  * The remote vault, and what the device reports about its connection: `navigator.onLine`
  * and the online/offline events, as a phone in airplane mode would.
