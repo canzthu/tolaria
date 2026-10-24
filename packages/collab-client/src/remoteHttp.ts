@@ -21,11 +21,23 @@ export function etagOf(response: Response): string {
 	return (response.headers.get("etag") ?? "").replaceAll('"', "");
 }
 
+/**
+ * Lets go of a body the caller does not read. In a browser an unread body keeps its request
+ * open until the response is garbage collected, holding a connection meanwhile, and the page
+ * never goes network-idle.
+ */
+export async function released(response: Response): Promise<Response> {
+	await response.body?.cancel();
+	return response;
+}
+
 export async function ok(response: Response): Promise<Response> {
 	if (response.ok) return response;
+	await released(response);
+	const route = response.url ? new URL(response.url).pathname : "the request";
 	throw new RemoteError(
 		response.status,
-		`the server answered ${response.status} for ${new URL(response.url).pathname}`,
+		`the server answered ${response.status} for ${route}`,
 	);
 }
 
@@ -57,6 +69,8 @@ export function assertVaultPath(path: string): void {
 	const segments = path.split("/");
 	const invalid =
 		path.includes("\\") ||
-		segments.some((segment) => segment === "" || segment === "." || segment === "..");
+		segments.some(
+			(segment) => segment === "" || segment === "." || segment === "..",
+		);
 	if (invalid) throw new RemoteError(400, `"${path}" is not a vault path`);
 }

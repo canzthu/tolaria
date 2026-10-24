@@ -64,7 +64,7 @@ test("a note created on the web is renamed after its heading and deleted", async
 	const before = await serverPaths(request);
 
 	await configureRemoteVault(page);
-	await page.goto("/", { waitUntil: "networkidle" });
+	await page.goto("/", { waitUntil: "load" });
 	const noteList = page.getByTestId("note-list-container");
 	await expect(noteList.getByText("Welcome", { exact: true })).toBeVisible({
 		timeout: 10_000,
@@ -127,7 +127,7 @@ test("a note created on the web is renamed after its heading and deleted", async
 	await expect(noteList.getByText(title, { exact: true })).toHaveCount(0);
 
 	// Still gone after a reload: the list comes from the server.
-	await page.reload({ waitUntil: "networkidle" });
+	await page.reload({ waitUntil: "load" });
 	await expect(noteList.getByText("Welcome", { exact: true })).toBeVisible({
 		timeout: 10_000,
 	});
