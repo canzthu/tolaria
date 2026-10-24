@@ -1307,6 +1307,8 @@
   "feedback.community.description": "Chatujte s tímom a ďalšími používateľmi, získajte pomoc a vyskúšajte alfa verzie a mobilné zostavy.",
   "feedback.community.cta": "Pripojte sa na Discord",
   "feedback.community.linkLabel": "Pripojte sa na Discord",
-  "communityBanner.invite": "Pripojte sa ku komunite Tolaria a porozprávajte sa s nami na Discorde.",
+  "communityBanner.invite": "Tolaria pre iOS je tu! Stiahnite si ju a pripojte sa k nášmu novému serveru Discord",
+  "communityBanner.ios": "Stiahnuť aplikáciu pre iOS",
+  "communityBanner.joinCommunity": "Pripojte sa k Discordu",
   "communityBanner.dismiss": "Odmietnuť pozvánku do komunity"
 }

@@ -22,7 +22,7 @@ export type UpdateStatus =
   | ({ state: 'available'; notes: string | undefined } & UpdateVersionInfo)
   | ({ state: 'downloading'; progress: number } & UpdateVersionInfo)
   | ({ state: 'ready' } & UpdateVersionInfo)
-  | { state: 'error' }
+  | { state: 'error'; message: string }
 
 export type UpdateCheckResult =
   | { kind: 'up-to-date' }
@@ -119,8 +119,9 @@ export function useUpdater(
       return { kind: 'available', ...versionInfo }
     } catch (error) {
       console.warn('[updater] Failed to check for updates')
-      setStatus({ state: 'error' })
-      return { kind: 'error', message: buildUpdateCheckErrorMessage(error) }
+      const message = buildUpdateCheckErrorMessage(error)
+      setStatus({ state: 'error', message })
+      return { kind: 'error', message }
     }
   }, [releaseChannel])
 
@@ -149,7 +150,7 @@ export function useUpdater(
       setStatus((prev) => (prev.state === 'downloading' ? { state: 'ready', ...versionInfo } : prev))
     } catch {
       console.warn('[updater] Download failed')
-      setStatus({ state: 'error' })
+      setStatus({ state: 'error', message: 'Could not download the update' })
     }
   }, [releaseChannel])
 

@@ -276,7 +276,7 @@ describe('useUpdater', () => {
       message: 'Could not check for updates: network error',
     })
     expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates')
-    expect(result.current.status).toEqual({ state: 'error' })
+    expect(result.current.status).toEqual({ state: 'error', message: 'Could not check for updates: network error' })
   })
 
   it('dismiss resets the banner state', async () => {
@@ -362,6 +362,6 @@ describe('useUpdater', () => {
     })
 
     expect(console.warn).toHaveBeenCalledWith('[updater] Download failed')
-    expect(result.current.status).toEqual({ state: 'error' })
+    expect(result.current.status).toEqual({ state: 'error', message: 'Could not download the update' })
   })
 })

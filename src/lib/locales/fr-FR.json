@@ -1307,6 +1307,8 @@
   "feedback.community.description": "Discutez avec l'équipe et d'autres utilisateurs, obtenez de l'aide et testez les versions alpha et mobiles.",
   "feedback.community.cta": "Rejoindre Discord",
   "feedback.community.linkLabel": "Rejoindre Discord",
-  "communityBanner.invite": "Rejoignez la communauté Tolaria et discutez avec nous sur Discord.",
+  "communityBanner.invite": "Tolaria pour iOS est arrivée ! Téléchargez-la et rejoignez notre nouveau serveur Discord",
+  "communityBanner.ios": "Télécharger l’application iOS",
+  "communityBanner.joinCommunity": "Rejoindre Discord",
   "communityBanner.dismiss": "Rejeter l’invitation à rejoindre la communauté"
 }

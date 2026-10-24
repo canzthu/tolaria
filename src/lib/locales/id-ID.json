@@ -1307,6 +1307,8 @@
   "feedback.community.description": "Ngobrol dengan tim dan pengguna lain, dapatkan bantuan, dan coba build alpha serta build seluler.",
   "feedback.community.cta": "Bergabunglah dengan Discord",
   "feedback.community.linkLabel": "Bergabunglah dengan Discord",
-  "communityBanner.invite": "Bergabunglah dengan komunitas Tolaria dan mengobrol bersama kami di Discord.",
+  "communityBanner.invite": "Tolaria untuk iOS sudah hadir! Unduh, lalu bergabunglah dengan server Discord baru kami",
+  "communityBanner.ios": "Unduh aplikasi iOS",
+  "communityBanner.joinCommunity": "Bergabunglah dengan Discord",
   "communityBanner.dismiss": "Tolak undangan komunitas"
 }

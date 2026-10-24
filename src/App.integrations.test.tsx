@@ -1,4 +1,5 @@
 import "./App.testUtils";
+import { useState } from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -12,18 +13,50 @@ import {
 	SLOW_APP_READY_TIMEOUT_MS,
 } from "./App.testUtils";
 import { useUpdater } from "./hooks/useUpdater";
+import type { UpdateCheckResult, UpdateStatus } from "./hooks/useUpdater";
 import type { Settings } from "./types";
 import { streamAiAgent } from "./utils/streamAiAgent";
 
+function mockUpdaterWithStatus(
+	checkForUpdates: () => Promise<UpdateCheckResult>,
+) {
+	vi.mocked(useUpdater).mockImplementation(() => {
+		const [status, setStatus] = useState<UpdateStatus>({ state: "idle" });
+		return {
+			status,
+			actions: {
+				checkForUpdates: async () => {
+					setStatus({ state: "checking" });
+					const result = await checkForUpdates();
+					if (result.kind === "available") {
+						setStatus({
+							state: "available",
+							version: result.version,
+							displayVersion: result.displayVersion,
+							notes: undefined,
+						});
+					} else if (result.kind === "error") {
+						setStatus({ state: "error", message: result.message });
+					} else {
+						setStatus({ state: "idle" });
+					}
+					return result;
+				},
+				startDownload: vi.fn(),
+				openReleaseNotes: vi.fn(),
+				dismiss: vi.fn(),
+			},
+		};
+	});
+}
+
 describe("App.integrations", () => {
 	it("shows visible feedback when a manual update check finds an update", async () => {
-		vi.mocked(useUpdater).mockReturnValue(
-			createMockUpdaterResult(async () => ({
-				kind: "available",
-				version: "2026.4.25",
-				displayVersion: "2026.4.25",
-			})),
-		);
+		mockUpdaterWithStatus(async () => ({
+			kind: "available",
+			version: "2026.4.25",
+			displayVersion: "2026.4.25",
+		}));
 
 		render(<App />);
 
@@ -34,9 +67,11 @@ describe("App.integrations", () => {
 		fireEvent.click(screen.getByTestId("status-build-number"));
 
 		await waitFor(() => {
-			expect(
-				screen.getByText("Tolaria 2026.4.25 is available"),
-			).toBeInTheDocument();
+			const bottomStack = screen.getByTestId("app-bottom-banner-stack");
+			expect(bottomStack).toContainElement(screen.getByTestId("update-banner"));
+			expect(screen.getByTestId("update-banner")).toHaveTextContent(
+				"Tolaria 2026.4.25 is available",
+			);
 		});
 	});
 
@@ -75,9 +110,7 @@ describe("App.integrations", () => {
 					resolveUpdate = resolve;
 				}),
 		);
-		vi.mocked(useUpdater).mockReturnValue(
-			createMockUpdaterResult(checkForUpdates),
-		);
+		mockUpdaterWithStatus(checkForUpdates);
 
 		render(<App />);
 
@@ -95,7 +128,9 @@ describe("App.integrations", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("Checking for updates...")).toBeInTheDocument();
+			const bottomStack = screen.getByTestId("app-bottom-banner-stack");
+			expect(bottomStack).toContainElement(screen.getByTestId("update-banner"));
+			expect(bottomStack).toHaveTextContent("Checking for updates...");
 		});
 		expect(checkForUpdates).toHaveBeenCalledOnce();
 

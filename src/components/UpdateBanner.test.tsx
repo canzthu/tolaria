@@ -63,18 +63,24 @@ describe("UpdateBanner", () => {
 		expect(screen.getByTestId("community-banner")).toBeInTheDocument();
 	});
 
-	it("shows the community banner on error state", () => {
-		const status: UpdateStatus = { state: "error" };
-		renderBanner(status);
-		expect(screen.getByTestId("community-banner")).toBeInTheDocument();
+	it("keeps updater errors in the bottom stack with the community banner", () => {
+		renderBanner({ state: "error", message: "Update check failed" });
+		const stack = screen.getByTestId("bottom-banner-stack");
+		expect(stack).toContainElement(screen.getByTestId("update-banner"));
+		expect(stack).toContainElement(screen.getByTestId("community-banner"));
+		expect(stack).toHaveTextContent("Update check failed");
 	});
 
 	it("shows immediate feedback while checking for updates", () => {
 		renderBanner({ state: "checking" });
 
-		expect(screen.getByTestId("update-banner")).toHaveTextContent(
-			"Checking for updates",
-		);
+		const stack = screen.getByTestId("bottom-banner-stack");
+		const banners = Array.from(stack.children);
+		expect(banners.map((banner) => banner.getAttribute("data-testid"))).toEqual([
+			"update-banner",
+			"community-banner",
+		]);
+		expect(stack).toHaveTextContent("Checking for updates");
 	});
 
 	it("shows version and action buttons when update is available", () => {

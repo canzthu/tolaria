@@ -1309,5 +1309,7 @@ files:
     feedback.community.description: d1fa9eb431f008ec1f02b24e28ec6351
     feedback.community.cta: 5c7ef8c320c94884cd78974ecc493846
     feedback.community.linkLabel: 5c7ef8c320c94884cd78974ecc493846
-    communityBanner.invite: b1bc4d7f121a3f5f7e8eb38197eb4956
+    communityBanner.invite: cb07c4eeb6eaaafe3e5a0f42efbb42a9
+    communityBanner.ios: 07bcb93dc92351ae037ecf755676fa0e
+    communityBanner.joinCommunity: 5c7ef8c320c94884cd78974ecc493846
     communityBanner.dismiss: df9374f4356460c586a8e9c3bae697dc

@@ -4,10 +4,11 @@ import {
 	ArrowsClockwise as RefreshCw,
 	X,
 } from "@phosphor-icons/react";
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import {
 	CONTRIBUTION_ANALYTICS_EVENT,
 	TOLARIA_DISCORD_INVITE_URL,
+	TOLARIA_IOS_DOWNLOAD_URL,
 } from "../constants/feedback";
 import type { UpdateActions, UpdateStatus } from "../hooks/useUpdater";
 import { restartApp } from "../hooks/useUpdater";
@@ -26,13 +27,13 @@ interface UpdateBannerProps {
 
 type VisibleUpdateStatus = Exclude<
 	UpdateStatus,
-	{ state: "idle" } | { state: "error" }
+	{ state: "idle" }
 >;
 
 function isUpdateBannerVisible(
 	status: UpdateStatus,
 ): status is VisibleUpdateStatus {
-	return status.state !== "idle" && status.state !== "error";
+	return status.state !== "idle";
 }
 
 function readCommunityBannerDismissed(): boolean {
@@ -55,7 +56,6 @@ const bannerStyle = {
 	fontSize: 13,
 	color: "var(--text-inverse)",
 	flexShrink: 0,
-	order: -1,
 } satisfies CSSProperties;
 
 const iconStyle = {
@@ -231,6 +231,8 @@ function renderBannerContent(
 			return renderDownloadingContent(status, locale);
 		case "ready":
 			return renderReadyContent(status, locale);
+		case "error":
+			return <span>{status.message}</span>;
 	}
 }
 
@@ -242,58 +244,103 @@ export function UpdateBanner({
 	const [communityDismissed, setCommunityDismissed] = useState(
 		readCommunityBannerDismissed,
 	);
-
-	if (!isUpdateBannerVisible(status)) {
-		if (communityDismissed) return null;
-		return (
-			<div
-				data-testid="community-banner"
-				style={{ ...bannerStyle, background: "var(--accent-green)" }}
-			>
-				<span>{translate(locale, "communityBanner.invite")}</span>
-				<Button
-					type="button"
-					variant="link"
-					size="xs"
-					onClick={() => {
-						trackEvent(CONTRIBUTION_ANALYTICS_EVENT, {
-							action: "discord",
-							surface: "top_banner",
-						});
-						void openExternalUrl(TOLARIA_DISCORD_INVITE_URL);
-					}}
-					style={{ ...primaryActionStyle, color: "var(--accent-green)" }}
-				>
-					{translate(locale, "feedback.community.cta")}
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon-xs"
-					data-testid="community-banner-dismiss"
-					onClick={() => {
-						try {
-							window.localStorage.setItem(
-								COMMUNITY_BANNER_DISMISSED_KEY,
-								"true",
-							);
-						} catch {
-							// Keep the banner dismissed for this session if storage is unavailable.
-						}
-						setCommunityDismissed(true);
-					}}
-					style={dismissButtonStyle}
-					aria-label={translate(locale, "communityBanner.dismiss")}
-				>
-					<X size={14} />
-				</Button>
-			</div>
+	const updateVisible = isUpdateBannerVisible(status);
+	useEffect(() => {
+		const appShell = document.querySelector<HTMLElement>(".app-shell");
+		const bottomOffset = communityDismissed
+			? updateVisible
+				? "80px"
+				: "2.75rem"
+			: updateVisible
+				? "124px"
+				: "80px";
+		appShell?.style.setProperty(
+			"--ai-workspace-floating-button-bottom",
+			bottomOffset,
 		);
-	}
+	}, [communityDismissed, updateVisible]);
 
 	return (
-		<div data-testid="update-banner" style={bannerStyle}>
-			{renderBannerContent(status, actions, locale)}
+		<div data-testid="bottom-banner-stack" style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+			{updateVisible && (
+				<div data-testid="update-banner" style={bannerStyle}>
+					{renderBannerContent(status, actions, locale)}
+				</div>
+			)}
+			{!communityDismissed && (
+				<div
+					data-testid="community-banner"
+					style={{
+						...bannerStyle,
+						background: "var(--accent-green)",
+						color: "#fff",
+						flexWrap: "wrap",
+					}}
+				>
+					<span>{translate(locale, "communityBanner.invite")}</span>
+					<Button
+						type="button"
+						variant="link"
+						size="xs"
+						data-testid="community-banner-ios"
+						onClick={() => {
+							trackEvent(CONTRIBUTION_ANALYTICS_EVENT, {
+								action: "ios_download",
+								surface: "bottom_banner",
+							});
+							void openExternalUrl(TOLARIA_IOS_DOWNLOAD_URL);
+						}}
+						style={{
+							...primaryActionStyle,
+							marginLeft: "auto",
+							background: "#fff",
+							color: "#176B3A",
+						}}
+					>
+						{translate(locale, "communityBanner.ios")}
+					</Button>
+					<Button
+						type="button"
+						variant="link"
+						size="xs"
+						onClick={() => {
+							trackEvent(CONTRIBUTION_ANALYTICS_EVENT, {
+								action: "discord",
+								surface: "bottom_banner",
+							});
+							void openExternalUrl(TOLARIA_DISCORD_INVITE_URL);
+						}}
+						style={{
+							...primaryActionStyle,
+							background: "#fff",
+							color: "#176B3A",
+						}}
+					>
+						{translate(locale, "communityBanner.joinCommunity")}
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-xs"
+						data-testid="community-banner-dismiss"
+						onClick={() => {
+							try {
+								window.localStorage.setItem(
+									COMMUNITY_BANNER_DISMISSED_KEY,
+									"true",
+								);
+							} catch {
+								// Keep the banner dismissed for this session if storage is unavailable.
+							}
+							setCommunityDismissed(true);
+						}}
+						style={dismissButtonStyle}
+						aria-label={translate(locale, "communityBanner.dismiss")}
+					>
+						<X size={14} />
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 }

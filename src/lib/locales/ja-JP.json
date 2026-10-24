@@ -1307,6 +1307,8 @@
   "feedback.community.description": "チームや他のユーザーとチャットしたり、サポートを受けたり、アルファ版やモバイル版のビルドを試したりできます。",
   "feedback.community.cta": "Discordに参加する",
   "feedback.community.linkLabel": "Discordに参加する",
-  "communityBanner.invite": "Tolariaコミュニティに参加して、Discordで私たちとチャットしましょう。",
+  "communityBanner.invite": "Tolaria for iOSが登場しました！ダウンロードして、新しいDiscordサーバーに参加しましょう",
+  "communityBanner.ios": "iOSアプリをダウンロード",
+  "communityBanner.joinCommunity": "Discordに参加する",
   "communityBanner.dismiss": "コミュニティへの招待を閉じる"
 }

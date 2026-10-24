@@ -39,6 +39,8 @@ export const TOLARIA_DOCS_URL = "https://refactoringhq.github.io/tolaria/";
 export const TOLARIA_FIRST_LAUNCH_DOCS_URL = `${TOLARIA_DOCS_URL}start/first-launch`;
 export const TOLARIA_PRODUCT_BOARD_URL = "https://tolaria.canny.io/";
 export const TOLARIA_DISCORD_INVITE_URL = "https://discord.gg/tRBC2u428B";
+export const TOLARIA_IOS_DOWNLOAD_URL =
+	"https://testflight.apple.com/join/7aPD4GAB";
 export const TOLARIA_GITHUB_CONTRIBUTING_URL =
 	"https://github.com/refactoringhq/tolaria/blob/main/CONTRIBUTING.md";
 export const TOLARIA_GITHUB_ISSUES_URL =
