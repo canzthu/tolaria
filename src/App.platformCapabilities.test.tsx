@@ -2,6 +2,18 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "./App";
 
+// These tests cover capability gating, not sync. The real mount-time auto-sync
+// pull is chained through delayed mock commands and can outlive the jsdom
+// environment on a loaded machine, so run the hook with sync disabled.
+vi.mock("./hooks/useAutoSync", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./hooks/useAutoSync")>();
+	return {
+		...actual,
+		useAutoSync: (options: Parameters<typeof actual.useAutoSync>[0]) =>
+			actual.useAutoSync({ ...options, enabled: false }),
+	};
+});
+
 /**
  * Tests for platform capabilities detection in App.tsx (TOL-174).
  * Verifies that desktop-only features are hidden in web builds.

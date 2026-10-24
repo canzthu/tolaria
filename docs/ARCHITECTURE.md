@@ -1140,6 +1140,7 @@ No Redux or global context. State lives in the root `App.tsx` and custom hooks:
 | `useVaultLoader` | `entries`, `allContent`, `modifiedFiles` | Vault data |
 | `useNoteActions` | `tabs`, `activeTabPath` | Composes `useNoteCreation` + `useNoteRename` + `frontmatterOps` |
 | `useNoteWindowLifecycle` | note-window open/title side effects | Opens `tauri://` note windows without full vault scans and keeps the native title current |
+| `useVaultRefreshHandlers` | pull/watcher vault refresh callbacks | Routes pulled and watcher-changed paths through `refreshPulledVaultState()` in the main window and `refreshNoteWindowVaultChanges()` in note windows, comparing the active tab with disk first |
 | `useStartupScreenState` | startup visibility booleans | Keeps onboarding, telemetry-consent, missing-vault, and initial indexing decisions out of `App.tsx` |
 | `useAppWindowControls` | view mode, panel visibility, command refs, zoom/build labels | Keeps main-window sizing and editor command ref plumbing out of `App.tsx` |
 | `useAppViewActions` | saved-view/type creation and saved-view mutation callbacks | Keeps saved-view persistence and Type auto-creation orchestration out of `App.tsx` |
