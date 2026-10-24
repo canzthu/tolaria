@@ -278,3 +278,4 @@ proposed → active → superseded
 | [0279](0279-mobile-preview-configuration-tolerance.md) | Mobile preview configuration tolerance | active |
 | [0280](0280-debounced-push-and-background-fetch.md) | Debounced push and background fetch for Tolaria remote | active |
 | [0282](0282-web-offline-read-service-worker.md) | Web offline read with a hand-written, per-account service worker | active |
+| [0283](0283-web-attachments-portable-paths-and-guarded-import.md) | Web attachments: portable paths, token-authorized object URLs and a server-side guarded image import | active |

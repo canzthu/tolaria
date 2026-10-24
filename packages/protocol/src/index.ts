@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.2'
+export const PROTOCOL_VERSION = '1.3'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -25,6 +25,8 @@ export const ROUTES = {
   collabDocs: `${API_PREFIX}/collab/docs`,
   /** Issues a short-lived ticket that opens one websocket, for clients that cannot send headers. */
   collabTickets: `${API_PREFIX}/collab/tickets`,
+  /** Downloads a public image into `attachments/` on the server's side (since 1.3). */
+  attachmentImports: `${API_PREFIX}/attachments/imports`,
 } as const
 
 /**
@@ -96,6 +98,7 @@ export const FILE_CAPABILITIES = [
   'entries.index',
   'entries.delta',
   'changes.feed',
+  'attachments.import',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
@@ -138,6 +141,11 @@ export interface ListResponse {
 }
 
 export type WriteOutcome = 'created' | 'updated' | 'unchanged' | 'recreated' | 'conflict'
+
+/** Body of `POST /v1/attachments/imports`; the answer is a `WriteResult` for the stored image. */
+export interface AttachmentImportRequest {
+  url: string
+}
 
 export interface WriteResult {
   outcome: WriteOutcome
@@ -240,6 +248,7 @@ export const ERROR_CODES = [
   'unsupported_protocol_version',
   'not_implemented',
   'upgrade_required',
+  'remote_unavailable',
   'internal',
 ] as const
 
