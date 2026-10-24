@@ -764,6 +764,10 @@ jobs:
 
   web-gates:
     executor: browser
+    # Each container builds the bundle and runs one Playwright shard into a blob report;
+    # web-gates-report merges the blobs into one HTML/JUnit report and records the pass marker
+    # (containers in a parallel job cannot, see mark_validated).
+    parallelism: 4
     steps:
       - checkout
       - skip_unless_changed:
@@ -783,19 +787,58 @@ jobs:
           paths:
             - ~/.cache/ms-playwright
       - run:
-          name: Server tests with coverage
-          command: pnpm test:server
+          name: Server tests with coverage (first container)
+          command: |
+            if [[ "${CIRCLE_NODE_INDEX:-0}" == "0" ]]; then
+              pnpm test:server
+            else
+              echo "Server tests run on container 0."
+            fi
       - run:
           name: Build web bundle
           command: pnpm build:web
       - run:
-          name: Web Playwright tests (Chromium, WebKit, iPhone, iPad, collab)
-          command: pnpm playwright:web
-      - store_test_results:
-          path: test-results
+          name: Web Playwright shard (Chromium, WebKit, iPhone, iPad, collab)
+          command: |
+            set -euo pipefail
+            shard=$((CIRCLE_NODE_INDEX + 1))
+            PLAYWRIGHT_BLOB_OUTPUT_DIR=/tmp/web-blob-reports \
+            PLAYWRIGHT_BLOB_OUTPUT_NAME="report-${shard}.zip" \
+              pnpm playwright:web --shard="${shard}/${CIRCLE_NODE_TOTAL}" --reporter=dot,blob
+      - persist_to_workspace:
+          root: /tmp/web-blob-reports
+          paths:
+            - report-*.zip
       - store_artifacts:
           path: test-results
           destination: web-playwright
+
+  web-gates-report:
+    executor: node
+    resource_class: medium
+    steps:
+      - checkout
+      - skip_unless_changed:
+          scope: web-gates
+          ignore: "^(src-tauri/.*\\.rs|docs/(?!web/))"
+          paths: "^(apps/|packages/|src/|docs/web/)"
+      - attach_workspace:
+          at: /tmp/web-blob-reports
+      - install_frontend_dependencies
+      - run:
+          name: Merge web Playwright shard reports
+          command: |
+            set -euo pipefail
+            PLAYWRIGHT_HTML_OUTPUT_DIR=test-results/web-report \
+            PLAYWRIGHT_HTML_OPEN=never \
+            PLAYWRIGHT_JUNIT_OUTPUT_FILE=test-results/web-junit/results.xml \
+              pnpm exec playwright merge-reports --config apps/web/playwright.config.ts \
+                --reporter=html,junit /tmp/web-blob-reports
+      - store_test_results:
+          path: test-results/web-junit
+      - store_artifacts:
+          path: test-results/web-report
+          destination: web-playwright-report
       - mark_validated:
           scope: web-gates
 
@@ -1746,6 +1789,14 @@ workflows:
             tags:
               ignore: /.*/
       - web-gates:
+          filters:
+            branches:
+              ignore: gh-pages
+            tags:
+              ignore: /.*/
+      - web-gates-report:
+          requires:
+            - web-gates
           filters:
             branches:
               ignore: gh-pages
