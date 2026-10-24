@@ -10,6 +10,7 @@ import {
 } from './previewOptions'
 import { phosphorStaticIconChunk } from './phosphorIconChunk'
 import { tolariaServiceWorker } from './serviceWorkerPlugin'
+import { appShellPreload } from './appShellPreload'
 
 // Tolaria Web: static build of the shared shell (no Tauri runtime).
 //
@@ -58,7 +59,7 @@ const staticIcons = phosphorStaticIconChunk()
 
 export default defineConfig(mergeConfig(sharedShellConfig(), {
   root: REPO_ROOT,
-  plugins: [staticWebApiGuard(), staticIcons.plugin, tolariaServiceWorker()],
+  plugins: [staticWebApiGuard(), staticIcons.plugin, tolariaServiceWorker(), appShellPreload()],
   // Read by src/main.tsx: only this build ships service-worker.js (TOL-198).
   define: { 'import.meta.env.VITE_TOLARIA_WEB_BUILD': JSON.stringify('true') },
   build: {

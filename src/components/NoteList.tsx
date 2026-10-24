@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect } from "react";
+import { useNoteListPaintedMark } from "../hooks/useNoteListPaintedMark";
 import type { NoteListMultiSelectionCommands } from "./note-list/multiSelectionCommands";
 import { NoteListLayout } from "./note-list/NoteListLayout";
 import { useMultiSelectKeyboard } from "./note-list/useMultiSelectKeyboard";
@@ -19,6 +20,7 @@ function NoteListInner({
 	...props
 }: NoteListInnerProps) {
 	const model = useNoteListModel(props);
+	useNoteListPaintedMark(model.visibleEntries.length > 0);
 	useNoteListDeletionFocus({
 		entries: props.entries,
 		visible: model.visibleEntries,

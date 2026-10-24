@@ -33,7 +33,8 @@ import {
 } from "../../protocol/src/index.ts";
 import { CollabProvider, type SocketLike } from "./collabProvider.ts";
 import { type RemoteAttachments, remoteAttachments } from "./remoteAttachments.ts";
-import { readCache, writeCache } from "./entriesCache.ts";
+import { writeCache } from "./entriesCache.ts";
+import { takeCache } from "./entriesCachePrefetch.ts";
 import {
 	assertVaultPath,
 	encoded,
@@ -180,21 +181,34 @@ function mapProtocolSearchResult(
 // Module-level cache state for web-only cache-first loading
 let cachedEntries: Map<string, AppVaultEntry> = new Map();
 let revalidating = false;
+// Startup lists the vault more than once at the same time: they share one cache read.
+let pendingCacheList: Promise<AppVaultEntry[] | null> | null = null;
+
+async function listFromCache(request: Request): Promise<AppVaultEntry[] | null> {
+	const cached = await takeCache();
+	if (!cached) return null;
+	cachedEntries = new Map(
+		cached.entries.map((e) => [e.path, mapProtocolEntryToApp(e)]),
+	);
+	// Start background revalidation
+	if (!revalidating) {
+		revalidateInBackground(request, cached.head);
+	}
+	return Array.from(cachedEntries.values());
+}
+
+function sharedCacheList(request: Request): Promise<AppVaultEntry[] | null> {
+	pendingCacheList ??= listFromCache(request).finally(() => {
+		pendingCacheList = null;
+	});
+	return pendingCacheList;
+}
 
 async function listEntries(request: Request): Promise<AppVaultEntry[]> {
 	// Web-only: try cache-first loading
 	if (typeof indexedDB !== "undefined" && cachedEntries.size === 0) {
-		const cached = await readCache();
-		if (cached) {
-			cachedEntries = new Map(
-				cached.entries.map((e) => [e.path, mapProtocolEntryToApp(e)]),
-			);
-			// Start background revalidation
-			if (!revalidating) {
-				revalidateInBackground(request, cached.head);
-			}
-			return Array.from(cachedEntries.values());
-		}
+		const fromCache = await sharedCacheList(request);
+		if (fromCache) return fromCache;
 	}
 
 	// No cache or cache unavailable: fetch full list
@@ -230,6 +244,15 @@ async function applyInChunks<T>(
 	}
 }
 
+/** Nothing changed since the cached HEAD: the snapshot is already current. */
+function isUnchanged(delta: EntriesDeltaResponse, since: string): boolean {
+	return (
+		delta.head === since &&
+		delta.changed.length === 0 &&
+		delta.deleted.length === 0
+	);
+}
+
 /**
  * Revalidates cached entries in the background by fetching deltas since the cached HEAD.
  * Chunks the work to avoid blocking the main thread.
@@ -253,6 +276,7 @@ async function revalidateInBackground(
 		await applyInChunks(delta.deleted, (path) => {
 			cachedEntries.delete(path);
 		});
+		if (isUnchanged(delta, since)) return;
 
 		// Update cache with new HEAD and entries
 		const protocolEntries = Array.from(cachedEntries.values()).map(

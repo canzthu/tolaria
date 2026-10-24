@@ -78,30 +78,63 @@ describe('LazyEditor', () => {
     expect(startup.markStartupPhase).toHaveBeenCalledWith('editor_committed')
   })
 
-  it('on the web, waits for the cached note list to paint before it loads the editor bundle', async () => {
-    vi.stubEnv('VITE_TOLARIA_WEB_BUILD', 'true')
-    await renderLazyEditor(null)
-
-    await act(async () => { startup.reach('react_shell') })
-    expect(editorRequested()).toBe(false)
-
-    await act(async () => {
-      startup.reach('active_usable')
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    })
-    expect(editorRequested()).toBe(true)
-  })
-
-  it('on the web, loads the editor bundle anyway when the vault is slow to become usable', async () => {
+  async function renderWebEditorAfterShell() {
     vi.stubEnv('VITE_TOLARIA_WEB_BUILD', 'true')
     vi.useFakeTimers()
     await renderLazyEditor(null)
-
     await act(async () => { startup.reach('react_shell') })
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+  }
+
+  async function advance(ms: number) {
+    await act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+  }
+
+  it('on the web, loads the editor bundle only after the note list painted and a grace period (TOL-206)', async () => {
+    await renderWebEditorAfterShell()
+
+    await act(async () => { startup.reach('active_usable') })
+    await advance(100)
     expect(editorRequested()).toBe(false)
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+    await act(async () => { startup.reach('note_list_painted') })
+    await advance(900)
+    expect(editorRequested()).toBe(false)
+
+    await advance(200)
     expect(editorRequested()).toBe(true)
+  })
+
+  it('on the web, loads the editor bundle at once when the user presses a pointer after the list painted', async () => {
+    await renderWebEditorAfterShell()
+    await act(async () => { startup.reach('note_list_painted') })
+    await advance(10)
+    expect(editorRequested()).toBe(false)
+
+    await act(async () => { window.dispatchEvent(new Event('pointerdown')) })
+    await advance(10)
+    expect(editorRequested()).toBe(true)
+  })
+
+  it('on the web, loads the editor bundle anyway when the note list is slow to paint', async () => {
+    await renderWebEditorAfterShell()
+
+    await advance(2_000)
+    expect(editorRequested()).toBe(false)
+
+    await advance(600)
+    expect(editorRequested()).toBe(true)
+  })
+
+  it('on the web, waits for an idle moment when the browser offers one', async () => {
+    const idle: Array<() => void> = []
+    vi.stubGlobal('requestIdleCallback', (callback: () => void) => { idle.push(callback); return idle.length })
+    await renderWebEditorAfterShell()
+    await act(async () => { startup.reach('note_list_painted') })
+    await advance(1_100)
+    expect(editorRequested()).toBe(false)
+
+    await act(async () => { for (const callback of idle) callback() })
+    expect(editorRequested()).toBe(true)
+    vi.unstubAllGlobals()
   })
 })

@@ -8,10 +8,14 @@ import { MOCK_CONTENT } from './mock-content'
 import { mockHandlers, addMockEntry, updateMockContent, trackMockChange } from './mock-handlers'
 import { tryVaultApi } from './vault-api'
 import { assertVaultWritable } from '../lib/offline/offlineMode'
+import { resolveBrowserBackendKind } from '../lib/platformCapabilities'
 
 export { addMockEntry, updateMockContent, trackMockChange }
 
 type MockHandler = (args?: unknown) => unknown
+
+/** Simulated IPC round trip for demo data. */
+const MOCK_IPC_LATENCY_MS = 100
 
 function registerMockHandlers(): Record<string, MockHandler> {
   return Object.fromEntries(
@@ -53,6 +57,12 @@ const VAULT_WRITE_COMMANDS = new Set([
   'migrate_is_a_to_type', 'save_view_cmd', 'delete_view_cmd', 'repair_vault',
 ])
 
+/** On a Tolaria remote the stand-ins answer at once: a fake delay here held startup back (TOL-206). */
+async function simulateIpcLatency(): Promise<void> {
+  if (resolveBrowserBackendKind() === 'remote') return
+  await new Promise((r) => setTimeout(r, MOCK_IPC_LATENCY_MS))
+}
+
 export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (VAULT_WRITE_COMMANDS.has(cmd)) assertVaultWritable('saving changes')
   const vaultResult = await tryVaultApi<T>(cmd, args)
@@ -60,7 +70,7 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
 
   const handler = resolveMockHandler(cmd)
   if (handler) {
-    await new Promise((r) => setTimeout(r, 100))
+    await simulateIpcLatency()
     return handler(args) as T
   }
   throw new Error(`No mock handler for command: ${cmd}`)

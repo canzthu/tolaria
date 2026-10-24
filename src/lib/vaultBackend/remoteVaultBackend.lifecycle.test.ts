@@ -86,6 +86,53 @@ describe('the cached note list', () => {
   })
 })
 
+describe('the cached note list at startup (TOL-206)', () => {
+  function cacheWith(head: string, paths: string[]) {
+    vi.stubGlobal('indexedDB', {})
+    vi.mocked(readCache).mockResolvedValue({ head, entries: paths.map((path) => protocolEntry(path)) } as Awaited<ReturnType<typeof readCache>>)
+  }
+
+  it('reads the cache once for listings that start together, and they get the same entries', async () => {
+    cacheWith('h1', ['a.md', 'b.md'])
+    handle = () => json({ head: 'h1', changed: [], deleted: [] })
+    const { files } = await backend()
+
+    const [first, second] = await Promise.all([files.list(), files.list()])
+
+    expect(readCache).toHaveBeenCalledTimes(1)
+    expect(second).toBe(first)
+    expect(first.map((entry) => entry.path)).toEqual(['a.md', 'b.md'])
+  })
+
+  it('uses the read started at boot instead of reading again', async () => {
+    cacheWith('h1', ['early.md'])
+    handle = () => json({ head: 'h1', changed: [], deleted: [] })
+    const { prefetchCache } = await import('../../../packages/collab-client/src/entriesCachePrefetch')
+    prefetchCache()
+    prefetchCache()
+
+    const listed = await (await backend()).files.list()
+
+    expect(readCache).toHaveBeenCalledTimes(1)
+    expect(listed.map((entry) => entry.path)).toEqual(['early.md'])
+  })
+
+  it('leaves the snapshot alone when nothing changed since its head', async () => {
+    cacheWith('h1', ['a.md'])
+    const requests: string[] = []
+    handle = (_method, path) => {
+      requests.push(path)
+      return json({ head: 'h1', changed: [], deleted: [] })
+    }
+
+    await (await backend()).files.list()
+
+    await vi.waitFor(() => expect(requests).toEqual(['/v1/entries?since=h1']))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(writeCache).not.toHaveBeenCalled()
+  })
+})
+
 describe('creating notes', () => {
   it('reports the conflict copy, and copes with a conflict without a body', async () => {
     let body: unknown = { outcome: 'conflict', path: 'plan (conflict 2026-10-23 2130).md' }
