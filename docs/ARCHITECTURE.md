@@ -1125,6 +1125,8 @@ URL routing on the web (ADR 0284): the web build keeps its location in the query
 
 Phone layout on the web (ADR 0286): at `(max-width: 640px)` the web build shows one pane, the note list or the note. `usePhoneNoteStack` (inside `useActiveNoteLocation`) holds which and marks `<html>` with `data-phone-pane` before the first paint; `App.css` hides the other pane with `visibility: hidden` so it stays mounted. While the list is shown `useWebRouting` routes no note, so opening a note pushes its URL and browser back, or the in-app back control, returns to the list. The back bar (`PhoneNoteBackBar`, rendered by `LazyEditor`) and the note list's opener read the stack from `phoneNoteStackStore`; the back bar calls `history.back()` when the entry beneath is the list. `useKeyboardAwareViewport` sizes the shell to `visualViewport` through CSS variables and scrolls the caret back above the on-screen keyboard. Wider layouts and the desktop app are untouched.
 
+Tablet layout on the web (ADR 0287): at `(min-width: 641px) and (max-width: 1366px) and (pointer: coarse)` the web build shows the note list and the note. `useTabletSidebar` (inside `useAppWindowControls`) keeps the sidebar collapsed until a view mode asks for it, for the session only, and marks `<html>` with `data-tablet-layout`; in portrait `App.css` floats the open sidebar over the list and a tap beside it closes it. In the web build `findShortcutCommandIdForEvent` and `getAppCommandShortcutDisplay` go through `webShortcuts`: browser-owned shortcuts are left to the browser and new note, quick open and the view modes move to ⌥⌘ (Ctrl+Alt elsewhere).
+
 ```mermaid
 flowchart LR
   B1[Browser: BlockNote + CollabProvider] <-->|sync, awareness| R[Room per docId]

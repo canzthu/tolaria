@@ -1473,6 +1473,8 @@ URL routing on the web (ADR 0284) adds `src/utils/webRoute.ts` (`WebRoute`, `par
 
 The phone layout on the web (ADR 0286) adds `usePhoneLayout` (`PHONE_LAYOUT_QUERY`), `usePhoneNoteStack` (`PhoneNoteStack`: `active`, `pane`, `backToList`, `showNote`; `NoteListPane` for `useWebRouting`; `BACK_TO_NOTE_LIST_STATE_KEY` in `history.state`; `PHONE_PANE_ATTRIBUTE` on `<html>`), which `useActiveNoteLocation` now returns, `phoneNoteStackStore` (`publishPhoneNoteStack`, `usePhoneNoteStackControls`, `usePhoneNoteOpener`), `useKeyboardAwareViewport` (`--tolaria-visual-viewport-height` / `-top`, `keepCaretAboveKeyboard`), and `src/components/phone/PhoneNoteBackBar.tsx`, the in-app back control rendered by `LazyEditor`.
 
+The tablet layout on the web (ADR 0287) adds `useMediaQueryMatch` (which `usePhoneLayout` now uses), `useTabletSidebar` (`TABLET_LAYOUT_QUERY`, `TABLET_LAYOUT_ATTRIBUTE` on `<html>`; `TabletSidebar`: `sidebarVisible`, `followViewMode`, `collapse`), called by `useAppWindowControls`, `webShortcuts` (`BROWSER_OWNED_SHORTCUT_COMMANDS`, `findWebShortcutCommand`, `webSafeDesktopCommand`, `webShortcutDisplay`), which `appCommandCatalog` consults in the web build, and `isWebBuild` in `src/utils/webBuild.ts`.
+
 In `apps/server`:
 
 - `Vault` (`src/vault.ts`) runs every mutation under one lock as pull, change, commit, push. `writeOutcome(current, incoming, precondition)` is the whole write decision.

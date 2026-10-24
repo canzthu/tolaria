@@ -1,6 +1,9 @@
 import type { useCreateBlockNote } from "@blocknote/react";
 import type { ReactNode } from "react";
-import { formatShortcutDisplay } from "../hooks/appCommandCatalog";
+import {
+	APP_COMMAND_IDS,
+	getAppCommandShortcutDisplay,
+} from "../hooks/appCommandCatalog";
 import type { FrontmatterOpOptions } from "../hooks/frontmatterOps";
 import { useDragRegion } from "../hooks/useDragRegion";
 import type { AiAgentId, AiAgentReadiness } from "../lib/aiAgents";
@@ -28,8 +31,13 @@ import type { ImageImportErrorHandler, Tab } from "./useEditorSetup";
 function EditorEmptyState({ locale = "en" }: { locale?: AppLocale }) {
 	const breadcrumbBarHeight = 52;
 	const { onMouseDown } = useDragRegion();
-	const quickOpenShortcut = formatShortcutDisplay({ display: "⌘P / ⌘O" });
-	const newNoteShortcut = formatShortcutDisplay({ display: "⌘N" });
+	// The web build shows its browser-safe shortcuts (TOL-194).
+	const quickOpenShortcut = getAppCommandShortcutDisplay(
+		APP_COMMAND_IDS.fileQuickOpen,
+	) ?? "";
+	const newNoteShortcut = getAppCommandShortcutDisplay(
+		APP_COMMAND_IDS.fileNewNote,
+	) ?? "";
 
 	return (
 		<div className="flex flex-1 flex-col overflow-hidden">

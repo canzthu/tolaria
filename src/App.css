@@ -116,6 +116,35 @@ html[data-phone-pane] .app-shell .app__editor > .app__phone-back-bar {
   border-bottom: 1px solid var(--border-primary);
 }
 
+/* Tablet web layout (TOL-194): the note list and the note, the sidebar collapsed until asked for. */
+html[data-tablet-layout] {
+  --tolaria-macos-traffic-light-padding: 16px;
+}
+
+html[data-tablet-layout] .app-shell .app {
+  position: relative;
+}
+
+html[data-tablet-layout] .app-shell .app__editor {
+  min-width: 0;
+}
+
+/* In portrait the sidebar floats over the note list, so the note keeps its width. */
+@media (orientation: portrait) {
+  html[data-tablet-layout] .app-shell .app__sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    box-shadow: 0 8px 24px var(--shadow-dialog);
+  }
+
+  html[data-tablet-layout] .app-shell .app__sidebar + .cursor-col-resize {
+    display: none;
+  }
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
