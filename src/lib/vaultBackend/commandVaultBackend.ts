@@ -32,7 +32,8 @@ export type CommandDialect = Extract<VaultBackendKind, 'tauri' | 'mock'>
 export interface CommandVaultBackendOptions {
   dialect: CommandDialect
   invoke: CommandInvoker
-  vaultPath: string
+  /** Without one, desktop commands find the vault from the note's absolute path. */
+  vaultPath?: string
 }
 
 interface NoteDraft {

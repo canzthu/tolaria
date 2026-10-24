@@ -45,12 +45,12 @@ export function createRemoteAttachmentClient(): RemoteAttachments | null {
 }
 
 /** The desktop path: Tauri commands backed by the Rust vault crate. */
-export function createTauriVaultBackend(vaultPath: string): VaultBackend {
+export function createTauriVaultBackend(vaultPath?: string): VaultBackend {
 	return createCommandVaultBackend({ dialect: "tauri", invoke, vaultPath });
 }
 
 /** The browser path: mock data, or the dev vault API when it is running. */
-export function createMockVaultBackend(vaultPath: string): VaultBackend {
+export function createMockVaultBackend(vaultPath?: string): VaultBackend {
 	return createCommandVaultBackend({
 		dialect: "mock",
 		invoke: mockInvoke,
@@ -63,7 +63,7 @@ export function createMockVaultBackend(vaultPath: string): VaultBackend {
  * (TOLARIA_REMOTE_URL and TOLARIA_REMOTE_TOKEN on window), uses the remote backend.
  * Otherwise falls back to Tauri (desktop) or mock (browser).
  */
-export function createVaultBackend(vaultPath: string): VaultBackend {
+export function createVaultBackend(vaultPath?: string): VaultBackend {
 	if (isTauri()) return createTauriVaultBackend(vaultPath);
 
 	const remoteConfig = getRemoteVaultConfig();

@@ -259,21 +259,8 @@ export function workspaceMoveReplacementTarget({
     : localTarget
 }
 
-function hasRemoteBackendConfigured(): boolean {
-  return typeof window !== 'undefined' 
-    && 'TOLARIA_REMOTE_URL' in window 
-    && 'TOLARIA_REMOTE_TOKEN' in window
-}
-
 export async function loadNoteContent({ path }: LoadNoteContentRequest): Promise<string> {
-  if (isTauri()) {
-    return invoke<string>('get_note_content', { path })
-  }
-  if (hasRemoteBackendConfigured()) {
-    const backend = createVaultBackend('')
-    return (await backend.files.read(path)).content
-  }
-  return mockInvoke<string>('get_note_content', { path })
+  return (await createVaultBackend().files.read(path)).content
 }
 
 function rewriteSummaryLabel(params: { updatedFiles: number }): string {
@@ -372,17 +359,20 @@ function resolveRenameVaultPath(entry: VaultEntry | undefined, fallbackVaultPath
   return entry ? vaultPathForEntry(entry, fallbackVaultPath) : fallbackVaultPath
 }
 
+const USER_FACING_RENAME_ERRORS = new Set(['A note with that name already exists', 'Invalid filename'])
+
+function trimmedErrorText(err: unknown): string {
+  if (typeof err === 'string') return err.trim()
+  return err instanceof Error ? err.message.trim() : ''
+}
+
 function renameErrorMessage(err: unknown): string {
-  const message = typeof err === 'string' ? err.trim() : err instanceof Error ? err.message.trim() : ''
-  if (message === 'A note with that name already exists' || message === 'Invalid filename') {
-    return message
-  }
-  return 'Failed to rename note'
+  const message = trimmedErrorText(err)
+  return USER_FACING_RENAME_ERRORS.has(message) ? message : 'Failed to rename note'
 }
 
 function moveNoteErrorMessage(err: unknown): string {
-  const message = typeof err === 'string' ? err.trim() : err instanceof Error ? err.message.trim() : ''
-  return message || 'Failed to move note'
+  return trimmedErrorText(err) || 'Failed to move note'
 }
 
 export interface NoteRenameConfig {
