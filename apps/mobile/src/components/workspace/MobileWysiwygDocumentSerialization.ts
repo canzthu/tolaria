@@ -1,4 +1,5 @@
 import {
+  mobileDocumentBody,
   mobileDocumentWithBody,
   tiptapJsonToMobileMarkdown,
 } from '../../workspace/mobileDocumentContent'
@@ -25,7 +26,10 @@ export function nativeWysiwygDocumentContentFromJson({
   vaultRootUri = null,
 }: NativeWysiwygDocumentSerializationInput): NativeWysiwygDocumentSerializationResult {
   const markdown = tiptapJsonToMobileMarkdown(json, { vaultRootUri })
-  if (shouldSkipInitialEmptySerialization({ initialBodyHasContent, isFirstSerialization, markdown })) {
+  if (
+    shouldSkipInitialEmptySerialization({ initialBodyHasContent, isFirstSerialization, markdown })
+    || shouldSkipUnchangedInitialSerialization({ currentContent, initialBodyHasContent, isFirstSerialization, markdown })
+  ) {
     return { content: currentContent, markdown, skipped: true }
   }
 
@@ -34,6 +38,23 @@ export function nativeWysiwygDocumentContentFromJson({
     markdown,
     skipped: false,
   }
+}
+
+function shouldSkipUnchangedInitialSerialization({
+  currentContent,
+  initialBodyHasContent,
+  isFirstSerialization,
+  markdown,
+}: Pick<NativeWysiwygDocumentSerializationInput, 'currentContent' | 'initialBodyHasContent' | 'isFirstSerialization'> & {
+  markdown: string
+}): boolean {
+  if (!isFirstSerialization || !initialBodyHasContent) return false
+
+  return normalizeTerminalLineBreaks(mobileDocumentBody(currentContent)) === normalizeTerminalLineBreaks(markdown)
+}
+
+function normalizeTerminalLineBreaks(value: string): string {
+  return value.replace(/\r\n/gu, '\n').replace(/\n+$/u, '')
 }
 
 export function nativeWysiwygShouldPublishMutationProof({

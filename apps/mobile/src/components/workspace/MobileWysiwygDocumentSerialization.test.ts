@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import type { TiptapJsonNode } from '../../workspace/mobileDocumentContent'
 import {
   nativeWysiwygDocumentContentFromJson,
   nativeWysiwygShouldPublishMutationProof,
 } from './MobileWysiwygDocumentSerialization'
-import type { TiptapJsonNode } from '../../workspace/mobileDocumentContent'
 
 describe('native WYSIWYG document serialization', () => {
   it('preserves raw frontmatter while replacing the editable document body', () => {
@@ -130,6 +130,35 @@ describe('native WYSIWYG document serialization', () => {
     })
   })
 
+  it.each([
+    {
+      currentBody: 'Existing body',
+      currentTitle: 'Existing title',
+      expected: {
+        content: '# Existing title\n\nExisting body',
+        markdown: '# Existing title\n\nExisting body',
+        skipped: true,
+      },
+      nextBody: 'Existing body',
+      nextTitle: 'Existing title',
+      scenario: 'preserves exact source when only a terminal newline differs',
+    },
+    {
+      currentBody: 'Existing body',
+      currentTitle: 'Existing title',
+      expected: {
+        content: '# Updated title\n\nUpdated body\n',
+        markdown: '# Updated title\n\nUpdated body',
+        skipped: false,
+      },
+      nextBody: 'Updated body',
+      nextTitle: 'Updated title',
+      scenario: 'serializes real edits immediately',
+    },
+  ])('$scenario on first serialization', ({ currentBody, currentTitle, expected, nextBody, nextTitle }) => {
+    expect(serializeInitialDocument({ currentTitle, currentBody, nextTitle, nextBody })).toEqual(expected)
+  })
+
   it('publishes mutation QA proofs for every non-skipped serialization', () => {
     expect(nativeWysiwygShouldPublishMutationProof({
       mutationProbeEnabled: true,
@@ -148,6 +177,20 @@ describe('native WYSIWYG document serialization', () => {
 
 function documentNode(...content: TiptapJsonNode[]): TiptapJsonNode {
   return { content, type: 'doc' }
+}
+
+function serializeInitialDocument({ currentBody, currentTitle, nextBody, nextTitle }: {
+  currentBody: string
+  currentTitle: string
+  nextBody: string
+  nextTitle: string
+}) {
+  return nativeWysiwygDocumentContentFromJson({
+    currentContent: `# ${currentTitle}\n\n${currentBody}`,
+    initialBodyHasContent: true,
+    isFirstSerialization: true,
+    json: documentNode(headingNode(1, nextTitle), paragraphNode(nextBody)),
+  })
 }
 
 function headingNode(level: number, text: string): TiptapJsonNode {
