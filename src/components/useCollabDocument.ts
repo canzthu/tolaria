@@ -6,6 +6,10 @@ import {
 	useState,
 } from "react";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
+import {
+	type ActiveCollabDocument,
+	publishActiveCollabDocument,
+} from "../lib/activeCollabDocument";
 import type {
 	VaultBackend,
 	VaultCollabChannel,
@@ -119,13 +123,27 @@ function useDocumentSession(
 	useEffect(() => () => sessionRef.current?.leave(), []);
 }
 
+/** What the status bar's sync pill reads: the document, or that one is being opened. */
+function activeDocumentOf(
+	target: string | null,
+	state: CollabDocumentState,
+): ActiveCollabDocument {
+	if (state.doc) return state.doc;
+	return target && !state.error ? "opening" : null;
+}
+
+function usePublishedDocument(document: ActiveCollabDocument): void {
+	useEffect(() => publishActiveCollabDocument(document), [document]);
+}
+
 /**
  * Opens a Yjs collaborative document for the given note path.
  * Returns no document when collaboration is not available (desktop) or not enabled.
  * Manages the document lifecycle: opens on mount/path change, closes on unmount.
  * The state always belongs to `path`: while another note's document is still open or
  * closing, the hook reports no document rather than the previous note's. A note renamed from
- * this page keeps its open document, which followed the file.
+ * this page keeps its open document, which followed the file. The document is published as
+ * the active one while the hook holds it.
  */
 export function useCollabDocument({
 	vaultBackend,
@@ -136,7 +154,8 @@ export function useCollabDocument({
 	const collab = enabled ? collabChannel(vaultBackend) : null;
 	const target = collab ? path : null;
 	useDocumentSession(collab, target, setOpened);
-	return opened && isOpenAt(opened.session, collab, target)
-		? opened
-		: NO_DOCUMENT;
+	const state =
+		opened && isOpenAt(opened.session, collab, target) ? opened : NO_DOCUMENT;
+	usePublishedDocument(activeDocumentOf(target, state));
+	return state;
 }

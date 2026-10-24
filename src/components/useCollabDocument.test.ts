@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
 import type { VaultBackend, VaultCollabDoc } from "../lib/vaultBackend/types";
+import { getActiveCollabDocument } from "../lib/activeCollabDocument";
 import { useCollabDocument } from "./useCollabDocument";
 
 describe("useCollabDocument", () => {
@@ -243,5 +244,21 @@ describe("useCollabDocument", () => {
 
 		unmount();
 		await waitFor(() => expect(mockDoc.close).toHaveBeenCalledTimes(2));
+	});
+
+	it("publishes the document it holds for the status bar's sync pill", async () => {
+		const { result, unmount } = renderCollab();
+		expect(getActiveCollabDocument()).toBe("opening");
+
+		await waitFor(() => expect(result.current.doc).toBe(mockDoc));
+		expect(getActiveCollabDocument()).toBe(mockDoc);
+
+		unmount();
+		expect(getActiveCollabDocument()).toBeNull();
+	});
+
+	it("publishes nothing without a note to open", () => {
+		renderCollab({ path: null });
+		expect(getActiveCollabDocument()).toBeNull();
 	});
 });
