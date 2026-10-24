@@ -1121,6 +1121,8 @@ Properties edits on the web are frontmatter transactions (TOL-203). `runFrontmat
 
 Offline read on the web (ADR 0282): the web build ships `service-worker.js`, registered after first paint and only with a remote server. It serves the shell from a versioned cache, and serves `GET /v1/entries` and `GET /v1/files/*` network-first with a fallback to a cache of the account that sent them, keyed by a hash of the server and the credential. With the network gone, the app opens the last vault from the ADR 0281 snapshot and these caches. The editors are read-only, vault writes and property edits are refused before any local change, no live document is opened, and the sync pill reads "Offline · read-only". Signing out or deleting the account clears every cache. Desktop builds never register the worker, and the `offlineRead` capability is false there.
 
+URL routing on the web (ADR 0284): the web build keeps its location in the query of `/`, as `/?vault=<slug>&note=<vault-relative path>&view=<view file>`. `useActiveNoteLocation` reads the opening URL once; its note wins over the last open note in `useLastActiveNote`, so it opens at the same moment, after the cached entries and never before first paint. `useWebRouting` then replaces the opening history entry with the restored location, pushes one entry per note or saved view opened, and on `popstate` opens what the URL names without pushing again. A query rather than a path keeps every route on the service worker's one cached shell. Desktop builds, including the browser dev build, and note windows never route.
+
 ```mermaid
 flowchart LR
   B1[Browser: BlockNote + CollabProvider] <-->|sync, awareness| R[Room per docId]

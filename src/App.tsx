@@ -56,7 +56,7 @@ import { useFileActions } from './hooks/useFileActions'
 import { useDeepLinks } from './hooks/useDeepLinks'
 import { useNoteGitUrls } from './hooks/useNoteGitUrls'
 import { useLayoutPanels } from './hooks/useLayoutPanels'
-import { useLastActiveNote } from './hooks/useLastActiveNote'
+import { useActiveNoteLocation } from './hooks/useActiveNoteLocation'
 import { useConflictFlow } from './hooks/useConflictFlow'
 import { useAppSave } from './hooks/useAppSave'
 import { useNoteRetargetingUi } from './hooks/useNoteRetargetingUi'
@@ -601,12 +601,17 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   } = notes
   const noteActiveTabPath = notes.activeTabPath
   const noteActiveTabPathRef = notes.activeTabPathRef
-  useLastActiveNote({
-    activeTabPath: noteActiveTabPath,
+  useActiveNoteLocation({
+    activeNotePath: noteActiveTabPath,
     enabled: !noteWindowParams && !aiWorkspaceWindow,
     entries: visibleEntries,
     isVaultLoading: vault.isLoading || !vaultSwitcher.loaded || !resolvedPath,
     openNote: handleSelectNote,
+    selection,
+    setSelection: handleSetSelection,
+    vaultPath: resolvedPath,
+    vaults: vaultSwitcher.allVaults,
+    views: vault.views,
   })
   useNoteWindowLifecycle({
     activeTabPath: notes.activeTabPath,
