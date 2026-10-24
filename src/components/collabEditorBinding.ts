@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useLiveNoteDocument } from "../lib/liveNoteDocuments";
 import { reportLiveNoteTitle } from "../lib/liveNoteTitle";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
 import { useOfflineReadOnly } from "../hooks/useOfflineReadOnly";
@@ -83,7 +84,10 @@ export function offlineCollabPath(
 	return !offline || path === boundPath ? path : null;
 }
 
-/** Opens the active note's live document when the platform edits notes collaboratively. */
+/**
+ * Opens the active note's live document when the platform edits notes collaboratively, and
+ * registers it while bound so property edits go into it.
+ */
 export function useCollabEditorBinding(
 	options: CollabEditorBindingOptions,
 ): CollabEditorBinding {
@@ -98,6 +102,8 @@ export function useCollabEditorBinding(
 	const binding = resolveCollabEditorBinding(path, state);
 	const nowBound = binding.kind === "bound" ? path : null;
 	if (nowBound !== boundPath) setBoundPath(nowBound);
+	// Property edits go into the bound document (TOL-203).
+	useLiveNoteDocument(binding.kind === "bound" ? binding.doc : null);
 	return binding;
 }
 
