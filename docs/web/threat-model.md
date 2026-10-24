@@ -222,8 +222,10 @@ async get(key: string): Promise<Uint8Array | null> {
 
 **Current protections:**
 - ✅ Endpoint URL validated at config load time (must be HTTP or HTTPS)
+- ✅ Endpoint host checked at startup (TOL-207, `apps/server/src/storeEndpoint.ts`): an IP literal, or every address the name resolves to, must be public per `isPublicAddress` (`apps/server/src/publicAddress.ts`, shared with the remote image import). Loopback, RFC 1918, CGNAT, link-local/metadata, ULA and IPv4-mapped addresses are refused, and the server does not start. `TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT=1` lifts this for a local MinIO and is itself refused unless `NODE_ENV=development`
+- ✅ Every store connection is checked too (TOL-207): `R2BlobStore` sends its requests with the shared `guardedLookup`, which resolves the host, refuses it when any address fails the policy and pins the socket to the checked address, so a later DNS answer cannot rebind the endpoint to an internal host
 - ✅ Endpoint is operator configuration, not user input
-- ✅ Keys are validated with `SAFE_KEY` regex before use
+- ✅ Keys are validated with the `SAFE_KEY` alphabet before use, for `R2BlobStore` as well as `LocalDiskStore` since TOL-207, so a key cannot leave the bucket path
 - ✅ Credentials never logged or exposed
 
 **Identified issue:**
@@ -234,11 +236,11 @@ The approved SSRF finding from Codacy (commit `fd8300eb`, decision by Karn 2026-
 - Approval SHA: `b21837f65bb5b4d00f3743634b460d91e60fe5d208ad7552c95ce667e272ad35`
 - Approval expires: 2026-10-30
 
-**Risk assessment:** **LOW-MEDIUM**
+**Risk assessment:** **LOW** (was LOW-MEDIUM before the TOL-207 startup check)
 - Endpoint is operator-controlled configuration
 - No user input directly influences the URL
 - Keys are validated before incorporation into URL
-- **However:** No explicit allowlist or IP range restrictions
+- No explicit domain allowlist; private, loopback and metadata addresses are refused at startup (TOL-207)
 - **Risk:** Misconfigured endpoint could point to internal services
 - **Risk:** Container compromise could modify environment variables
 
@@ -293,7 +295,7 @@ This would make the Codacy finding disappear because the endpoint would be const
 
 **Recommendations:**
 1. **Option A (Least impact):** Keep current approved-report entry; document in threat model that R2 endpoint is operator-trusted configuration
-2. **Option B (Defense in depth, small change):** Add private IP range validation at config load (prevents accidental internal endpoint configuration)
+2. **Option B (Defense in depth, small change):** Add private IP range validation at config load (prevents accidental internal endpoint configuration) — **done in TOL-207**
 3. **Option C (Eliminates finding, operational overhead):** Implement full allowlist validation as shown above
 
 **Remote image import (TOL-204):**

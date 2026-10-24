@@ -54,6 +54,21 @@ describe('loadConfig', () => {
   })
 })
 
+describe('private R2 endpoints (TOL-207)', () => {
+  it('are refused by default and allowed by the development flag in development', () => {
+    expect(loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN }).allowPrivateR2Endpoint).toBe(false)
+    expect(loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT: '0' }).allowPrivateR2Endpoint).toBe(false)
+    const flagged = { TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT: '1', NODE_ENV: 'development' }
+    expect(loadConfig(flagged).allowPrivateR2Endpoint).toBe(true)
+  })
+
+  it.each([undefined, 'production', 'test', 'staging'])('refuses the development flag when NODE_ENV is %s', (nodeEnv) => {
+    expect(() => loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT: '1', NODE_ENV: nodeEnv })).toThrowError(
+      'TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT is for development only: it also needs NODE_ENV=development',
+    )
+  })
+})
+
 describe('isLoopbackHost', () => {
   it.each(['127.0.0.1', '127.1.2.3', 'localhost', 'LOCALHOST', '::1'])('accepts %s', (host) => {
     expect(isLoopbackHost(host)).toBe(true)

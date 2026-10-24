@@ -26,6 +26,8 @@ export interface ServerConfig {
    * under `prefix` (one per vault). Null: indexes are only kept in the blob store.
    */
   indexSnapshots: { r2: R2Config; prefix: string } | null
+  /** Whether the R2 endpoints may be private or loopback addresses (development only); see `storeEndpoint.ts`. */
+  allowPrivateR2Endpoint: boolean
 }
 
 type Env = Record<string, string | undefined>
@@ -87,32 +89,35 @@ function collabSettings(env: Env): ServerConfig['collab'] {
   }
 }
 
-function r2Settings(env: Env, purpose: string): R2Config {
-  const bucket = setting(env, 'TOLARIA_R2_BUCKET')
-  const endpoint = setting(env, 'TOLARIA_R2_ENDPOINT')
-  const region = setting(env, 'TOLARIA_R2_REGION')
-  const accessKeyId = setting(env, 'TOLARIA_R2_ACCESS_KEY_ID')
-  const secretAccessKey = setting(env, 'TOLARIA_R2_SECRET_ACCESS_KEY')
-  
-  if (!bucket) throw new Error(`TOLARIA_R2_BUCKET is required when ${purpose}`)
-  if (!endpoint) throw new Error(`TOLARIA_R2_ENDPOINT is required when ${purpose}`)
-  if (!region) throw new Error(`TOLARIA_R2_REGION is required when ${purpose}`)
-  if (!accessKeyId) throw new Error(`TOLARIA_R2_ACCESS_KEY_ID is required when ${purpose}`)
-  if (!secretAccessKey) throw new Error(`TOLARIA_R2_SECRET_ACCESS_KEY is required when ${purpose}`)
-  
-  try {
-    const endpointUrl = new URL(endpoint)
-    if (!['http:', 'https:'].includes(endpointUrl.protocol)) {
-      throw new Error('TOLARIA_R2_ENDPOINT must be an HTTP or HTTPS URL')
-    }
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error('TOLARIA_R2_ENDPOINT must be a valid URL')
-    }
-    throw error
+function required(env: Env, name: string, purpose: string): string {
+  const value = setting(env, name)
+  if (!value) throw new Error(`${name} is required when ${purpose}`)
+  return value
+}
+
+function endpointSetting(env: Env, purpose: string): string {
+  const endpoint = required(env, 'TOLARIA_R2_ENDPOINT', purpose)
+  if (!URL.canParse(endpoint)) throw new Error('TOLARIA_R2_ENDPOINT must be a valid URL')
+  if (!['http:', 'https:'].includes(new URL(endpoint).protocol)) {
+    throw new Error('TOLARIA_R2_ENDPOINT must be an HTTP or HTTPS URL')
   }
-  
+  return endpoint
+}
+
+function r2Settings(env: Env, purpose: string): R2Config {
+  const bucket = required(env, 'TOLARIA_R2_BUCKET', purpose)
+  const endpoint = endpointSetting(env, purpose)
+  const region = required(env, 'TOLARIA_R2_REGION', purpose)
+  const accessKeyId = required(env, 'TOLARIA_R2_ACCESS_KEY_ID', purpose)
+  const secretAccessKey = required(env, 'TOLARIA_R2_SECRET_ACCESS_KEY', purpose)
   return { bucket, endpoint, region, accessKeyId, secretAccessKey }
+}
+
+/** A local MinIO or podman S3 lives on a private address, which only a development server may reach (TOL-207). */
+function allowPrivateR2Endpoint(env: Env): boolean {
+  if (setting(env, 'TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT') !== '1') return false
+  if (setting(env, 'NODE_ENV') === 'development') return true
+  throw new Error('TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT is for development only: it also needs NODE_ENV=development')
 }
 
 function blobStoreSettings(env: Env, stateDir: string): ServerConfig['blobStore'] {
@@ -160,5 +165,6 @@ export function loadConfig(env: Env): ServerConfig {
     collab: collabSettings(env),
     blobStore: blobStoreSettings(env, stateDir),
     indexSnapshots: indexSnapshotSettings(env),
+    allowPrivateR2Endpoint: allowPrivateR2Endpoint(env),
   }
 }

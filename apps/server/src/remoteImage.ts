@@ -1,9 +1,9 @@
-import { lookup as resolveHost, type LookupAddress } from 'node:dns'
 import { type IncomingMessage, type RequestOptions, request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
-import { BlockList, isIP, type LookupFunction } from 'node:net'
+import type { LookupFunction } from 'node:net'
 import { posix } from 'node:path'
 import { VaultError } from './errors.ts'
+import { type AddressPolicy, guardedLookup, isPublicAddress, isRefusedLiteral } from './publicAddress.ts'
 
 /**
  * Imports an image a pasted page points at into the vault (TOL-204), the way the desktop
@@ -24,9 +24,6 @@ export const REMOTE_IMAGE_LIMITS: RemoteImageLimits = {
   timeoutMs: 15_000,
   maxRedirects: 5,
 }
-
-/** Whether the server may connect to an address. Tests swap it to reach a loopback fixture. */
-export type AddressPolicy = (address: string) => boolean
 
 export interface RemoteImageOptions {
   limits?: Partial<RemoteImageLimits>
@@ -56,47 +53,6 @@ const IMAGE_EXTENSIONS = new Map([
 const FALLBACK_NAME = 'remote-image'
 const UNSAFE_NAME_CHARACTERS = /[^\p{L}\p{N}._-]/gu
 
-/** Private, loopback, link-local (cloud metadata included), shared, reserved and multicast. */
-const NON_PUBLIC_IPV4: ReadonlyArray<[string, number]> = [
-  ['0.0.0.0', 8],
-  ['10.0.0.0', 8],
-  ['100.64.0.0', 10],
-  ['127.0.0.0', 8],
-  ['169.254.0.0', 16],
-  ['172.16.0.0', 12],
-  ['192.0.0.0', 24],
-  ['192.0.2.0', 24],
-  ['192.168.0.0', 16],
-  ['198.18.0.0', 15],
-  ['198.51.100.0', 24],
-  ['203.0.113.0', 24],
-  ['224.0.0.0', 3],
-]
-/** IPv6 is allowed in global unicast only, minus the ranges that tunnel to or document other hosts. */
-const NON_PUBLIC_GLOBAL_IPV6: ReadonlyArray<[string, number]> = [
-  ['2001::', 23],
-  ['2001:db8::', 32],
-  ['2002::', 16],
-]
-
-function blockList(ranges: ReadonlyArray<[string, number]>, family: 'ipv4' | 'ipv6'): BlockList {
-  const list = new BlockList()
-  for (const [network, prefix] of ranges) list.addSubnet(network, prefix, family)
-  return list
-}
-
-const IPV4_DENIED = blockList(NON_PUBLIC_IPV4, 'ipv4')
-const IPV6_GLOBAL = blockList([['2000::', 3]], 'ipv6')
-const IPV6_DENIED = blockList(NON_PUBLIC_GLOBAL_IPV6, 'ipv6')
-
-/** True only for a public unicast address. Mapped, loopback, ULA and link-local IPv6 are all outside 2000::/3. */
-export function isPublicAddress(address: string): boolean {
-  const family = isIP(address)
-  if (family === 4) return !IPV4_DENIED.check(address, 'ipv4')
-  if (family === 6) return IPV6_GLOBAL.check(address, 'ipv6') && !IPV6_DENIED.check(address, 'ipv6')
-  return false
-}
-
 function refused(message: string): VaultError {
   return new VaultError(400, 'invalid_request', message)
 }
@@ -121,33 +77,11 @@ function hasCredentials(url: URL): boolean {
   return `${url.username}${url.password}` !== ''
 }
 
-/** An IP literal is connected to without a lookup, so it is checked here. */
-function isRefusedLiteral(url: URL, isAllowedAddress: AddressPolicy): boolean {
-  const host = url.hostname.replace(/^\[|\]$/gu, '')
-  return isIP(host) !== 0 && !isAllowedAddress(host)
-}
-
 function checkedUrl(url: URL, isAllowedAddress: AddressPolicy): URL {
   if (!ALLOWED_PROTOCOLS.has(url.protocol)) throw refused('url must be an absolute http or https URL')
   if (hasCredentials(url)) throw refused('url must not carry credentials')
   if (isRefusedLiteral(url, isAllowedAddress)) throw refusedAddress()
   return url
-}
-
-type LookupCallback = (error: Error | null, address: string | LookupAddress[], family?: number) => void
-
-/** Resolves like the default lookup, then refuses the whole host when any address is not allowed. */
-function guardedLookup(isAllowedAddress: AddressPolicy): LookupFunction {
-  const lookup = (hostname: string, options: { all?: boolean; family?: number }, callback: LookupCallback) => {
-    resolveHost(hostname, { all: true, family: options.family ?? 0 }, (error, addresses) => {
-      if (error) return callback(error, '')
-      const allowed = addresses.length > 0 && addresses.every(({ address }) => isAllowedAddress(address))
-      if (!allowed) return callback(refusedAddress(), '')
-      if (options.all) return callback(null, addresses)
-      return callback(null, addresses[0].address, addresses[0].family)
-    })
-  }
-  return lookup as unknown as LookupFunction
 }
 
 interface FetchContext {
@@ -254,7 +188,7 @@ export function remoteImageFetcher(options: RemoteImageOptions = {}): RemoteImag
   return async (raw) => {
     const start = checkedUrl(parsedUrl(raw), isAllowedAddress)
     const signal = AbortSignal.timeout(limits.timeoutMs)
-    const context: FetchContext = { lookup: guardedLookup(isAllowedAddress), signal, isAllowedAddress }
+    const context: FetchContext = { lookup: guardedLookup(isAllowedAddress, refusedAddress), signal, isAllowedAddress }
     try {
       const { url, extension, bytes } = await download(start, context, limits)
       return { path: `attachments/${now()}-${attachmentName(url, extension)}`, bytes }

@@ -28,6 +28,7 @@ Use `pnpm run server`: bare `pnpm server` is a pnpm built-in command.
 | `TOLARIA_BLOBSTORE` | `local` | Blob store for doc index and Yjs snapshots: `local` (disk under `state/`) or `r2` (S3-compatible) |
 | `TOLARIA_R2_BUCKET` | none | R2 bucket name (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
 | `TOLARIA_R2_ENDPOINT` | none | R2 endpoint URL (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
+| `TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT` | unset | At startup the server refuses an R2 endpoint that is, or resolves to, a private, loopback, link-local, CGNAT or metadata address. Set to `1`, together with `NODE_ENV=development`, to reach a local MinIO or podman S3; refused otherwise (the Docker image sets `NODE_ENV=production`). Every store connection is checked again after its own DNS lookup |
 | `TOLARIA_R2_REGION` | none | R2 region (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
 | `TOLARIA_R2_ACCESS_KEY_ID` | none | R2 access key (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |
 | `TOLARIA_R2_SECRET_ACCESS_KEY` | none | R2 secret key (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |

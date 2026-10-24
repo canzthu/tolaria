@@ -3,8 +3,12 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { LocalDiskStore, R2BlobStore } from '../src/store.ts'
+import { LocalDiskStore, R2BlobStore, type StoreMethod } from '../src/store.ts'
 import { text } from './helpers.ts'
+
+function listEntry(key: string): string {
+  return `<Contents><Key>${key}</Key></Contents>`
+}
 
 /**
  * Minimal in-process S3-compatible fake for testing R2BlobStore.
@@ -14,6 +18,8 @@ class FakeS3Server {
   private server: Server
   private storage = new Map<string, Uint8Array>()
   readonly paths: string[] = []
+  /** When set, every request is answered with this status. */
+  failWith = 0
   private port = 0
 
   constructor() {
@@ -44,54 +50,51 @@ class FakeS3Server {
   }
 
   private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const url = new URL(req.url ?? '/', `http://${req.headers.host}`)
-    this.paths.push(req.url ?? '')
-    const key = url.pathname.slice(1).replace(/^[^/]+\//, '')
+    const path = req.url ?? '/'
+    const url = new URL(path, 'http://fake-s3')
+    this.paths.push(path)
+    // A fresh connection per request, so each one goes through the store's address check.
+    res.shouldKeepAlive = false
+    if (this.failWith) return void res.writeHead(this.failWith, 'Unavailable').end()
+    return this.route(req, res, url)
+  }
 
-    if (req.method === 'GET' && url.searchParams.has('list-type')) {
-      const prefix = url.searchParams.get('prefix') ?? ''
-      const keys = Array.from(this.storage.keys()).filter((k) => k.startsWith(prefix))
-      const xml = `<?xml version="1.0"?><ListBucketResult>${keys.map((k) => `<Contents><Key>${k}</Key></Contents>`).join('')}</ListBucketResult>`
-      res.writeHead(200, { 'Content-Type': 'application/xml' })
-      res.end(xml)
-      return
-    }
+  private async route(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const key = url.pathname.split('/').slice(2).join('/')
+    if (req.method === 'PUT') return this.write(key, req, res)
+    if (req.method === 'DELETE') return this.remove(key, res)
+    if (req.method !== 'GET') return void res.writeHead(405).end()
+    if (url.searchParams.has('list-type')) return this.list(url.searchParams.get('prefix') ?? '', res)
+    this.read(key, res)
+  }
 
-    if (req.method === 'GET') {
-      const value = this.storage.get(key)
-      if (!value) {
-        res.statusCode = 404
-        res.end()
-        return
-      }
-      res.writeHead(200)
-      res.end(value)
-      return
-    }
+  private list(prefix: string, res: ServerResponse): void {
+    const keys = Array.from(this.storage.keys()).filter((k) => k.startsWith(prefix))
+    const xml = `<?xml version="1.0"?><ListBucketResult>${keys.map(listEntry).join('')}</ListBucketResult>`
+    res.writeHead(200, { 'Content-Type': 'application/xml' }).end(xml)
+  }
 
-    if (req.method === 'PUT') {
-      const chunks: Uint8Array[] = []
-      for await (const chunk of req) {
-        chunks.push(chunk as Uint8Array)
-      }
-      const buffer = Buffer.concat(chunks)
-      this.storage.set(key, new Uint8Array(buffer))
-      res.writeHead(200)
-      res.end()
-      return
-    }
+  private read(key: string, res: ServerResponse): void {
+    const value = this.storage.get(key)
+    if (value) res.writeHead(200).end(value)
+    else res.writeHead(404).end()
+  }
 
-    if (req.method === 'DELETE') {
-      this.storage.delete(key)
-      res.writeHead(204)
-      res.end()
-      return
-    }
+  private async write(key: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const chunks: Uint8Array[] = []
+    for await (const chunk of req) chunks.push(chunk as Uint8Array)
+    this.storage.set(key, new Uint8Array(Buffer.concat(chunks)))
+    res.writeHead(200).end()
+  }
 
-    res.statusCode = 405
-    res.end()
+  private remove(key: string, res: ServerResponse): void {
+    this.storage.delete(key)
+    res.writeHead(204).end()
   }
 }
+
+/** The fake listens on loopback, which the store refuses by default (TOL-207). */
+const LOOPBACK = { isAllowedAddress: (address: string) => address === '127.0.0.1' }
 
 describe('LocalDiskStore', () => {
   let root: string
@@ -155,7 +158,7 @@ describe('R2BlobStore', () => {
       region: 'auto',
       accessKeyId: 'test-key',
       secretAccessKey: 'test-secret',
-    })
+    }, LOOPBACK)
   })
 
   afterEach(async () => {
@@ -193,7 +196,7 @@ describe('R2BlobStore', () => {
       region: 'auto',
       accessKeyId: 'test-key',
       secretAccessKey: 'test-secret',
-    })
+    }, LOOPBACK)
     
     const indexData = await store2.get('docs/index.bin')
     const snapshotData = await store2.get('snapshots/note-1.bin')
@@ -231,7 +234,7 @@ describe('R2BlobStore request signing', () => {
       accessKeyId: 'AKIDEXAMPLE',
       secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
     },
-    () => new Date('2026-10-23T12:34:56.789Z'),
+    { now: () => new Date('2026-10-23T12:34:56.789Z') },
   )
   const base = 'https://acct.r2.cloudflarestorage.com/tolaria-proto'
 
@@ -241,20 +244,80 @@ describe('R2BlobStore request signing', () => {
     ['GET', `${base}/?list-type=2&prefix=vaults%2Fprototype%2F`, undefined, '8afad17ddd4095c5d9d93f08aadc4236c5ac08f77700c01f0b7dd56871ec29fc'],
     ['DELETE', `${base}/a%20b/it%27s.json`, undefined, 'b562274d2e736bb9b1c01b9c2e7bec057afa5bdbe33188dffa849d0a4c327ba3'],
   ])('signs %s %s as SigV4 does', (method, url, body, signature) => {
-    const headers = signer.signRequest(method, new URL(url), body === undefined ? undefined : text(body))
+    const headers = signer.signRequest(method as StoreMethod, new URL(url), body === undefined ? undefined : text(body))
     expect(headers['X-Amz-Date']).toBe('20261023T123456Z')
     expect(headers.Authorization).toBe(
       `AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20261023/auto/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`,
     )
   })
 
-  it('sends keys percent-encoded per path segment, as they are signed', async () => {
+  it('sends keys as path segments and the list prefix percent-encoded, as they are signed', async () => {
     const server = new FakeS3Server()
     const endpoint = await server.start()
-    const store = new R2BlobStore({ bucket: 'b', endpoint, region: 'auto', accessKeyId: 'k', secretAccessKey: 's' })
-    await store.put("a b/it's (1).json", text('x'))
-    await store.list('a b')
+    const store = new R2BlobStore({ bucket: 'b', endpoint, region: 'auto', accessKeyId: 'k', secretAccessKey: 's' }, LOOPBACK)
+    await store.put('vaults/v-1/index_2.json', text('x'))
+    await store.list('vaults/v-1')
     await server.stop()
-    expect(server.paths).toEqual(['/b/a%20b/it%27s%20%281%29.json', '/b/?list-type=2&prefix=a%20b%2F'])
+    expect(server.paths).toEqual(['/b/vaults/v-1/index_2.json', '/b/?list-type=2&prefix=vaults%2Fv-1%2F'])
+  })
+
+  it.each(['../other-bucket/x', 'a/../../b', '/absolute', 'a//b', '.hidden', '', 'a b', "it's"])(
+    'refuses the unsafe key %j before sending anything',
+    async (key) => {
+      const server = new FakeS3Server()
+      const endpoint = await server.start()
+      const store = new R2BlobStore({ bucket: 'b', endpoint, region: 'auto', accessKeyId: 'k', secretAccessKey: 's' }, LOOPBACK)
+      await expect(store.put(key, text('x'))).rejects.toThrowError(/invalid store key/)
+      await expect(store.get(key)).rejects.toThrowError(/invalid store key/)
+      await expect(store.delete(key)).rejects.toThrowError(/invalid store key/)
+      await expect(store.list(key)).rejects.toThrowError(/invalid store key/)
+      await server.stop()
+      expect(server.paths).toEqual([])
+    },
+  )
+})
+
+describe('R2BlobStore address policy (TOL-207)', () => {
+  let server: FakeS3Server
+  let port: string
+
+  beforeEach(async () => {
+    server = new FakeS3Server()
+    port = new URL(await server.start()).port
+  })
+
+  afterEach(() => server.stop())
+
+  const config = (endpoint: string) => ({ bucket: 'b', endpoint, region: 'auto', accessKeyId: 'k', secretAccessKey: 's' })
+  const answering = (...answers: string[]) => {
+    let calls = 0
+    return async () => [{ address: answers[Math.min(calls++, answers.length - 1)], family: 4 }]
+  }
+
+  it('refuses a loopback endpoint by default, before sending anything', async () => {
+    const store = new R2BlobStore(config(`http://127.0.0.1:${port}`))
+    await expect(store.put('docs/a', text('x'))).rejects.toThrowError(/R2 endpoint refused/)
+    expect(server.paths).toEqual([])
+  })
+
+  it('refuses a host name that resolves to a private address by default', async () => {
+    const store = new R2BlobStore(config(`http://minio.internal:${port}`), { resolveHost: answering('10.0.0.7') })
+    await expect(store.get('docs/a')).rejects.toThrowError(/R2 endpoint refused/)
+  })
+
+  it('checks every connection, so a host rebound to a private address is refused', async () => {
+    const store = new R2BlobStore(config(`http://s3.test:${port}`), { ...LOOPBACK, resolveHost: answering('127.0.0.1', '10.0.0.7') })
+    await store.put('docs/a', text('x'))
+    await expect(store.get('docs/a')).rejects.toThrowError(/R2 endpoint refused/)
+    expect(server.paths).toEqual(['/b/docs/a'])
+  })
+
+  it('reports the status of a failed request', async () => {
+    server.failWith = 503
+    const store = new R2BlobStore(config(`http://127.0.0.1:${port}`), LOOPBACK)
+    await expect(store.get('docs/a')).rejects.toThrowError('R2 GET failed: 503 Unavailable')
+    await expect(store.put('docs/a', text('x'))).rejects.toThrowError('R2 PUT failed: 503 Unavailable')
+    await expect(store.delete('docs/a')).rejects.toThrowError('R2 DELETE failed: 503 Unavailable')
+    await expect(store.list('docs')).rejects.toThrowError('R2 LIST failed: 503 Unavailable')
   })
 })

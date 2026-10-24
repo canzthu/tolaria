@@ -1477,7 +1477,8 @@ In `apps/server`:
 - `VaultPath` (`src/paths.ts`) is a path that passed validation; only such paths reach the working clone.
 - `DocIndex` (`src/docIndex.ts`) gives each note a stable `docId` that follows renames, for the reserved collaboration channel.
 - `BlobStore` (`src/store.ts`) is the storage interface for server state outside git, with `LocalDiskStore`; it is the seam for Object Storage.
-- `remoteImageFetcher` (`src/remoteImage.ts`) downloads an image for `POST /v1/attachments/imports` from public hosts only: `isPublicAddress` decides, a guarded `lookup` pins the connection to a checked address, and redirects, size and time are capped. `Services.remoteImages` lets a test swap it.
+- `remoteImageFetcher` (`src/remoteImage.ts`) downloads an image for `POST /v1/attachments/imports` from public hosts only: `isPublicAddress` (`src/publicAddress.ts`) decides, a guarded `lookup` pins the connection to a checked address, and redirects, size and time are capped. `Services.remoteImages` lets a test swap it.
+- `checkStoreEndpoints` (`src/storeEndpoint.ts`) runs at startup, before any `R2BlobStore` request: each configured R2/S3 endpoint must be, or resolve only to, public addresses (the same `isPublicAddress`), unless `TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT=1` with `NODE_ENV=development` allows a local MinIO. `R2BlobStore` then sends every request through the shared `guardedLookup`, so each connection is pinned to an address that passed the same policy (`R2Options.isAllowedAddress`).
 
 ### Vault Scanning (Rust)
 

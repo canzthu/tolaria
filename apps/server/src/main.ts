@@ -5,7 +5,9 @@ import { ChangeEmitter } from './changeEmitter.ts'
 import { codeFingerprint, SnapshotSeededStore } from './indexSnapshots.ts'
 import { INDEX_KEY as SEARCH_INDEX_KEY } from './searchIndex.ts'
 import { closeVaultServer, createVaultServer } from './server.ts'
-import { LocalDiskStore, R2BlobStore, type BlobStore } from './store.ts'
+import { isPublicAddress } from './publicAddress.ts'
+import { LocalDiskStore, R2BlobStore, type BlobStore, type R2Options } from './store.ts'
+import { checkStoreEndpoints } from './storeEndpoint.ts'
 import { Vault } from './vault.ts'
 import { INDEX_KEY as VAULT_INDEX_KEY } from './vaultIndex.ts'
 
@@ -13,11 +15,16 @@ function log(message: string): void {
   process.stdout.write(`${new Date().toISOString()} ${message}\n`)
 }
 
+/** A development MinIO may be private (`TOLARIA_R2_ALLOW_PRIVATE_ENDPOINT`); otherwise every R2 connection must be public. */
+function r2Options(config: ReturnType<typeof loadConfig>): R2Options {
+  return { isAllowedAddress: config.allowPrivateR2Endpoint ? () => true : isPublicAddress }
+}
+
 function createBlobStore(config: ReturnType<typeof loadConfig>): BlobStore {
   if (config.blobStore.type === 'local') {
     return new LocalDiskStore(config.blobStore.stateDir)
   }
-  return new R2BlobStore(config.blobStore.config)
+  return new R2BlobStore(config.blobStore.config, r2Options(config))
 }
 
 /** The blob store, seeded with index snapshots when they are configured; created before the clone so they download meanwhile. */
@@ -28,7 +35,7 @@ async function createStore(config: ReturnType<typeof loadConfig>): Promise<{ sto
   const code = codeFingerprint(await readFile(fileURLToPath(import.meta.url)))
   const snapshots = new SnapshotSeededStore({
     local: store,
-    remote: new R2BlobStore(config.indexSnapshots.r2),
+    remote: new R2BlobStore(config.indexSnapshots.r2, r2Options(config)),
     prefix: `${config.indexSnapshots.prefix}/${code}`,
     keys: [VAULT_INDEX_KEY, SEARCH_INDEX_KEY],
     log,
@@ -38,6 +45,7 @@ async function createStore(config: ReturnType<typeof loadConfig>): Promise<{ sto
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env)
+  await checkStoreEndpoints(config)
   const changes = new ChangeEmitter(log)
   const { store, snapshots } = await createStore(config)
   
