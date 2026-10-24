@@ -7,6 +7,7 @@ import { withWorkspaceOperation } from './git/workspaceOperationQueue'
 import { workspaceTextBatch, type WorkspaceTextBatchWriter } from './workspaceTextBatch'
 import { normalizedWorkspaceRelativePath, requireWorkspaceWritePath, validateWorkspaceWrites } from './workspaceWriteValidation'
 import { takePreparedWorkspaceSnapshot } from './preparedWorkspaceSnapshot'
+import { trackWorkspacePathWrites } from './workspacePathGenerations'
 export { normalizedWorkspaceRelativePath } from './workspaceWriteValidation'
 
 type WorkspaceMutation = void | Promise<void>
@@ -42,6 +43,7 @@ export function createFileSystemWorkspaceRepository(fileSystem: WorkspaceFileSys
       validateWorkspaceWrites(writes)
 
       const operations = workspaceWriteOperations(fileSystem, rootUri, writes)
+      trackWorkspacePathWrites(rootUri, workspaceWritePaths(writes))
       await persistWorkspaceOperations(rootUri, operations)
     },
     readNoteContent: async (note, request) => {
@@ -60,6 +62,14 @@ export function createFileSystemWorkspaceRepository(fileSystem: WorkspaceFileSys
   }
 }
 
+function workspaceWritePaths(writes: MobileWorkspaceWrite[]): string[] {
+  return writes.flatMap((write) => {
+    if (write.kind === 'saveVaultConfig') return ['@vault-config']
+    if (write.kind === 'moveNote' || write.kind === 'renameFolder') return [write.path, write.toPath]
+    return [write.path]
+  })
+}
+
 function workspaceSnapshotOptions(fileSystem: WorkspaceFileSystem, root: string, request?: ReadOnlyWorkspaceRequest) {
   const index = recoveredWorkspaceIndex(fileSystem, root, request)
   return {
@@ -75,8 +85,7 @@ function workspaceSnapshotIdentity(root: string, request?: ReadOnlyWorkspaceRequ
 }
 
 async function readWorkspaceNote(fileSystem: WorkspaceFileSystem, root: string, note: MobileNote) {
-  const recovered = fileSystem.recoverPendingWrites?.(root)
-  if (note.rawContent !== undefined && !recovered) return note.rawContent
+  fileSystem.recoverPendingWrites?.(root)
   const relativePath = noteRelativePath(note)
   if (!relativePath) return null
   return fileSystem.readTextFileAsync

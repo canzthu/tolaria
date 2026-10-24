@@ -9,6 +9,7 @@ import type { MobileWorkspaceSnapshot } from '../workspace/mobileWorkspaceModel'
 import type { ReadOnlyWorkspaceRepository } from '../workspace/readOnlyWorkspaceRepository'
 import { useWorkspaceEditPipeline } from './tabletWorkspacePersistence'
 import { useTabletWorkspaceNavigation } from './tabletWorkspaceNavigation'
+import { useMobileNoteRead } from './useMobileNoteRead'
 
 const state = vi.hoisted(() => ({ manager: () => ({}) }))
 const repositoryRequest = { source: 'native' as const, vaultRootUri: 'file:///owned' }
@@ -89,6 +90,23 @@ it('discards obsolete hydration rather than applying its action to the fresh fra
   expect(h.current().pipeline.workspaceSnapshot.notes.find(n => n.id === 'notes/first.md')?.title).toBe('Fresh first')
 })
 
+it('keeps cached native note content inert until an exact disk read completes', async () => {
+  const h = harness()
+  let finishRead: (content: string) => void = () => {}
+  vi.mocked(h.repository.readNoteContent).mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve }))
+  await h.render()
+
+  expect(h.current().noteRead.status).toBe('loading')
+  expect(h.repository.readNoteContent).toHaveBeenCalledOnce()
+  const selectedId = h.current().navigation.selectedNoteId
+  expect(h.current().pipeline.workspaceSnapshot.notes.find(note => note.id === selectedId)?.rawContent).toBeDefined()
+
+  await act(async () => finishRead('# Disk version\n'))
+
+  expect(h.current().noteRead.status).toBe('ready')
+  expect(h.current().pipeline.workspaceSnapshot.notes.find(note => note.id === selectedId)?.rawContent).toBe('# Disk version\n')
+})
+
 it('keeps a note created during the network wait when fresh disk results include its persisted write', async () => {
   const h = harness()
   await h.render()
@@ -143,7 +161,9 @@ function useProbe(repository: ReadOnlyWorkspaceRepository, source: MobileWorkspa
   const pipeline = useWorkspaceEditPipeline({ repository, repositoryRequest, snapshot: source })
   const [search, setSearch] = useState('')
   const navigation = useTabletWorkspaceNavigation(pipeline.workspaceSnapshot, search)
-  return { pipeline, navigation, search, setSearch }
+  const noteRead = useMobileNoteRead({ applyEdit: pipeline.applyWorkspaceEdit, note: navigation.selectedNote,
+    repository, request: repositoryRequest })
+  return { pipeline, navigation, noteRead, search, setSearch }
 }
 
 function harness() {

@@ -59,7 +59,7 @@ export function useTabletWorkspaceController(request: TabletWorkspaceControllerR
     onCreateNoteDirect: createActions.onCreateNote,
   })
   const openActionSheetQaTarget = useControllerQaTarget(actionSheetActions, workspaceSnapshot)
-  const selectedNoteRead = useMobileNoteRead({ applyEdit, note: navigation.selectedNote, repository, request: repositoryRequest })
+  const selectedNoteRead = useMobileNoteRead({ applyEdit: pipeline.applyWorkspaceEdit, note: navigation.selectedNote, repository, request: repositoryRequest })
   return {
     ...actionSheetActions,
     ...navigation,

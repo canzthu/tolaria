@@ -77,13 +77,17 @@ export function applyMobileNoteEdit(
   typeDefinitions?: MobileTypeDefinitions,
 ): MobileNote {
   if (note.id !== edit.noteId) return note
-  if (isMobileNoteHydration(edit) && note.rawContent !== undefined) return note
+  if (isMobileNoteHydration(edit) && note.rawContent !== undefined && !isDiskRefresh(edit)) return note
   if (isMobileTextFileContentEdit(edit)) return applyMobileTextFileContentEdit(note, edit)
   if (!canApplyMobileMarkdownEdit(note)) return note
 
   const editableNote = withEditableContent(note)
   const handler = mobileNoteEditHandlers.get(edit.type)
   return handler ? handler({ editableNote, note, notes, typeDefinitions }, edit) : note
+}
+
+function isDiskRefresh(edit: MobileNoteEdit): boolean {
+  return 'refresh' in edit && edit.refresh === true
 }
 
 export function addRelationship({

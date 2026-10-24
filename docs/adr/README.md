@@ -280,3 +280,4 @@ proposed → active → superseded
 | [0282](0282-web-offline-read-service-worker.md) | Web offline read with a hand-written, per-account service worker | active |
 | [0283](0283-web-attachments-portable-paths-and-guarded-import.md) | Web attachments: portable paths, token-authorized object URLs and a server-side guarded image import | active |
 | [0284](0284-web-url-routing-with-query-routes.md) | Web URL routing with query routes over the History API | active |
+| [0285](0285-mobile-disk-authoritative-note-editing-and-index-reconciliation.md) | Disk-authoritative mobile note editing and index reconciliation | active |

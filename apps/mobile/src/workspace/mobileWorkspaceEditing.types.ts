@@ -28,8 +28,8 @@ export type MobileWorkspaceEdit =
   | { defaults?: MobileCreateNoteDefaults; title: NoteTitle; type: 'createNote' }
   | { noteId: NoteId; type: 'deleteNote' }
   | { allNoteIndex?: number; note: MobileNote; noteIndex?: number; type: 'restoreNote' }
-  | { noteId: NoteId; rawContent: MarkdownContent; type: 'hydrateNoteContent' }
-  | { noteId: NoteId; rawContent: TextFileContent; type: 'hydrateTextFileContent' }
+  | { noteId: NoteId; rawContent: MarkdownContent; refresh?: true; type: 'hydrateNoteContent' }
+  | { noteId: NoteId; rawContent: TextFileContent; refresh?: true; type: 'hydrateTextFileContent' }
   | { key: FrontmatterKey; noteId: NoteId; value: MobilePropertyValue; type: 'updateProperty' }
   | { key: FrontmatterKey; noteId: NoteId; type: 'deleteProperty' }
   | { key: FrontmatterKey; noteId: NoteId; targetRef?: WikilinkRef; targetTitle: NoteTitle; type: 'addRelationship' }

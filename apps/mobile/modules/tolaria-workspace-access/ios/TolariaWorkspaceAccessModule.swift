@@ -122,9 +122,14 @@ public class TolariaWorkspaceAccessModule: Module {
   private func readWorkspaceIndex(_ uri: String) throws -> String {
     let store = try managedWorkspaceText(uri)
     workspaceMutationLock.lock()
-    defer { workspaceMutationLock.unlock() }
-    _ = try store.recover()
-    try requireWorkspaceMutationRoot(store.root)
+    do {
+      _ = try store.recover()
+      try requireWorkspaceMutationRoot(store.root)
+      workspaceMutationLock.unlock()
+    } catch {
+      workspaceMutationLock.unlock()
+      throw error
+    }
     return try WorkspaceFileIndex(root: store.root).json()
   }
 

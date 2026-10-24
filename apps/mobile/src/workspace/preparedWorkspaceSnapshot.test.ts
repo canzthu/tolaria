@@ -3,6 +3,8 @@ import { buildLocalVaultWorkspaceSnapshot } from './localVaultSnapshot'
 import { rememberPreparedWorkspaceSnapshot, takePreparedWorkspaceSnapshot } from './preparedWorkspaceSnapshot'
 import { prepareNativeWorkspace } from './prepareNativeWorkspace'
 import { createFileSystemWorkspaceRepository, type WorkspaceFileSystem } from './fileSystemWorkspaceRepository'
+import { trackWorkspacePathWrites } from './workspacePathGenerations'
+import type { NativeWorkspaceSelection } from './nativeWorkspacePicker'
 
 function fixture() {
   const index = { directories: ['notes'], files: [{ relativePath: 'notes/one.md', absolutePath: 'file:///fixture/notes/one.md',
@@ -31,6 +33,26 @@ it('prepares a fresh snapshot for exactly one initial read', async () => {
   expect(takePreparedWorkspaceSnapshot(f.index, f.options)).toBeNull()
   expect(preload).toHaveBeenCalledExactlyOnceWith(f.selection)
   expect(readVaultConfig).toHaveBeenCalledExactlyOnceWith(f.selection.vaultRootUri)
+  expect(selected).toBe(f.selection)
+})
+
+it('re-reads the index when a path is written during workspace preparation', async () => {
+  const f = fixture()
+  let firstPass = true
+  const preload = vi.fn(async (selection: NativeWorkspaceSelection | null) => {
+    if (firstPass) {
+      firstPass = false
+      queueMicrotask(() => trackWorkspacePathWrites(f.selection.vaultRootUri, ['notes/one.md']))
+    } else {
+      expect(selection?.index).toBeUndefined()
+    }
+    return f.selection
+  })
+  const selected = await prepareNativeWorkspace(f.selection, undefined, {
+    preload, readVaultConfig: () => f.options.vaultConfig,
+  })
+
+  expect(preload).toHaveBeenCalledTimes(2)
   expect(selected).toBe(f.selection)
 })
 

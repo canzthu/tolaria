@@ -1,5 +1,5 @@
 import { mobileNoteActionMode } from './mobileNoteActionMode'
-import type { MobileWorkspaceEdit } from './mobileWorkspaceEditing'
+import type { MobileWorkspaceEdit, MobileWorkspaceEditResult } from './mobileWorkspaceEditing'
 import type { MobileNote, MobileWorkspaceSnapshot } from './mobileWorkspaceModel'
 import type { ReadOnlyWorkspaceRequest } from './readOnlyWorkspaceRepository'
 
@@ -13,6 +13,61 @@ export type MobileNoteReadState = {
 export function mobileNoteNeedsRead(note: MobileNote | null, source: WorkspaceSource): boolean {
   if (!source || source === 'fixture' || !note) return false
   return note.rawContent === undefined && mobileNoteActionMode(note) !== 'binary-file'
+}
+
+export function mobileNoteValidationKey(note: MobileNote | null, rootUri?: string | null): string | null {
+  return note ? `${rootUri ?? ''}:${note.path ?? note.id}` : null
+}
+
+export function mobileNoteNeedsDiskValidation(note: MobileNote | null, source: WorkspaceSource, validatedKey: string | null, noteKey: string | null): boolean {
+  return Boolean(note && source === 'native' && mobileNoteActionMode(note) !== 'binary-file' && validatedKey !== noteKey)
+}
+
+export function mobileNoteNeedsLoad(note: MobileNote | null, source: WorkspaceSource, validatedKey: string | null, noteKey: string | null): boolean {
+  return mobileNoteNeedsRead(note, source) || mobileNoteNeedsDiskValidation(note, source, validatedKey, noteKey)
+}
+
+export function markNoteDiskValidated({ note, source, validatedKey, noteKey, setValidated }: {
+  note: MobileNote | null
+  source: WorkspaceSource
+  validatedKey: string | null
+  noteKey: string | null
+  setValidated: (key: string) => void
+}): () => void {
+  return () => {
+    if (mobileNoteNeedsDiskValidation(note, source, validatedKey, noteKey) && noteKey) setValidated(noteKey)
+  }
+}
+
+export function mobileDiskHydration(note: MobileNote, rawContent: string) {
+  return note.fileKind === 'text'
+    ? { noteId: note.id, rawContent, refresh: true as const, type: 'hydrateTextFileContent' as const }
+    : { noteId: note.id, rawContent, refresh: true as const, type: 'hydrateNoteContent' as const }
+}
+
+export function startValidatedMobileNoteRead({ applyEdit, note, onError, onValidated, read }: {
+  applyEdit: (edit: MobileWorkspaceEdit) => MobileWorkspaceEditResult | null | Promise<MobileWorkspaceEditResult | null>
+  note: MobileNote
+  onError: () => void
+  onValidated: () => void
+  read: () => Promise<string | null>
+}) {
+  return startMobileNoteRead({
+    read,
+    onError,
+    onContent: async rawContent => {
+      const applied = await applyEdit(mobileDiskHydration(note, rawContent))
+      if (containsDiskContent(applied, note, rawContent)) onValidated()
+    },
+  })
+}
+
+function containsDiskContent(result: MobileWorkspaceEditResult | null, note: MobileNote, rawContent: string): boolean {
+  if (!result) return false
+  const notes = result.snapshot.allNotes
+    ? [...result.snapshot.notes, ...result.snapshot.allNotes]
+    : result.snapshot.notes
+  return notes.some(candidate => candidate.id === note.id && candidate.path === note.path && candidate.rawContent === rawContent)
 }
 
 export function isMobileNoteHydration(edit: MobileWorkspaceEdit): boolean {
@@ -49,7 +104,7 @@ function noteEditId(edit: MobileWorkspaceEdit): string | null {
 
 export function startMobileNoteRead({ read, onContent, onError, timeoutMs }: {
   read: () => Promise<string | null>
-  onContent: (content: string) => void
+  onContent: (content: string) => void | Promise<void>
   onError: () => void
   timeoutMs?: number
 }) {
@@ -83,23 +138,23 @@ export function startMobileNoteRead({ read, onContent, onError, timeoutMs }: {
 async function readSelectedNote({ isActive, markSettled, onContent, onError, read }: {
   isActive: () => boolean
   markSettled: () => void
-  onContent: (content: string) => void
+  onContent: (content: string) => void | Promise<void>
   onError: () => void
   read: () => Promise<string | null>
 }) {
   try {
     const content = await read()
     if (!isActive()) return
-    markSettled()
-    deliverNoteContent(content, onContent, onError)
+    if (content === null) {
+      markSettled()
+      onError()
+      return
+    }
+    await onContent(content)
+    if (isActive()) markSettled()
   } catch {
     reportReadFailure(isActive, markSettled, onError)
   }
-}
-
-function deliverNoteContent(content: string | null, onContent: (content: string) => void, onError: () => void) {
-  if (content === null) onError()
-  else onContent(content)
 }
 
 function reportReadFailure(isActive: () => boolean, markSettled: () => void, onError: () => void) {
