@@ -55,6 +55,7 @@ export type TimerHandle = ReturnType<typeof setTimeout>
 
 export type NativeTentapEditorBridgeOptions = Omit<MobileWysiwygMarkdownEditorProps, 'notes' | 'typeDefinitions'> & {
   initialDocumentContent: string
+  onInitialContentSyncFailure?: () => void
   onInlineAutocomplete: NativeWysiwygInlineAutocompleteHandler
 }
 

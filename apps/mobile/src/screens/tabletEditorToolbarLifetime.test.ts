@@ -39,7 +39,7 @@ vi.mock('../ui/MobileChip', () => ({ MobileChip: () => null }))
 vi.mock('../qa/mobileLayoutProbe', () => ({ useMobileLayoutProbe: () => ({ probe: () => ({}), metrics: [] }) }))
 vi.mock('../workspace/mobileAttachmentImport', () => ({ useMobileAttachmentImporter: () => vi.fn() }))
 vi.mock('../workspace/mobileAttachmentOpen', () => ({ useMobileAttachmentLinkOpener: () => vi.fn() }))
-vi.mock('../components/workspace/MobileEditorBlocks', () => ({ MobileEditorBlocks: () => null }))
+vi.mock('../components/workspace/MobileEditorBlocks', () => ({ MobileEditorBlocks: () => createElement('div', { 'data-testid': 'cached-read-only-content' }) }))
 vi.mock('../components/workspace/MobileFilePreview', () => ({ MobileFilePreview: () => null }))
 vi.mock('../components/workspace/MobileWysiwygMarkdownEditor', () => ({
   MobileWysiwygMarkdownEditor: ({ note }: { note: MobileNote }) => createElement('div', { 'data-rich-note': note.id }),
@@ -48,7 +48,8 @@ vi.mock('../components/workspace/MobileMarkdownSourceEditor', () => ({
   MobileMarkdownSourceEditor: ({ note }: { note: MobileNote }) => createElement('div', { 'data-source-note': note.id }),
 }))
 vi.mock('./TabletEditorPanelChrome', () => ({ EmptyEditorPanel: () => null, MobileFilePreviewFallback: () => null,
-  MobileNoteReadFallback: () => null, MobileSpreadsheetFallback: () => null }))
+  MobileNoteReadFallback: ({ state }: { state: { status: string } }) => createElement('div', { 'data-testid': 'note-read-fallback', 'data-state': state.status }),
+  MobileSpreadsheetFallback: () => null }))
 
 let root: ReturnType<typeof createRoot> | undefined
 beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
@@ -128,6 +129,15 @@ it('retains the rich editor until its last document read completes', async () =>
   expect(resume).toHaveBeenCalledOnce()
 })
 
+it('keeps a cached note visible and read-only while its exact disk read waits behind sync', async () => {
+  const harness = createHarness()
+  await harness.select(0, 0, { status: 'loading', retry: vi.fn() })
+  expect(harness.host.querySelector('[data-testid="cached-read-only-content"]')).not.toBeNull()
+  expect(harness.host.querySelector('[data-testid="note-read-fallback"]')).toBeNull()
+  expect(harness.host.querySelector('[data-rich-note]')).toBeNull()
+  expect(harness.host.querySelector('[data-source-note]')).toBeNull()
+})
+
 it('keeps the draft mounted and reports a failed document read instead of switching mode', async () => {
   const harness = createHarness()
   harness.editors.register(() => Promise.reject(new Error('editorNotReady')))
@@ -153,7 +163,9 @@ it('does not switch a different note when an older mode request completes', asyn
 function createHarness() {
   const host = document.createElement('div')
   root = createRoot(host)
-  const notes = workspaceScenarioForId('default').notes.slice(0, 2)
+  const notes = workspaceScenarioForId('default').notes.slice(0, 2).map((note, index) => index === 0
+    ? { ...note, rawContent: '# Cached note', editorBlocks: [] }
+    : note)
   const editors = createWorkspaceSyncEditors()
   return { host, notes, editors,
     button: (testID: string) => {
@@ -161,9 +173,9 @@ function createHarness() {
       if (!button) throw new Error(`Missing ${testID}`)
       return button
     },
-    select: (index: number, revision = 0) => act(async () => {
+    select: (index: number, revision = 0, noteRead?: { status: 'loading'; retry: () => void }) => act(async () => {
       root?.render(createElement(WorkspaceSnapshotRevisionContext.Provider, { value: revision }, createElement(WorkspaceSyncEditorsContext.Provider, { value: editors }, createElement(TabletEditorPanel, { blocks: [], bullets: [], compact: false, notes,
-        note: notes[index], onUpdateContent: vi.fn(), onToggleFavorite: vi.fn(), onOpenMoreActions: vi.fn(), onNavigateWikilink: vi.fn(),
+        note: notes[index], noteRead, onUpdateContent: vi.fn(), onToggleFavorite: vi.fn(), onOpenMoreActions: vi.fn(), onNavigateWikilink: vi.fn(),
         renameFilename: { value: 'renamed.md', notes, onChange: vi.fn(), onSubmit: vi.fn() } }))))
     }),
   }

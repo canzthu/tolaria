@@ -157,7 +157,12 @@ function useNativeTentapEditorLifecycle(
   useEditorBridgeRef(refs.editorRef, editor)
   useEditableContentRef({ blocks, bullets, note, refs })
   useResetEditorChangeGate({ noteId: note.id, refs })
-  useSyncInitialEditorContent({ initialContent, noteId: note.id, refs })
+  useSyncInitialEditorContent({
+    initialContent,
+    noteId: note.id,
+    onInitialContentSyncFailure: options.onInitialContentSyncFailure,
+    refs,
+  })
 }
 
 function useNativeTentapEditorRefs(initialDocumentContent: string): NativeTentapEditorRefs {

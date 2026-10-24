@@ -47,7 +47,7 @@ export const readOnlyWorkspaceRepository: ReadOnlyWorkspaceRepository = {
     }
   },
   readNoteContent: async (note, request) => {
-    if (note.rawContent !== undefined) return note.rawContent
+    if (request?.source !== 'native' && note.rawContent !== undefined) return note.rawContent
     if (request?.source === 'native') {
       return nativeWorkspaceRepository.readNoteContent(note, request)
     }

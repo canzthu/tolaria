@@ -28,6 +28,7 @@ import { mobileSpreadsheetNeedsFallback } from '../workspace/mobileSpreadsheetFo
 import type { MobileTableOfContentsTarget } from '../workspace/mobileTableOfContents'
 import type { MobileEditorBlock, MobileNote } from '../workspace/mobileWorkspaceModel'
 import { useMobilePullToSync } from '../workspace/useMobilePullToSync'
+import type { MobileNoteReadState } from '../workspace/mobileNoteRead'
 import { WorkspaceSnapshotRevisionContext } from '../workspace/workspaceSyncEditors'
 import type {
   EditorContentProps,
@@ -96,7 +97,7 @@ export function TabletEditorPanel(props: TabletEditorPanelProps) {
 
   const fileMode = editorFileMode(note)
   const plainText = fileMode === 'text'
-  const effectiveEditing = fileMode !== 'binary' && initialEditing
+  const effectiveEditing = canEditCurrentNote(fileMode, initialEditing, noteRead)
   const effectiveEditingMode = plainText ? 'source' : editingMode
   const contentProps = createEditorContentProps(props, note, {
     editing: effectiveEditing,
@@ -222,7 +223,8 @@ function EditorPanelBody(
   } = props
   const themeStyles = useMobileStyles(createEditorPanelStyles)
   const { panelStyles } = themeStyles
-  if (noteRead && noteRead.status !== 'ready') return <MobileNoteReadFallback state={noteRead} />
+  const readFallback = noteReadFallbackState(noteRead, note)
+  if (readFallback) return <MobileNoteReadFallback note={note} state={readFallback} />
   if (fileMode === 'binary') {
     return (
       <MobileFilePreview
@@ -268,6 +270,15 @@ function EditorPanelBody(
       <EditorContent {...contentProps} />
     </ScrollView>
   )
+}
+
+function canEditCurrentNote(fileMode: EditorFileMode, editing: boolean, noteRead?: MobileNoteReadState) {
+  return fileMode !== 'binary' && editing && noteRead?.status !== 'loading'
+}
+
+function noteReadFallbackState(noteRead: MobileNoteReadState | undefined, note: MobileNote) {
+  if (!noteRead || noteRead.status === 'ready') return null
+  return noteRead.status === 'error' || note.rawContent === undefined ? noteRead : null
 }
 
 function useTableOfContentsScroll(

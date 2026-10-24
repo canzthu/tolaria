@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { workspaceScenarios } from '../fixtures/workspaceFixtures'
+import { expoWorkspaceFileSystem } from './expoWorkspaceFileSystem'
 import {
   fixtureReadOnlyWorkspaceRepository,
   HOST_WORKSPACE_NOTE_CONTENTS_GLOBAL_KEY,
@@ -155,5 +156,24 @@ describe('fixtureReadOnlyWorkspaceRepository', () => {
 
     Reflect.deleteProperty(globalThis, HOST_WORKSPACE_NOTE_CONTENTS_GLOBAL_KEY)
     Reflect.deleteProperty(globalThis, HOST_WORKSPACE_WRITE_FAILURE_GLOBAL_KEY)
+  })
+})
+
+describe('readOnlyWorkspaceRepository native reads', () => {
+  it('re-reads cached native note content from disk before returning it', async () => {
+    const recover = vi.spyOn(expoWorkspaceFileSystem, 'recoverPendingWrites').mockReturnValue(false)
+    const read = vi.spyOn(expoWorkspaceFileSystem, 'readTextFileAsync').mockResolvedValue('# Disk version')
+
+    try {
+      await expect(readOnlyWorkspaceRepository.readNoteContent({
+        ...workspaceScenarios.default.notes[0],
+        path: 'Notes/cached.md',
+        rawContent: '# Cached version',
+      }, { source: 'native', vaultRootUri: 'file:///fixture-vault' })).resolves.toBe('# Disk version')
+      expect(read).toHaveBeenCalledExactlyOnceWith('file:///fixture-vault', 'Notes/cached.md')
+      expect(recover).toHaveBeenCalledExactlyOnceWith('file:///fixture-vault')
+    } finally {
+      vi.restoreAllMocks()
+    }
   })
 })

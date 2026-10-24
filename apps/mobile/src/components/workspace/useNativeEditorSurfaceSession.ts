@@ -14,6 +14,7 @@ export function useNativeEditorSurfaceSession(props: Options): Surface {
   const picker = useNativeWikilinkPickerState()
   const bridge = useNativeTentapEditorBridge({
     ...props, initialDocumentContent: initialNativeEditorContent(props),
+    onInitialContentSyncFailure: () => props.onProcessLoss('initialContentSyncFailed'),
     onInlineAutocomplete: picker.onInlineAutocomplete,
   })
   const externalLink = useNativeExternalLinkState(bridge.editor)

@@ -23,6 +23,16 @@ export function beginNativeInitialContentSync(options: InitialContentOptions): N
   return new InitialContentSync(options)
 }
 
+export function recoverUntouchedEditorAfterInitialSyncFailure(options: {
+  hasInteracted: boolean
+  hasAcceptedChanges: boolean
+  recover?: () => void
+}) {
+  if (options.hasInteracted || options.hasAcceptedChanges || !options.recover) return false
+  options.recover()
+  return true
+}
+
 class InitialContentSync implements NativeInitialContentSync {
   private active = true
   private acknowledged = false

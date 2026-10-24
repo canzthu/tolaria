@@ -10,29 +10,35 @@ export function useMobileNoteRead({ applyEdit, note, repository, request }: {
   repository: ReadOnlyWorkspaceRepository
   request?: ReadOnlyWorkspaceRequest
 }): MobileNoteReadState {
-  const [failedNote, setFailedNote] = useState<MobileNote | null>(null)
+  const [failedNoteKey, setFailedNoteKey] = useState<string | null>(null)
   const [validatedNoteKey, setValidatedNoteKey] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const applyEditRef = useRef(applyEdit)
+  const noteRef = useRef(note)
   const noteKey = mobileNoteValidationKey(note, request?.vaultRootUri)
   const needsRead = mobileNoteNeedsLoad(note, request?.source, validatedNoteKey, noteKey)
-  useEffect(() => { applyEditRef.current = applyEdit }, [applyEdit])
+  const applyLatestEdit = useCallback((edit: MobileWorkspaceEdit) => applyEditRef.current(edit), [])
   useEffect(() => {
-    if (!note || !needsRead) return
+    applyEditRef.current = applyEdit
+    noteRef.current = note
+  }, [applyEdit, note])
+  useEffect(() => {
+    const selectedNote = noteRef.current
+    if (!selectedNote || !needsRead) return
     const operation = startValidatedMobileNoteRead({
-      applyEdit: applyEditRef.current,
-      note,
-      onError: () => setFailedNote(note),
-      onValidated: markNoteDiskValidated({ note, source: request?.source, validatedKey: validatedNoteKey, noteKey, setValidated: setValidatedNoteKey }),
-      read: () => repository.readNoteContent(note, request),
+      applyEdit: applyLatestEdit,
+      note: selectedNote,
+      onError: () => setFailedNoteKey(noteKey),
+      onValidated: markNoteDiskValidated({ note: selectedNote, source: request?.source, validatedKey: validatedNoteKey, noteKey, setValidated: setValidatedNoteKey }),
+      read: () => repository.readNoteContent(noteRef.current ?? selectedNote, request),
     })
     return operation.cancel
-  }, [attempt, needsRead, note, noteKey, repository, request, validatedNoteKey])
+  }, [applyLatestEdit, attempt, needsRead, noteKey, repository, request, validatedNoteKey])
 
   const retry = useCallback(() => {
-    setFailedNote(null)
+    setFailedNoteKey(null)
     setAttempt((current) => current + 1)
   }, [])
   if (!needsRead) return { status: 'ready', retry }
-  return { status: failedNote === note ? 'error' : 'loading', retry }
+  return { status: failedNoteKey === noteKey ? 'error' : 'loading', retry }
 }

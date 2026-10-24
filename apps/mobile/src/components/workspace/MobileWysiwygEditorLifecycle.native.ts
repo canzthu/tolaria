@@ -5,7 +5,7 @@ import type { MobileEditorBlock, MobileNote } from '../../workspace/mobileWorksp
 import { injectMobileEditorAppearance, useEditorAppearance } from './useEditorAppearance'
 import { WorkspaceSyncEditorsContext } from '../../workspace/workspaceSyncEditors'
 import type { createMobileEditorDocumentBridge } from './MobileWysiwygDocumentReads.native'
-import { beginNativeInitialContentSync, scheduleNativeCreatedNoteFocus, type NativeInitialContentSync } from './nativeInitialContentSync'
+import { beginNativeInitialContentSync, recoverUntouchedEditorAfterInitialSyncFailure, scheduleNativeCreatedNoteFocus, type NativeInitialContentSync } from './nativeInitialContentSync'
 
 type TimerHandle = ReturnType<typeof setTimeout>
 
@@ -89,10 +89,12 @@ export function useResetEditorChangeGate({ noteId, refs }: { noteId: string; ref
 export function useSyncInitialEditorContent({
   initialContent,
   noteId,
+  onInitialContentSyncFailure,
   refs,
 }: {
   initialContent: string
   noteId: string
+  onInitialContentSyncFailure?: () => void
   refs: NativeTentapEditorRefs
 }) {
   const syncedContentRef = useRef<{ content: string; noteId: string } | null>(null)
@@ -102,10 +104,11 @@ export function useSyncInitialEditorContent({
     syncInitialEditorContent({
       initialContent,
       noteId,
+      onInitialContentSyncFailure,
       refs,
       syncedContentRef,
     })
-  }, [initialContent, noteId, refs])
+  }, [initialContent, noteId, onInitialContentSyncFailure, refs])
   useEffect(() => {
     if (!editors) return
     return scheduleNativeCreatedNoteFocus({
@@ -152,7 +155,7 @@ export function isContentSettableEditorBridge(editor: EditorBridge | null): edit
   return typeof (editor as Partial<ContentSettableEditorBridge> | null)?.setContent === 'function'
 }
 
-function syncNativeInitialEditorContent(initialContent: string, refs: NativeTentapEditorRefs) {
+function syncNativeInitialEditorContent(initialContent: string, refs: NativeTentapEditorRefs, onInitialContentSyncFailure?: () => void) {
   if (!canSyncInitialContent(refs)) return
   cancelNativeInitialContentSync(refs)
   refs.acceptsEditorChangesRef.current = false
@@ -164,7 +167,14 @@ function syncNativeInitialEditorContent(initialContent: string, refs: NativeTent
       return isSilentContentSettableEditorBridge(editor) ? editor : null
     },
     shouldSync: () => canSyncInitialContent(refs),
-    onError: () => { console.warn('[mobile-editor] Initial content acknowledgement failed') },
+    onError: () => {
+      console.warn('[mobile-editor] Initial content acknowledgement failed')
+      recoverUntouchedEditorAfterInitialSyncFailure({
+        hasInteracted: refs.acceptsEditorChangesRef.current,
+        hasAcceptedChanges: refs.hasAcceptedEditorChangeRef.current,
+        recover: onInitialContentSyncFailure,
+      })
+    },
   })
 }
 
@@ -206,11 +216,13 @@ function resetEditorChangeGate(_noteId: string, refs: NativeTentapEditorRefs) {
 function syncInitialEditorContent({
   initialContent,
   noteId,
+  onInitialContentSyncFailure,
   refs,
   syncedContentRef,
 }: {
   initialContent: string
   noteId: string
+  onInitialContentSyncFailure?: () => void
   refs: NativeTentapEditorRefs
   syncedContentRef: MutableRefObject<{
     content: string
@@ -221,7 +233,7 @@ function syncInitialEditorContent({
 
   clearTimer(refs.saveTimerRef.current)
   refs.firstEditorSerializationRef.current = true
-  syncNativeInitialEditorContent(initialContent, refs)
+  syncNativeInitialEditorContent(initialContent, refs, onInitialContentSyncFailure)
   syncedContentRef.current = { content: initialContent, noteId }
 }
 

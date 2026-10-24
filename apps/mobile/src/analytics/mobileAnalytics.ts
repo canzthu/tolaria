@@ -2,7 +2,7 @@ import type { MobileTelemetryContext } from './mobileTelemetryContext'
 
 export type MobileAnalyticsEvent =
   | { name: 'mobile_startup_preview_used' }
-  | { name: 'mobile_editor_recovery_requested'; reason: 'contentProcessTerminated' | 'renderProcessGone' }
+  | { name: 'mobile_editor_recovery_requested'; reason: 'contentProcessTerminated' | 'renderProcessGone' | 'initialContentSyncFailed' }
   | { name: 'mobile_update_channel_selected'; channel: 'stable' | 'alpha'; outcome: 'idle' | 'checking' | 'downloading' | 'ready' | 'current' | 'unavailable' | 'failed' | 'restarting' }
   | { name: 'note_created' | 'note_deleted' | 'vault_opened' | 'vault_switched' | 'search_used' | 'commit_made' }
   | { name: 'mobile_git_clone_cancel_requested' }

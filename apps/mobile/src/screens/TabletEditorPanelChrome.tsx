@@ -1,6 +1,6 @@
 import { useMobileStyles, useMobileColors } from '../ui/theme/useMobileTheme'
 import { ArrowClockwise, FileText, WarningCircle } from 'phosphor-react-native'
-import { ActivityIndicator, View } from 'react-native'
+import { ScrollView, View } from 'react-native'
 import { MobileTypeIcon } from '../components/workspace/MobileWorkspaceIcons'
 import { Text } from '../components/ui/text'
 import { mobileText } from '../i18n/mobileText'
@@ -12,26 +12,27 @@ import type { MobileNote, MobileTypeDefinitions } from '../workspace/mobileWorks
 import { createEditorPanelStyles } from './TabletEditorPanelStyles'
 import type { MobileNoteReadState } from '../workspace/mobileNoteRead'
 
-export function MobileNoteReadFallback({ state }: { state: MobileNoteReadState }) {
+export function MobileNoteReadFallback({ note, state }: { note: MobileNote; state: MobileNoteReadState }) {
   const themeStyles = useMobileStyles(createEditorPanelStyles)
   const { panelStyles } = themeStyles
   const mobileColors = useMobileColors()
   const failed = state.status === 'error'
+  if (!failed) {
+    return (
+      <ScrollView contentContainerStyle={[panelStyles.content, { flexGrow: 1 }]} style={panelStyles.editorHost}
+        testID="note-read-loading">
+        <Text style={[panelStyles.filePreviewTitle, { textAlign: 'left', width: '100%' }]}>{note.title}</Text>
+        <Text style={[panelStyles.filePreviewDescription, { textAlign: 'left', width: '100%' }]}>{note.snippet}</Text>
+      </ScrollView>
+    )
+  }
   return (
-    <View style={panelStyles.emptyState} testID={failed ? 'note-read-error' : 'note-read-loading'}>
+    <View style={panelStyles.emptyState} testID="note-read-error">
       <View style={panelStyles.filePreviewFallback} accessibilityLiveRegion="polite">
-        {failed ? <WarningCircle size={24} color={mobileColors.textMuted} /> : <ActivityIndicator color={mobileColors.textMuted} />}
-        <Text style={panelStyles.filePreviewDescription}>
-          {mobileText(failed ? 'mobile.editor.readFailed' : 'mobile.editor.loading')}
-        </Text>
-        {failed ? (
-          <MobileButton
-            icon={<ArrowClockwise size={16} color={mobileColors.textMuted} />}
-            label={mobileText('pulse.retry')}
-            onPress={state.retry}
-            testID="note-read-retry"
-          />
-        ) : null}
+        <WarningCircle size={24} color={mobileColors.textMuted} />
+        <Text style={panelStyles.filePreviewDescription}>{mobileText('mobile.editor.readFailed')}</Text>
+        <MobileButton icon={<ArrowClockwise size={16} color={mobileColors.textMuted} />}
+          label={mobileText('pulse.retry')} onPress={state.retry} testID="note-read-retry" />
       </View>
     </View>
   )

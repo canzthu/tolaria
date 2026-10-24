@@ -24,6 +24,14 @@ it('ignores healthy foreground transitions and restarts only the lost session', 
   expect(restart).toHaveBeenLastCalledWith(2, 'renderProcessGone')
 })
 
+it('retries an unacknowledged initial document only once', () => {
+  const { recovery, restart } = fixture()
+  recovery.lost(0, 'initialContentSyncFailed')
+  expect(restart).toHaveBeenCalledExactlyOnceWith(1, 'initialContentSyncFailed')
+  recovery.lost(1, 'initialContentSyncFailed')
+  expect(restart).toHaveBeenCalledExactlyOnceWith(1, 'initialContentSyncFailed')
+})
+
 it('defers background process loss until the app is active', () => {
   const { recovery, restart } = fixture(false)
   recovery.lost(0, 'contentProcessTerminated')

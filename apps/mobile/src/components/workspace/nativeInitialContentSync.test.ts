@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createMobileEditorFocus } from '../../workspace/mobileEditorFocus'
-import { beginNativeInitialContentSync, scheduleNativeCreatedNoteFocus, type NativeInitialContentSync } from './nativeInitialContentSync'
+import { beginNativeInitialContentSync, recoverUntouchedEditorAfterInitialSyncFailure, scheduleNativeCreatedNoteFocus, type NativeInitialContentSync } from './nativeInitialContentSync'
 
 let active: NativeInitialContentSync[] = []
 beforeEach(() => { vi.useFakeTimers(); active = [] })
@@ -156,6 +156,16 @@ it('bounds an unacknowledged content write and ignores its late completion', asy
   reply.resolve()
   await vi.advanceTimersByTimeAsync(0)
   expect(sync.isReady()).toBe(false)
+})
+
+it.each([
+  { hasInteracted: false, hasAcceptedChanges: false, shouldRecover: true },
+  { hasInteracted: true, hasAcceptedChanges: false, shouldRecover: false },
+  { hasInteracted: false, hasAcceptedChanges: true, shouldRecover: false },
+])('recovers after an initial sync failure only while the editor is untouched (%o)', ({ hasInteracted, hasAcceptedChanges, shouldRecover }) => {
+  const recover = vi.fn()
+  expect(recoverUntouchedEditorAfterInitialSyncFailure({ hasInteracted, hasAcceptedChanges, recover })).toBe(shouldRecover)
+  expect(recover).toHaveBeenCalledTimes(shouldRecover ? 1 : 0)
 })
 
 it('focuses a requested new note promptly after acknowledgement without any content retries', async () => {
