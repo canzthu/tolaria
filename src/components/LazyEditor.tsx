@@ -3,6 +3,7 @@ import type { EditorProps } from './Editor'
 import { EditorStartupFallback } from './EditorStartupFallback'
 import { markStartupPhase } from '../lib/startupPerformance'
 import { waitForEditorTurn } from './editorLoadTurn'
+import { PhoneNoteBackBar } from './phone/PhoneNoteBackBar'
 
 let editorModulePromise: Promise<{ Editor: ComponentType<EditorProps> }> | null = null
 
@@ -45,5 +46,10 @@ export function LazyEditor(props: EditorProps) {
     return () => { lifecycle.abort() }
   }, [props.activeTabPath])
 
-  return Editor ? <LoadedEditor Editor={Editor} {...props} /> : <EditorStartupFallback {...props} />
+  return (
+    <>
+      <PhoneNoteBackBar locale={props.locale ?? 'en'} />
+      {Editor ? <LoadedEditor Editor={Editor} {...props} /> : <EditorStartupFallback {...props} />}
+    </>
+  )
 }

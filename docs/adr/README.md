@@ -281,3 +281,4 @@ proposed → active → superseded
 | [0283](0283-web-attachments-portable-paths-and-guarded-import.md) | Web attachments: portable paths, token-authorized object URLs and a server-side guarded image import | active |
 | [0284](0284-web-url-routing-with-query-routes.md) | Web URL routing with query routes over the History API | active |
 | [0285](0285-mobile-disk-authoritative-note-editing-and-index-reconciliation.md) | Disk-authoritative mobile note editing and index reconciliation | active |
+| [0286](0286-web-phone-layout-as-a-url-driven-pane-stack.md) | Web phone layout as a URL-driven pane stack | active |

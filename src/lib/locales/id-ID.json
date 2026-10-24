@@ -1310,5 +1310,7 @@
   "communityBanner.invite": "Tolaria untuk iOS sudah hadir! Unduh, lalu bergabunglah dengan server Discord baru kami",
   "communityBanner.ios": "Unduh aplikasi iOS",
   "communityBanner.joinCommunity": "Bergabunglah dengan Discord",
-  "communityBanner.dismiss": "Tolak undangan komunitas"
+  "communityBanner.dismiss": "Tolak undangan komunitas",
+  "phone.action.notes": "Catatan",
+  "phone.action.backToNotes": "Kembali ke catatan"
 }

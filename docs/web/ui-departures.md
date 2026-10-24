@@ -4,6 +4,8 @@ Standing rule (Luca, 10 Oct 2026): Tolaria Web reuses the desktop shell, BlockNo
 
 ## Departures made
 
+B3-1 (TOL-193) gives the shell a phone layout. It reuses the note list, editor, status bar, `Button`, Phosphor icons and tokens unchanged; the departures are the first rows of the table. ADR 0286.
+
 Spike S4 (TOL-8) adds the first web-only surface, the collaborative note page. It reuses the editor, its theme, the shadcn components and the design tokens; the departures are in the table.
 
 Spike S3 (TOL-5) adds the server and the protocol package and touches no UI.
@@ -12,6 +14,9 @@ Spike S1 (TOL-3, TOL-4) builds the existing shell as a static web bundle without
 
 | Date | What changed | Why | Where |
 |---|---|---|---|
+| 24 Oct 2026 | At phone width (≤ 640 px) the shell shows one pane, the note list or the note, instead of three side by side; the sidebar and resize handles are hidden | The editor was off-screen and unreachable by touch at 393 px | `src/hooks/usePhoneNoteStack.ts`, `src/App.css` (`html[data-phone-pane]`) |
+| 24 Oct 2026 | A "‹ Notes" back bar above the note on the phone; browser back also returns to the list, because the list's URL names no note | A phone has no list beside the note to go back to; the desktop's breadcrumb back/forward walk note history, not panes | `src/components/phone/PhoneNoteBackBar.tsx` (in `LazyEditor`), `src/hooks/useWebRouting.ts` |
+| 24 Oct 2026 | On the phone the shell is sized to the visual viewport and padded by the safe-area insets (`viewport-fit=cover`); the caret is scrolled back above the on-screen keyboard | Phone browsers: notch, home indicator and a keyboard that covers the bottom of the page | `src/hooks/useKeyboardAwareViewport.ts`, `src/App.css`, `index.html` |
 | 12 Oct 2026 | A standalone collaborative note page (`/apps/web/collab.html?note=<path>`) instead of the three-pane shell | The shell swaps markdown into one editor instance; a live document needs an editor created for it. A page of its own proves the multiplayer path first and works on a phone, which the shell does not yet | `apps/web/collab.html`, `apps/web/src/collab/` |
 | 12 Oct 2026 | Presence avatars in the note header: overlapping circles with initials, coloured per person, name in a tooltip, the viewer marked "(you)" | Multiplayer UI ships in the first beta; the desktop has no notion of other people | `apps/web/src/collab/PresenceAvatars.tsx` |
 | 12 Oct 2026 | Live cursors and selections of other people in the editor, labelled with their name while they are active | Same. BlockNote's collaboration cursors with their default styling, in the person's presence colour | `apps/web/src/collab/CollabEditor.tsx` |
@@ -26,9 +31,8 @@ Found while running the unchanged shell in a browser and in iPhone and iPad emul
 
 | Area | What the unchanged shell does on the web | Likely adaptation |
 |---|---|---|
-| Phone layout | Three fixed panes; the editor is off-screen at 393 px and cannot be reached by touch | Single-pane stack with back navigation |
+| Phone sidebar | Since TOL-193 the phone shows the list or the note; the sidebar (types, saved views, favorites) is hidden and not reachable yet | A sidebar pane before the list in the same stack |
 | iPad portrait layout | Editor pane clipped on the right at 834 px | Two panes, collapsible sidebar |
-| Navigation | No URLs; state is lost on reload | Deep-link URLs for vault, note and view, with back and forward |
 | Shortcuts and empty state | Advertises `⌘P / ⌘O / ⌘N`, which browsers own | Command palette first; browser-safe shortcuts; touch-first empty state |
 | Status bar | Git branch, changes, commit, sync and history controls | Sync and connection status, including offline and conflict states |
 | Web-only surfaces | Absent | Login, account, sharing and permissions dialogs, add to home screen |

@@ -1471,6 +1471,8 @@ Offline read on the web (ADR 0282) adds, in `src/lib/offline`: `routeOfflineRequ
 
 URL routing on the web (ADR 0284) adds `src/utils/webRoute.ts` (`WebRoute`, `parseWebRoute`, `webRouteSearch`, `webRouteForState`, `routeNotePath` for local absolute and remote relative entry paths, `findRouteEntry`, `routeVaultSlug` with the `tolaria://` deep-link slug), `useWebRouting` (History API sync and `popstate`), and `useActiveNoteLocation`, which App calls in place of `useLastActiveNote`: it feeds the opening URL's note to `useLastActiveNote` as `preferredEntry` and starts routing once `useLastActiveNote` reports the restore finished. Routing is on only when `VITE_TOLARIA_WEB_BUILD` is `true`.
 
+The phone layout on the web (ADR 0286) adds `usePhoneLayout` (`PHONE_LAYOUT_QUERY`), `usePhoneNoteStack` (`PhoneNoteStack`: `active`, `pane`, `backToList`, `showNote`; `NoteListPane` for `useWebRouting`; `BACK_TO_NOTE_LIST_STATE_KEY` in `history.state`; `PHONE_PANE_ATTRIBUTE` on `<html>`), which `useActiveNoteLocation` now returns, `phoneNoteStackStore` (`publishPhoneNoteStack`, `usePhoneNoteStackControls`, `usePhoneNoteOpener`), `useKeyboardAwareViewport` (`--tolaria-visual-viewport-height` / `-top`, `keepCaretAboveKeyboard`), and `src/components/phone/PhoneNoteBackBar.tsx`, the in-app back control rendered by `LazyEditor`.
+
 In `apps/server`:
 
 - `Vault` (`src/vault.ts`) runs every mutation under one lock as pull, change, commit, push. `writeOutcome(current, incoming, precondition)` is the whole write decision.

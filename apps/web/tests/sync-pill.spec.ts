@@ -119,6 +119,14 @@ async function forwardCollabSocket(
 	return { client, mute: () => (muted = true) };
 }
 
+/** The phone shows the note or the list (TOL-193): back to the list there; true on a phone. */
+async function showNoteList(page: Page): Promise<boolean> {
+	const back = page.getByTestId("phone-back-to-notes");
+	if (!(await back.isVisible())) return false;
+	await back.click();
+	return true;
+}
+
 test("is synced, and only the pill spins while the vault reloads in the background", async ({
 	page,
 }, testInfo) => {
@@ -126,6 +134,7 @@ test("is synced, and only the pill spins while the vault reloads in the backgrou
 	await openNote(page);
 	await expectPill(page, "synced", testInfo);
 	await expect(page.getByTestId("status-commit-push")).toHaveCount(0);
+	await showNoteList(page);
 
 	const reload = gate();
 	await page.route("**/v1/entries**", async (route) => {

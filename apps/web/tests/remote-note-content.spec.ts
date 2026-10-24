@@ -76,6 +76,14 @@ test("loads note content in editor without showing empty state", async ({
 	expect(blockCount).toBeGreaterThan(0);
 });
 
+/** The phone shows the note or the list (TOL-193): back to the list there; true on a phone. */
+async function showNoteList(page: Page): Promise<boolean> {
+	const back = page.getByTestId("phone-back-to-notes");
+	if (!(await back.isVisible())) return false;
+	await back.click();
+	return true;
+}
+
 test("note content cache uses remote backend for reloads", async ({ page }) => {
 	await configureRemoteVault(page);
 	await page.goto("/", { waitUntil: "networkidle" });
@@ -94,6 +102,7 @@ test("note content cache uses remote backend for reloads", async ({ page }) => {
 
 	// Close and reopen the same note
 	await page.keyboard.press("Escape");
+	await showNoteList(page);
 	await page
 		.getByTestId("note-list-container")
 		.getByText("Welcome", { exact: true })

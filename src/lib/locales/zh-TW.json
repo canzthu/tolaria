@@ -1310,5 +1310,7 @@
   "communityBanner.invite": "iOS 版 Tolaria 來了！下載應用程式，並加入我們的全新 Discord 伺服器",
   "communityBanner.ios": "下載 iOS App",
   "communityBanner.joinCommunity": "加入 Discord",
-  "communityBanner.dismiss": "關閉社群邀請"
+  "communityBanner.dismiss": "關閉社群邀請",
+  "phone.action.notes": "備註",
+  "phone.action.backToNotes": "返回備註"
 }

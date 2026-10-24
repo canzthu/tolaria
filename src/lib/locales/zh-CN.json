@@ -1310,5 +1310,7 @@
   "communityBanner.invite": "Tolaria iOS 版上线啦！下载它，并加入我们的新 Discord 服务器",
   "communityBanner.ios": "下载 iOS 应用",
   "communityBanner.joinCommunity": "加入 Discord",
-  "communityBanner.dismiss": "拒绝社区邀请"
+  "communityBanner.dismiss": "拒绝社区邀请",
+  "phone.action.notes": "笔记",
+  "phone.action.backToNotes": "返回笔记"
 }

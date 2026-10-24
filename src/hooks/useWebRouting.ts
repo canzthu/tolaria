@@ -13,6 +13,7 @@ import {
   type WebRoute,
 } from '../utils/webRoute'
 import { useLatestRef } from './editorTabSwapLifecycle'
+import { BACK_TO_NOTE_LIST_STATE_KEY, type NoteListPane } from './usePhoneNoteStack'
 
 export interface WebRoutingOptions {
   activeNotePath: string | null
@@ -20,6 +21,8 @@ export interface WebRoutingOptions {
   entries: VaultEntry[]
   /** The route the page was opened with; its view is selected once the vault is ready. */
   initialRoute: WebRoute | null
+  /** Phone layout (TOL-193): while the list is shown the URL names no note, and back shows it. */
+  noteListPane?: NoteListPane
   openNote: (entry: VaultEntry) => Promise<void>
   /** The open note was restored (or there was none): from here the URL follows the app. */
   ready: boolean
@@ -37,12 +40,19 @@ function currentUrlFor(route: WebRoute): string {
   return `${pathname}${webRouteSearch(route, search)}${hash}`
 }
 
+/** A pushed entry remembers whether the one before it named no note, for the phone's back control. */
+function pushedState(synced: WebRoute): unknown {
+  const state: unknown = window.history.state
+  const base = typeof state === 'object' && state !== null ? state : {}
+  return { ...base, [BACK_TO_NOTE_LIST_STATE_KEY]: synced.note === null }
+}
+
 /** The first sync replaces the entry the page was opened with; later ones are new history. */
 function syncUrl(syncedRef: MutableRefObject<WebRoute | null>, route: WebRoute): void {
   const synced = syncedRef.current
   if (synced && webRoutesEqual(synced, route)) return
   syncedRef.current = route
-  if (synced) window.history.pushState(window.history.state, '', currentUrlFor(route))
+  if (synced) window.history.pushState(pushedState(synced), '', currentUrlFor(route))
   else window.history.replaceState(window.history.state, '', currentUrlFor(route))
 }
 
@@ -93,7 +103,10 @@ function applyPoppedRoute({ latestRef, poppingRef, syncedRef }: PopRefs): void {
   const current = webRouteForState(latest)
   const entry = routeEntry(route, latest, current.vault)
   const view = routeView(route, latest, current.vault)
-  syncedRef.current = { vault: current.vault, note: entry ? route.note : current.note, view: view?.filename ?? null }
+  // A phone shows the list for a route without a note; wider layouts keep the open note.
+  const keptNote = latest.noteListPane ? null : current.note
+  syncedRef.current = { vault: current.vault, note: entry ? route.note : keptNote, view: view?.filename ?? null }
+  latest.noteListPane?.show(!entry)
   selectPoppedView(view, latest)
   if (!entry) return
   poppingRef.current = true
@@ -110,7 +123,8 @@ export function useWebRouting({ enabled, initialRoute, ready, ...latest }: WebRo
   const syncedRef = useRef<WebRoute | null>(null)
   const pendingViewRef = useRef<WebRoute | null>(initialRoute)
   const poppingRef = useRef(false)
-  const { activeNotePath, selection, vaultPath, vaults } = latest
+  const { selection, vaultPath, vaults } = latest
+  const activeNotePath = latest.noteListPane?.shown ? null : latest.activeNotePath
   const route = useMemo(
     () => webRouteForState({ activeNotePath, selection, vaultPath, vaults }),
     [activeNotePath, selection, vaultPath, vaults],

@@ -2,9 +2,10 @@ import { useCallback, useState } from 'react'
 import type { VaultEntry } from '../types'
 import { findRouteEntry, parseWebRoute, routeMatchesVault, routeVaultSlug, type WebRoute } from '../utils/webRoute'
 import { useLastActiveNote } from './useLastActiveNote'
+import { usePhoneNoteStack, type PhoneNoteStack } from './usePhoneNoteStack'
 import { useWebRouting, type WebRoutingOptions } from './useWebRouting'
 
-export interface ActiveNoteLocationOptions extends Omit<WebRoutingOptions, 'enabled' | 'initialRoute' | 'ready'> {
+export interface ActiveNoteLocationOptions extends Omit<WebRoutingOptions, 'enabled' | 'initialRoute' | 'noteListPane' | 'ready'> {
   /** Restores the last open note: the main window only. */
   enabled: boolean
   isVaultLoading: boolean
@@ -36,8 +37,9 @@ function useRouteEntryResolver(
 /**
  * Which note is open when the app starts, and on the web where the URL says it is: the note a
  * shared or reloaded URL names wins over the last open note, then the URL follows (TOL-175).
+ * At phone width the web build shows the list or the note, and the URL says which (TOL-193).
  */
-export function useActiveNoteLocation({ enabled, isVaultLoading, ...routing }: ActiveNoteLocationOptions): void {
+export function useActiveNoteLocation({ enabled, isVaultLoading, ...routing }: ActiveNoteLocationOptions): PhoneNoteStack {
   const webRouting = enabled && isWebBuild()
   const initialRoute = useInitialWebRoute(webRouting)
   const preferredEntry = useRouteEntryResolver(initialRoute, routing)
@@ -49,5 +51,12 @@ export function useActiveNoteLocation({ enabled, isVaultLoading, ...routing }: A
     openNote: routing.openNote,
     preferredEntry,
   })
-  useWebRouting({ ...routing, enabled: webRouting, initialRoute, ready })
+  const { noteListPane, stack } = usePhoneNoteStack({
+    activeNotePath: routing.activeNotePath,
+    enabled: webRouting,
+    initialRoute,
+    ready,
+  })
+  useWebRouting({ ...routing, enabled: webRouting, initialRoute, noteListPane, ready })
+  return stack
 }

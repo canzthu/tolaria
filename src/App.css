@@ -68,6 +68,54 @@ body.mac-chrome.mac-chrome-fullscreen {
   flex: 1;
 }
 
+/* Phone web layout (TOL-193): one pane at a time, inside the safe area and above the keyboard. */
+html[data-phone-pane] .app-shell {
+  position: fixed;
+  top: var(--tolaria-visual-viewport-top, 0);
+  left: 0;
+  height: var(--tolaria-visual-viewport-height, 100%);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-shadow: none;
+}
+
+html[data-phone-pane] .app-shell .app {
+  position: relative;
+}
+
+html[data-phone-pane] .app-shell .app__sidebar,
+html[data-phone-pane] .app-shell .app > .cursor-col-resize {
+  display: none;
+}
+
+/* The pane behind stays laid out: the list keeps its scroll, the editor is ready for a tap. */
+html[data-phone-pane="list"] .app-shell .app__editor,
+html[data-phone-pane="note"] .app-shell .app__note-list {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+
+html[data-phone-pane] .app-shell .app__note-list {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+html[data-phone-pane] .app-shell .app__note-list > * {
+  border-left: none;
+}
+
+html[data-phone-pane] .app-shell .app__editor {
+  min-width: 0;
+}
+
+html[data-phone-pane] .app-shell .app__editor > .app__phone-back-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

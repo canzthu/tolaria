@@ -33,7 +33,10 @@ test.describe("French browser", () => {
 	}) => {
 		const catalogs = await openRemoteVault(page);
 
-		await expect(page.getByText("Toutes les notes").first()).toBeVisible({
+		// The note list's title: on screen in every layout, the phone's included (TOL-193).
+		await expect(
+			page.getByText("Boîte de réception", { exact: true }).filter({ visible: true }).first(),
+		).toBeVisible({
 			timeout: 10_000,
 		});
 		expect(catalogs.some((path) => path.includes("/fr-FR-"))).toBe(true);
@@ -48,7 +51,9 @@ test.describe("English browser", () => {
 	}) => {
 		const catalogs = await openRemoteVault(page);
 
-		await expect(page.getByText("All Notes").first()).toBeVisible({
+		await expect(
+			page.getByText("Inbox", { exact: true }).filter({ visible: true }).first(),
+		).toBeVisible({
 			timeout: 10_000,
 		});
 		expect(catalogs).toEqual([]);

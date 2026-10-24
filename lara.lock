@@ -1313,3 +1313,5 @@ files:
     communityBanner.ios: 07bcb93dc92351ae037ecf755676fa0e
     communityBanner.joinCommunity: 5c7ef8c320c94884cd78974ecc493846
     communityBanner.dismiss: df9374f4356460c586a8e9c3bae697dc
+    phone.action.notes: f4c6f851b00d5518bf888815de279aba
+    phone.action.backToNotes: 6bb45b1cc12f68ac668f5bc8036e2aa4

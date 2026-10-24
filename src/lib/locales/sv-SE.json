@@ -1310,5 +1310,7 @@
   "communityBanner.invite": "Tolaria för iOS är här! Ladda ner den och gå med i vår nya Discord-server",
   "communityBanner.ios": "Ladda ner iOS-appen",
   "communityBanner.joinCommunity": "Gå med i Discord",
-  "communityBanner.dismiss": "Avvisa inbjudan till communityn"
+  "communityBanner.dismiss": "Avvisa inbjudan till communityn",
+  "phone.action.notes": "Anteckningar",
+  "phone.action.backToNotes": "Tillbaka till anteckningar"
 }

@@ -6,6 +6,9 @@ import { COLLAB_TOKEN } from "../playwright.config";
  * opens it in a browser that never saw the vault, and back/forward walk the notes opened.
  */
 
+/** The phone stack shows one pane; phone-layout.spec.ts covers its back navigation (TOL-193). */
+const PHONE_PROJECTS = ["iphone-15"];
+
 const NOTES = {
 	welcome: { path: "welcome.md", title: "Welcome", body: "A throwaway vault" },
 	ada: { path: "people/ada.md", title: "Ada", body: "Works on" },
@@ -57,10 +60,13 @@ test("reloading keeps the open note, and the URL names its vault", async ({
 
 test("a shared URL opens the same note in a browser that never opened it", async ({
 	page,
-}) => {
+}, testInfo) => {
 	await openRemoteVault(page, `/?note=${NOTES.heron.path}`);
 
 	await expectOpenNote(page, NOTES.heron);
+	if (PHONE_PROJECTS.includes(testInfo.project.name)) {
+		await page.getByTestId("phone-back-to-notes").click();
+	}
 	await expect(
 		page
 			.getByTestId("note-list-container")
@@ -77,7 +83,11 @@ test("a shared URL wins over the note that was open last", async ({ page }) => {
 	await expectOpenNote(page, NOTES.ada);
 });
 
-test("back and forward walk the notes opened", async ({ page }) => {
+test("back and forward walk the notes opened", async ({ page }, testInfo) => {
+	test.skip(
+		PHONE_PROJECTS.includes(testInfo.project.name),
+		"the phone goes back to the list between notes",
+	);
 	await openRemoteVault(page);
 	await openFromList(page, NOTES.welcome);
 	await openFromList(page, NOTES.ada);

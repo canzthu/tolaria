@@ -1310,5 +1310,7 @@
   "communityBanner.invite": "Tolaria for iOSが登場しました！ダウンロードして、新しいDiscordサーバーに参加しましょう",
   "communityBanner.ios": "iOSアプリをダウンロード",
   "communityBanner.joinCommunity": "Discordに参加する",
-  "communityBanner.dismiss": "コミュニティへの招待を閉じる"
+  "communityBanner.dismiss": "コミュニティへの招待を閉じる",
+  "phone.action.notes": "ノート",
+  "phone.action.backToNotes": "ノートに戻る"
 }

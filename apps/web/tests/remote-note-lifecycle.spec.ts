@@ -54,6 +54,14 @@ function editor(page: Page) {
 	return page.locator(".bn-editor");
 }
 
+/** The phone shows the note or the list (TOL-193): back to the list there; true on a phone. */
+async function showNoteList(page: Page): Promise<boolean> {
+	const back = page.getByTestId("phone-back-to-notes");
+	if (!(await back.isVisible())) return false;
+	await back.click();
+	return true;
+}
+
 test("a note created on the web is renamed after its heading and deleted", async ({
 	page,
 	request,
@@ -110,10 +118,12 @@ test("a note created on the web is renamed after its heading and deleted", async
 		.poll(() => remotePaths(), { timeout: 10_000 })
 		.toContain(renamedPath);
 
+	const phone = await showNoteList(page);
 	await expect(
 		noteList.getByText(title, { exact: true }),
 		"the note list shows the renamed note by its title",
 	).toBeVisible();
+	if (phone) await noteList.getByText(title, { exact: true }).click();
 	await page.getByRole("button", { name: "More note actions" }).click();
 	await page.getByRole("menuitem", { name: "Delete this note" }).click();
 	await page.getByTestId("confirm-delete-btn").click();
@@ -128,6 +138,8 @@ test("a note created on the web is renamed after its heading and deleted", async
 
 	// Still gone after a reload: the list comes from the server.
 	await page.reload({ waitUntil: "load" });
+	// Like the desktop, the phone opened the next note in the deleted one's place.
+	if (phone) await page.getByTestId("phone-back-to-notes").click({ timeout: 10_000 });
 	await expect(noteList.getByText("Welcome", { exact: true })).toBeVisible({
 		timeout: 10_000,
 	});

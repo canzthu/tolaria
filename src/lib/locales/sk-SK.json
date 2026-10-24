@@ -1310,5 +1310,7 @@
   "communityBanner.invite": "Tolaria pre iOS je tu! Stiahnite si ju a pripojte sa k nášmu novému serveru Discord",
   "communityBanner.ios": "Stiahnuť aplikáciu pre iOS",
   "communityBanner.joinCommunity": "Pripojte sa k Discordu",
-  "communityBanner.dismiss": "Odmietnuť pozvánku do komunity"
+  "communityBanner.dismiss": "Odmietnuť pozvánku do komunity",
+  "phone.action.notes": "Poznámky",
+  "phone.action.backToNotes": "Späť na poznámky"
 }
