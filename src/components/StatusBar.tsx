@@ -9,6 +9,8 @@ import type { GitRemoteStatus, SyncStatus } from '../types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
 import { StatusBarPrimarySection, StatusBarSecondarySection } from './status-bar/StatusBarSections'
+import { isRemoteBrowserShell } from './status-bar/syncPillState'
+import { WebSyncPill } from './status-bar/WebSyncPill'
 import type { VaultOption } from './status-bar/types'
 import { CONTRIBUTION_ANALYTICS_EVENT, TOLARIA_DISCORD_INVITE_URL } from '../constants/feedback'
 import { trackEvent } from '../lib/telemetry'
@@ -110,6 +112,13 @@ interface StatusBarProps {
 interface StatusBarFooterProps extends StatusBarProps {
   compact: boolean
   stacked: boolean
+  /** The web build: one sync pill stands in for the git controls. */
+  webSync: boolean
+}
+
+function webSyncPill({ webSync, isOffline, isVaultReloading, locale = 'en' }: StatusBarFooterProps) {
+  if (!webSync) return undefined
+  return <WebSyncPill isOffline={isOffline === true} isReloading={isVaultReloading === true} locale={locale} />
 }
 
 function StatusBarPrimaryFromFooter(options: StatusBarFooterProps) {
@@ -121,6 +130,7 @@ function StatusBarPrimaryFromFooter(options: StatusBarFooterProps) {
       lastSyncTime={options.lastSyncTime ?? null}
       conflictCount={options.conflictCount ?? 0}
       mcpStatus={options.aiFeaturesEnabled === false ? undefined : options.mcpStatus}
+      syncPill={webSyncPill(options)}
     />
   )
 }
@@ -208,10 +218,11 @@ function StatusBarFooter(props: StatusBarFooterProps) {
 export function StatusBar(props: StatusBarProps) {
   useStatusBarTicker()
   const { compact, stacked } = useStatusBarLayout()
+  const [webSync] = useState(isRemoteBrowserShell)
 
   return (
     <TooltipProvider>
-      <StatusBarFooter {...props} compact={compact} stacked={stacked} />
+      <StatusBarFooter {...props} compact={compact} stacked={stacked} webSync={webSync} />
     </TooltipProvider>
   )
 }

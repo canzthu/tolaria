@@ -89,10 +89,11 @@ test("an edit in the web editor is saved to the server and survives a reload", a
 	await configureRemoteVault(page);
 	await openNote(page);
 
-	// Git runs on the server: the shell shows no mock change count or sync state.
+	// Git runs on the server: the shell shows its sync pill, not the mock git controls.
 	const statusBar = page.getByTestId("status-bar");
 	await expect(statusBar).toBeVisible();
-	await expect(statusBar).not.toContainText("Synced");
+	await expect(statusBar.getByTestId("status-sync-pill")).toBeVisible();
+	await expect(statusBar).not.toContainText("Not synced");
 	await expect(statusBar).not.toContainText("Changes");
 
 	await typeAtEndOfLastLine(page, marker);

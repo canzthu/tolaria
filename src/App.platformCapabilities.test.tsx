@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "./App";
 
@@ -90,7 +90,7 @@ describe("App platform capabilities", () => {
 		expect(container).toBeTruthy();
 	});
 
-	test("hides the mock git status in the status bar when a remote server is configured", async () => {
+	test("shows the sync pill instead of the git status when a remote server is configured", async () => {
 		vi.stubGlobal("TOLARIA_REMOTE_URL", "https://example.com");
 		vi.stubGlobal("TOLARIA_REMOTE_TOKEN", "test-token");
 
@@ -98,7 +98,11 @@ describe("App platform capabilities", () => {
 
 		const statusBar = await screen.findByTestId("status-bar");
 		await waitFor(() => expect(statusBar).toHaveTextContent("Contribute"));
-		expect(statusBar).not.toHaveTextContent(/synced|changes|commit/i);
+		expect(within(statusBar).getByTestId("status-sync-pill")).toHaveAttribute(
+			"role",
+			"status",
+		);
+		expect(statusBar).not.toHaveTextContent(/changes|commit|not synced/i);
 	});
 
 	test("keeps the git status in the status bar without a remote server", async () => {

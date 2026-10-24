@@ -178,9 +178,10 @@ test("opens the last vault read-only with the network gone", async ({
 	const unopened = await createUnopenedNote(request, testInfo.project.name);
 	const page = await startOffline(context);
 
-	const offlinePill = page.getByTestId("status-offline");
-	await expect(offlinePill).toBeVisible();
-	await expect(offlinePill).toHaveAttribute("data-read-only", "true");
+	const syncPill = page.getByTestId("status-sync-pill");
+	await expect(syncPill).toHaveAttribute("data-state", "offline");
+	await expect(syncPill).toHaveAttribute("data-read-only", "true");
+	await expect(syncPill).toHaveText("Offline · read-only");
 	await expect(page.getByTestId("vault-loading-skeleton")).toHaveCount(0);
 
 	// The note opened in the earlier session reads from the cache, and cannot change.
@@ -198,7 +199,8 @@ test("opens the last vault read-only with the network gone", async ({
 	// Back online, the same request reaches the server, and nothing typed offline did.
 	await origin.start();
 	await setDeviceOnline(page, true);
-	await expect(offlinePill).toHaveCount(0);
+	await expect(syncPill).not.toHaveAttribute("data-state", "offline");
+	await expect(syncPill).not.toHaveAttribute("data-read-only");
 	expect(await pageFetchStatus(page, unopened)).toBe(200);
 	await page.waitForTimeout(2_000);
 	expect(await serverContent(request, CACHED.path)).not.toContain(OFFLINE_EDIT);
