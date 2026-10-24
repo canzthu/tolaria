@@ -1,7 +1,7 @@
+import type { Block, BlockNoteEditor, BlockSchema, InlineContentSchema, StyleSchema } from '@blocknote/core'
 import { blocksToYXmlFragment, yXmlFragmentToBlocks } from '@blocknote/core/yjs'
 import * as Y from 'yjs'
 import { type LineMatch, matchLines } from './lineMerge.ts'
-import type { HeadlessEditor, NoteBlock } from './markdownBlocks.ts'
 
 /**
  * Changes a live document to a new list of blocks while touching as little as possible:
@@ -24,7 +24,7 @@ function withoutIds(_key: string, value: unknown): unknown {
 }
 
 /** A block's content regardless of its id: equal signatures mean nothing to change. */
-function signature(block: NoteBlock): string {
+function signature(block: unknown): string {
   return JSON.stringify(block, withoutIds)
 }
 
@@ -48,8 +48,15 @@ function clones(group: Y.XmlElement, from: number, to: number): Y.XmlElement[] {
   return group.slice(from, to).map((node) => (node as Y.XmlElement).clone())
 }
 
-/** Must run inside a transaction on the fragment's document. */
-export function patchBlocks(editor: HeadlessEditor, fragment: Y.XmlFragment, next: NoteBlock[]): void {
+/**
+ * Must run inside a transaction on the fragment's document. Any editor of the note schema
+ * will do: the server's headless one, or the web editor bound to the fragment.
+ */
+export function patchBlocks<B extends BlockSchema, I extends InlineContentSchema, S extends StyleSchema>(
+  editor: BlockNoteEditor<B, I, S>,
+  fragment: Y.XmlFragment,
+  next: Block<B, I, S>[],
+): void {
   if (fragment.length === 0) {
     blocksToYXmlFragment(editor, next, fragment)
     return

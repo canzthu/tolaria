@@ -1,6 +1,9 @@
-import { act, screen } from "@testing-library/react";
+import type { EditorView } from "@codemirror/view";
+import { act, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as Y from "yjs";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
+import { DOC_FRONTMATTER_FIELD } from "../../packages/protocol/src/index";
 import { resolvePlatformCapabilities } from "../lib/platformCapabilities";
 import type {
 	VaultBackend,
@@ -71,6 +74,7 @@ function remoteBackend(
 function renderWebEditor(
 	vaultBackend: VaultBackend<RemoteBindings>,
 	onContentChange = vi.fn(),
+	rawToggleRef?: { current: () => void },
 ) {
 	renderEditor({
 		tabs: [mockTab],
@@ -78,8 +82,23 @@ function renderWebEditor(
 		platformCapabilities: resolvePlatformCapabilities("remote"),
 		vaultBackend,
 		onContentChange,
+		rawToggleRef,
 	});
 	return onContentChange;
+}
+
+type CodeMirrorElement = HTMLElement & { __cmView?: EditorView };
+
+function rawEditorView(): EditorView {
+	const element = screen.getByTestId("raw-editor-codemirror");
+	return (element as CodeMirrorElement).__cmView as EditorView;
+}
+
+async function toggleRaw(rawToggleRef: { current: () => void }) {
+	await act(async () => {
+		rawToggleRef.current();
+	});
+	await flushEditorSwapWork();
 }
 
 describe("Editor collaboration binding", () => {
@@ -116,6 +135,35 @@ describe("Editor collaboration binding", () => {
 		act(() => blockNoteViewState.onChange?.());
 		await flushEditorSwapWork();
 		expect(onContentChange).not.toHaveBeenCalled();
+	});
+
+	it("opens raw mode on the live document and saves raw edits into it (TOL-221)", async () => {
+		const doc = new Y.Doc();
+		doc.getText(DOC_FRONTMATTER_FIELD).insert(0, "---\nstatus: Live\n---\n");
+		const document = { ...liveDocument(Promise.resolve()), doc };
+		const rawToggleRef = { current: () => {} };
+		const onContentChange = renderWebEditor(
+			remoteBackend(vi.fn().mockResolvedValue(document)),
+			vi.fn(),
+			rawToggleRef,
+		);
+		await flushEditorSwapWork();
+
+		await toggleRaw(rawToggleRef);
+		const view = rawEditorView();
+		expect(view.state.doc.toString()).toMatch(/^---\nstatus: Live\n---\n/);
+		act(() => {
+			view.dispatch({
+				changes: { from: 0, to: view.state.doc.length, insert: "---\nstatus: Raw\n---\nRaw body\n" },
+			});
+		});
+		await toggleRaw(rawToggleRef);
+
+		await waitFor(() =>
+			expect(doc.getText(DOC_FRONTMATTER_FIELD).toString()).toBe("---\nstatus: Raw\n---\n"),
+		);
+		expect(onContentChange).not.toHaveBeenCalled();
+		expect(screen.queryByTestId("raw-editor-codemirror")).not.toBeInTheDocument();
 	});
 
 	it("falls back to the tab content when the live document cannot be opened", async () => {
