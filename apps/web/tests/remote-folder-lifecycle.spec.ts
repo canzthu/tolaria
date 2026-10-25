@@ -81,10 +81,6 @@ function lastRemoteCommit(): string[] {
 		.sort();
 }
 
-function remoteHead(): string {
-	return execFileSync("git", ["--git-dir", REMOTE_GIT_DIR, "rev-parse", "main"], { encoding: "utf8" }).trim();
-}
-
 async function openApp(page: Page, url = "/"): Promise<void> {
 	await page.goto(url, { waitUntil: "load" });
 	await expect(page.getByTestId("create-folder-btn")).toBeVisible({ timeout: 10_000 });
@@ -174,21 +170,25 @@ test("deleting a folder on the web takes its notes in one commit and closes them
 	}
 });
 
-test("opening the sidebar commits nothing, and a name Windows cannot hold is refused before anything is sent", async ({
+/** A request that could change the vault: anything but a read. The shared server's HEAD also moves with other specs' pushes. */
+function isVaultWrite(method: string, url: string): boolean {
+	return method !== "GET" && method !== "HEAD" && new URL(url).pathname.startsWith("/v1/");
+}
+
+test("opening the sidebar writes nothing, and a name Windows cannot hold is refused before anything is sent", async ({
 	page,
 }, testInfo) => {
 	skipUnlessDesktop(testInfo);
-	const head = remoteHead();
-	const sent: string[] = [];
+	const writes: string[] = [];
 	page.on("request", (request) => {
-		if (request.method() === "POST" && /\/v1\/folders$/u.test(request.url())) sent.push(request.url());
+		if (isVaultWrite(request.method(), request.url())) writes.push(`${request.method()} ${request.url()}`);
 	});
 	await configureRemoteVault(page.context());
 	await openApp(page);
+	await expect(page.getByTestId("folder-row:projects")).toBeVisible();
 
 	await createFolder(page, "LPT1");
 
 	await expect(page.getByText("Failed to create folder: Invalid folder name")).toBeVisible({ timeout: 10_000 });
-	expect(sent).toEqual([]);
-	expect(remoteHead()).toBe(head);
+	expect(writes).toEqual([]);
 });
