@@ -27,7 +27,7 @@ describe("App platform capabilities", () => {
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
-		localStorage.removeItem("tolaria:ai-agents-onboarding-dismissed");
+		window.localStorage.removeItem("tolaria:ai-agents-onboarding-dismissed");
 	});
 
 	test("detects remote backend configuration", () => {
@@ -96,7 +96,7 @@ describe("App platform capabilities", () => {
 		vi.stubGlobal("TOLARIA_REMOTE_TOKEN", "test-token");
 		// A returning user: the remote's stand-ins answer at once (TOL-206), so the AI agents
 		// card would otherwise cover the shell before the status bar is read.
-		localStorage.setItem("tolaria:ai-agents-onboarding-dismissed", "1");
+		window.localStorage.setItem("tolaria:ai-agents-onboarding-dismissed", "1");
 
 		render(<App />);
 
