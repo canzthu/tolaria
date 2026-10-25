@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.5'
+export const PROTOCOL_VERSION = '1.6'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -66,6 +66,8 @@ export const COLLAB_TICKET_PARAM = 'ticket'
 export const COLLAB_CLOSE = {
   /** The message could not be read. */
   invalidMessage: 4400,
+  /** Nothing arrived on the connection, not even a pong, for the server's idle timeout (since 1.6). */
+  idle: 4408,
   /** The note of this document was deleted. */
   gone: 4410,
   /** A change the connection sent is not a valid change to this kind of document. */
@@ -261,6 +263,8 @@ export const ERROR_CODES = [
   'not_implemented',
   'upgrade_required',
   'remote_unavailable',
+  /** Too many requests for this account; `Retry-After` says when to try again (since 1.6). */
+  'rate_limited',
   'internal',
 ] as const
 

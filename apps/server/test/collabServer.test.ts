@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { WebSocket as NodeWebSocket } from 'ws'
 import * as Y from 'yjs'
 import { CollabProvider, type SocketLike } from '../../../packages/collab-client/src/collabProvider.ts'
-import type { CollabTicketResponse, ListResponse, VaultResponse } from '../../../packages/protocol/src/index.ts'
+import { type CollabTicketResponse, type ListResponse, PROTOCOL_VERSION, type VaultResponse } from '../../../packages/protocol/src/index.ts'
 import { closeVaultServer, createVaultServer } from '../src/server.ts'
 import { LocalDiskStore } from '../src/store.ts'
 import type { Vault } from '../src/vault.ts'
@@ -138,7 +138,7 @@ describe('the collaboration channel over websockets', () => {
   it('is advertised with protocol 1.2 and the collaboration capabilities', async () => {
     const meta = (await (await api('/v1/vault')).json()) as VaultResponse
 
-    expect(meta.protocolVersion).toBe('1.5')
+    expect(meta.protocolVersion).toBe(PROTOCOL_VERSION)
     expect(meta.capabilities).toEqual(expect.arrayContaining(['collab.yjs', 'collab.awareness', 'collab.tickets']))
     expect(meta.collab.available).toBe(true)
   })

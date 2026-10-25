@@ -4,6 +4,8 @@ import { type RawData, type WebSocket, WebSocketServer } from 'ws'
 import { COLLAB_MAX_MESSAGE_BYTES, COLLAB_TICKET_PARAM, type CollabAccess, ROUTES } from '../../../../packages/protocol/src/index.ts'
 import type { DocId, DocIndex } from '../docIndex.ts'
 import { isAuthorized, singleHeader } from '../httpIo.ts'
+import { ACCOUNT, type RateLimiter, retryAfterSeconds } from '../rateLimit.ts'
+import { type ConnectionCounter, watchIdle } from './connectionLimits.ts'
 import type { CollabHub, Connection } from './hub.ts'
 import type { TicketBook } from './tickets.ts'
 
@@ -13,6 +15,10 @@ export interface UpgradeOptions {
   docs: DocIndex
   token: string
   maxMessageBytes: number
+  /** Every upgrade is charged to the account's request bucket. */
+  limiter: RateLimiter
+  connections: ConnectionCounter
+  idleTimeoutMs: number
   log(message: string): void
 }
 
@@ -25,6 +31,7 @@ const DOC_PREFIX = `${ROUTES.collabDocs}/`
 const REFUSALS = new Map([
   [401, 'Unauthorized'],
   [404, 'Not Found'],
+  [429, 'Too Many Requests'],
 ])
 const INTERNAL_ERROR = 1011
 const MESSAGE_TOO_BIG = 1009
@@ -32,10 +39,13 @@ const MESSAGE_TOO_BIG = 1009
 /** Thrown with the HTTP status the upgrade is refused with. */
 class Refusal extends Error {
   readonly status: number
+  /** Seconds for `Retry-After`, when trying again later helps. */
+  readonly retryAfter?: number
 
-  constructor(status: number) {
+  constructor(status: number, retryAfter?: number) {
     super(`upgrade refused with ${status}`)
     this.status = status
+    this.retryAfter = retryAfter
   }
 }
 
@@ -55,9 +65,23 @@ function admit(request: IncomingMessage, { token, tickets, docs }: UpgradeOption
   return { docId, access }
 }
 
+/**
+ * Takes the account's place for one more websocket on this document, freed when its TCP socket
+ * closes, however the upgrade ends. The account is the token's, whichever credential was used:
+ * only the token holder gets tickets.
+ */
+function reserve(socket: Duplex, { docId }: Admission, { limiter, connections }: UpgradeOptions): void {
+  const wait = limiter.take(ACCOUNT)
+  if (wait > 0) throw new Refusal(429, retryAfterSeconds(wait))
+  const release = connections.admit(ACCOUNT, docId)
+  if (!release) throw new Refusal(429)
+  socket.once('close', release)
+}
+
 function refuse(socket: Duplex, error: unknown): void {
   const status = error instanceof Refusal ? error.status : 401
-  socket.end(`HTTP/1.1 ${status} ${REFUSALS.get(status)}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)
+  const retry = error instanceof Refusal && error.retryAfter ? `Retry-After: ${error.retryAfter}\r\n` : ''
+  socket.end(`HTTP/1.1 ${status} ${REFUSALS.get(status)}\r\n${retry}Connection: close\r\nContent-Length: 0\r\n\r\n`)
 }
 
 /**
@@ -125,8 +149,9 @@ class Arrival {
 }
 
 /** Joins a websocket to its document. Messages that arrive while the document opens wait. */
-function serve(ws: WebSocket, { docId, access }: Admission, { hub, log, maxMessageBytes }: UpgradeOptions): void {
+function serve(ws: WebSocket, { docId, access }: Admission, { hub, log, maxMessageBytes, idleTimeoutMs }: UpgradeOptions): void {
   const arrival = new Arrival(ws, maxMessageBytes)
+  watchIdle(ws, idleTimeoutMs)
   ws.on('message', (data) => arrival.message(bytes(data)))
   ws.on('close', () => arrival.close())
   ws.on('error', (error) => log(`collab: websocket error: ${error.message}`))
@@ -148,6 +173,7 @@ export function attachCollab(server: Server, options: UpgradeOptions): WebSocket
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     try {
       const admission = admit(request, options)
+      reserve(socket, admission, options)
       sockets.handleUpgrade(request, socket, head, (ws) => serve(ws, admission, options))
     } catch (error) {
       refuse(socket, error)

@@ -84,6 +84,7 @@ describe('collaboration settings', () => {
     expect(loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN }).collab).toEqual({
       policy: { idleMs: 5_000, maxWaitMs: 60_000 },
       lingerMs: 30_000,
+      limits: { perAccount: 128, perDoc: 32, idleTimeoutMs: 60_000 },
     })
   })
 
@@ -95,7 +96,7 @@ describe('collaboration settings', () => {
       TOLARIA_COLLAB_LINGER_MS: '1000',
     })
 
-    expect(config.collab).toEqual({ policy: { idleMs: 2_000, maxWaitMs: 30_000 }, lingerMs: 1_000 })
+    expect(config.collab).toMatchObject({ policy: { idleMs: 2_000, maxWaitMs: 30_000 }, lingerMs: 1_000 })
   })
 
   it('switches the channel off with TOLARIA_COLLAB=0 and refuses a cadence that is no number', () => {
@@ -254,5 +255,35 @@ describe('index snapshot settings', () => {
     expect(() =>
       loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_INDEX_SNAPSHOTS: 'r2', TOLARIA_INDEX_SNAPSHOT_PREFIX: 'v' }),
     ).toThrowError('TOLARIA_R2_BUCKET is required when TOLARIA_INDEX_SNAPSHOTS=r2')
+  })
+})
+
+describe('limit settings', () => {
+  it('allows 50 requests a second with bursts of 500 by default', () => {
+    expect(loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN }).rateLimit).toEqual({ perSecond: 50, burst: 500 })
+  })
+
+  it('reads the request and websocket limits from the environment', () => {
+    const config = loadConfig({
+      TOLARIA_SERVER_TOKEN: TOKEN,
+      TOLARIA_RATE_LIMIT_PER_SECOND: '5',
+      TOLARIA_RATE_LIMIT_BURST: '10',
+      TOLARIA_COLLAB_MAX_CONNECTIONS: '8',
+      TOLARIA_COLLAB_MAX_CONNECTIONS_PER_DOC: '2',
+      TOLARIA_COLLAB_SOCKET_IDLE_TIMEOUT_MS: '1000',
+      TOLARIA_COLLAB_MAX_MESSAGE_BYTES: '4096',
+    })
+
+    expect(config.rateLimit).toEqual({ perSecond: 5, burst: 10 })
+    expect(config.collab).toMatchObject({ limits: { perAccount: 8, perDoc: 2, idleTimeoutMs: 1_000 }, maxMessageBytes: 4096 })
+  })
+
+  it.each([
+    ['TOLARIA_RATE_LIMIT_PER_SECOND', '0'],
+    ['TOLARIA_RATE_LIMIT_BURST', 'lots'],
+    ['TOLARIA_COLLAB_MAX_CONNECTIONS_PER_DOC', '-1'],
+    ['TOLARIA_COLLAB_MAX_MESSAGE_BYTES', String(16 * 1024 * 1024 + 1)],
+  ])('refuses %s=%s', (name, value) => {
+    expect(() => loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN, [name]: value })).toThrowError(`${name} must be an integer`)
   })
 })

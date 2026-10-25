@@ -287,3 +287,4 @@ proposed → active → superseded
 | [0289](0289-server-rename-transaction-with-live-link-patches.md) | Server rename transaction with live wikilink patches | active |
 | [0290](0290-live-document-keeps-its-edits-on-a-desktop-conflict.md) | A live document keeps its edits on a desktop conflict; the incoming version becomes the conflict copy | active |
 | [0291](0291-presence-in-the-web-note-view.md) | Presence in the web note view: device names, paced awareness, clear within 5 s | active |
+| [0292](0292-in-process-request-and-websocket-limits-on-the-server.md) | In-process request and websocket limits on the server, per account | active |

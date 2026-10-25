@@ -1486,6 +1486,7 @@ In `apps/server`:
 - `Vault` (`src/vault.ts`) runs every mutation under one lock as pull, change, commit, push. `writeOutcome(current, incoming, precondition)` is the whole write decision.
 - `GitSync` (`src/gitSync.ts`) fetches, fast-forwards or replays unpushed commits onto the remote's history, and pushes with retry.
 - `VaultPath` (`src/paths.ts`) is a path that passed validation; only such paths reach the working clone.
+- `RateLimiter` (`src/rateLimit.ts`) keeps a token bucket per account (`accountOf`: the token's, or the anonymous one); `RateLimited` is its `429 rate_limited` with `Retry-After`. `ConnectionCounter` and `watchIdle` (`src/collab/connectionLimits.ts`) cap open websockets per account and per document and close idle ones with `4408` (ADR 0292).
 - `DocIndex` (`src/docIndex.ts`) gives each note a stable `docId` that follows renames, for the reserved collaboration channel.
 - `BlobStore` (`src/store.ts`) is the storage interface for server state outside git, with `LocalDiskStore`; it is the seam for Object Storage.
 - `remoteImageFetcher` (`src/remoteImage.ts`) downloads an image for `POST /v1/attachments/imports` from public hosts only: `isPublicAddress` (`src/publicAddress.ts`) decides, a guarded `lookup` pins the connection to a checked address, and redirects, size and time are capped. `Services.remoteImages` lets a test swap it.

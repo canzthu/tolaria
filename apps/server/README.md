@@ -37,11 +37,19 @@ Use `pnpm run server`: bare `pnpm server` is a pnpm built-in command.
 | `TOLARIA_SERVER_HOST` | `127.0.0.1` | Bind address |
 | `TOLARIA_SERVER_PORT` | `8787` | Port |
 | `TOLARIA_SERVER_ALLOW_NON_LOOPBACK` | unset | Set to `1` to bind a non-loopback address. The server speaks plain HTTP: only do this behind a TLS-terminating proxy |
-| `TOLARIA_SERVER_MAX_BODY_BYTES` | `26214400` | Largest accepted request body, and websocket message up to 16 MiB |
+| `TOLARIA_SERVER_MAX_BODY_BYTES` | `26214400` | Largest accepted request body, and websocket message up to 16 MiB unless `TOLARIA_COLLAB_MAX_MESSAGE_BYTES` is set |
 | `TOLARIA_COLLAB` | on | Set to `0` to leave the collaboration channel unserved |
 | `TOLARIA_COLLAB_IDLE_MS` | `5000` | Write an edited document this long after its last edit |
 | `TOLARIA_COLLAB_MAX_WAIT_MS` | `60000` | Write it at the latest this long after its first unwritten edit |
 | `TOLARIA_COLLAB_LINGER_MS` | `30000` | Keep a document without clients open this long |
+| `TOLARIA_RATE_LIMIT_PER_SECOND` | `50` | Requests one account (the token) gains per second: a token bucket over every route but `/healthz` and every websocket upgrade. Beyond it: `429 rate_limited` with `Retry-After`. Callers without the token share a bucket of their own |
+| `TOLARIA_RATE_LIMIT_BURST` | `500` | Requests a full bucket allows at once |
+| `TOLARIA_COLLAB_MAX_CONNECTIONS` | `128` | Open websockets of the account over every document; one more is refused with `429` |
+| `TOLARIA_COLLAB_MAX_CONNECTIONS_PER_DOC` | `32` | Open websockets of one document |
+| `TOLARIA_COLLAB_MAX_MESSAGE_BYTES` | the body limit | Largest websocket message, at most 16 MiB; a larger one closes the socket with `1009` |
+| `TOLARIA_COLLAB_SOCKET_IDLE_TIMEOUT_MS` | `60000` | The server pings each websocket this often and closes one with `4408` that sent nothing since the last ping, not even a pong |
+
+The limits (ADR 0292, "Limits" in the protocol) are sized so the web app, collaborative editing and the e2e suites stay far below them; a test that needs others sets these variables, or `rateLimit` and `collab.limits` of `createVaultServer`. Edge rate limits in front of the container are configured elsewhere.
 
 Git credentials for a private remote come from the environment the server runs in (SSH agent or a credential helper), never from the URL.
 

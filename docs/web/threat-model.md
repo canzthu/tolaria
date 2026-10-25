@@ -131,13 +131,13 @@ The `vaultPath()` function validates all client-supplied paths with strict rules
 **Risk assessment:** **MEDIUM**
 - Good authentication and size limits
 - Document validation protects integrity
+- **Since TOL-208 (ADR 0292):** at most 128 open websockets per account and 32 per document, refused at the upgrade with `429`; upgrades are charged to the account's request bucket; a socket that answers no ping for 60 s is closed with `4408`; the message limit is configurable (`TOLARIA_COLLAB_MAX_MESSAGE_BYTES`)
 - **Missing:** Per-client rate limiting on message frequency
-- **Missing:** Per-vault concurrent connection limits
 
 **Recommendations:**
 1. Add per-client message rate limiting (e.g., 100 messages/second)
-2. Add per-vault connection limits (e.g., 50 concurrent connections)
-3. Add connection duration limits or idle timeouts
+2. ~~Add per-vault connection limits~~ Done in TOL-208
+3. ~~Add connection duration limits or idle timeouts~~ Idle timeout done in TOL-208
 
 ### 4. Security Headers and CSP
 
@@ -178,18 +178,18 @@ The desktop Tauri app has extensive CSP configured in `src-tauri/tauri.conf.json
 - ✅ Git operations are serialized per vault (mutex via `queue`)
 - ✅ Y.Doc updates validated before acceptance
 
+- ✅ Per-account token bucket on every `/v1` request and websocket upgrade: 50 requests/s, bursts of 500, `429 rate_limited` with `Retry-After`; callers without the token share their own bucket (TOL-208, ADR 0292)
+- ✅ At most 128 open websockets per account and 32 per document; idle sockets closed with `4408` (TOL-208)
+
 **Missing protections:**
-- ❌ No per-IP or per-token rate limiting
-- ❌ No per-vault concurrent connection limits
-- ❌ No per-vault request rate limits
+- ❌ No per-IP rate limiting in the container (left to the Cloudflare edge)
 - ❌ No protection against slowloris-style attacks
 - ❌ No limits on git repository size growth
 - ❌ No limits on number of open documents per vault
 - ❌ No request timeout enforcement at HTTP level
 
-**Risk assessment:** **MEDIUM-HIGH**
-- A single authenticated client can exhaust resources
-- Can open many WebSocket connections to one or many vaults
+**Risk assessment:** **MEDIUM** (MEDIUM-HIGH before TOL-208)
+- A single authenticated client can still use its whole request budget on expensive routes
 - Can send maximum-sized bodies repeatedly
 - Can trigger expensive git operations (sync, search) repeatedly
 - **Note:** Cloudflare Worker (out of scope) likely provides some protection
@@ -368,9 +368,9 @@ These security concerns span the boundary between the open-source server (this r
 |------|-----------|--------|
 | Path Traversal | LOW | ✅ Comprehensive validation |
 | Token/Ticket Security | LOW | ✅ Strong cryptographic design |
-| WebSocket Auth | MEDIUM | ⚠️ Missing connection/rate limits |
+| WebSocket Auth | LOW-MEDIUM | ✅ Connection limits and idle timeout (TOL-208); ⚠️ no message-rate limit |
 | Security Headers | LOW | ✅ Adequate for JSON API |
-| Rate Limiting | MEDIUM-HIGH | ⚠️ Missing per-client/vault limits |
+| Rate Limiting | MEDIUM | ✅ Per-account request limit (TOL-208); ⚠️ no per-IP or concurrency limit in the container |
 | SSRF (R2BlobStore) | LOW-MEDIUM | ⚠️ Operator config, approved exception |
 | SSRF (remote image import) | LOW | ✅ Public-address guard, pinned connection, caps |
 | Git Security | LOW | ✅ Proper hardening |
@@ -379,8 +379,8 @@ These security concerns span the boundary between the open-source server (this r
 ## Recommendations Summary
 
 **High priority:**
-1. Add per-token request rate limiting for file API
-2. Add per-vault concurrent WebSocket connection limits
+1. ~~Add per-token request rate limiting for file API~~ Done in TOL-208
+2. ~~Add per-vault concurrent WebSocket connection limits~~ Done in TOL-208
 3. Add per-client WebSocket message rate limiting
 
 **Medium priority:**

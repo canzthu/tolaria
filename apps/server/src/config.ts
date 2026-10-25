@@ -1,6 +1,9 @@
 import { isIP } from 'node:net'
 import { join, resolve } from 'node:path'
+import { COLLAB_MAX_MESSAGE_BYTES } from '../../../packages/protocol/src/index.ts'
+import { type ConnectionLimits, DEFAULT_CONNECTION_LIMITS } from './collab/connectionLimits.ts'
 import { DEFAULT_FLUSH_POLICY, type FlushPolicy } from './collab/flush.ts'
+import { DEFAULT_RATE_LIMIT, type RateLimit } from './rateLimit.ts'
 import type { R2Config } from './store.ts'
 
 export type BlobStoreType = 'local' | 'r2'
@@ -17,8 +20,10 @@ export interface ServerConfig {
   /** Directory of server state that is not in git (doc index, later Y.Doc snapshots). */
   stateDir: string
   maxBodyBytes: number
+  /** Requests per account (the token), over every route but `/healthz`. */
+  rateLimit: RateLimit
   /** Null when the collaboration channel is switched off. */
-  collab: { policy: FlushPolicy; lingerMs: number } | null
+  collab: { policy: FlushPolicy; lingerMs: number; limits: ConnectionLimits; maxMessageBytes?: number } | null
   /** Blob store configuration */
   blobStore: { type: 'local'; stateDir: string } | { type: 'r2'; config: R2Config }
   /**
@@ -38,6 +43,8 @@ const DEFAULT_MAX_BODY_BYTES = 25 * 1024 * 1024
 const MIN_TOKEN_LENGTH = 16
 const DEFAULT_LINGER_MS = 30_000
 const MAX_DELAY_MS = 24 * 60 * 60 * 1000
+const MAX_RATE = 1_000_000
+const MAX_CONNECTIONS = 100_000
 const LOOPBACK_NAMES = new Set(['localhost', '::1'])
 
 function setting(env: Env, name: string): string | undefined {
@@ -77,6 +84,29 @@ function bindHost(env: Env): string {
   )
 }
 
+function rateLimitSettings(env: Env): RateLimit {
+  const { perSecond, burst } = DEFAULT_RATE_LIMIT
+  return {
+    perSecond: positiveInteger(env, 'TOLARIA_RATE_LIMIT_PER_SECOND', perSecond, MAX_RATE),
+    burst: positiveInteger(env, 'TOLARIA_RATE_LIMIT_BURST', burst, MAX_RATE),
+  }
+}
+
+function connectionLimits(env: Env): ConnectionLimits {
+  const { perAccount, perDoc, idleTimeoutMs } = DEFAULT_CONNECTION_LIMITS
+  return {
+    perAccount: positiveInteger(env, 'TOLARIA_COLLAB_MAX_CONNECTIONS', perAccount, MAX_CONNECTIONS),
+    perDoc: positiveInteger(env, 'TOLARIA_COLLAB_MAX_CONNECTIONS_PER_DOC', perDoc, MAX_CONNECTIONS),
+    idleTimeoutMs: positiveInteger(env, 'TOLARIA_COLLAB_SOCKET_IDLE_TIMEOUT_MS', idleTimeoutMs, MAX_DELAY_MS),
+  }
+}
+
+/** Unset leaves the websocket message limit at the body limit. */
+function maxMessageBytes(env: Env): { maxMessageBytes?: number } {
+  if (setting(env, 'TOLARIA_COLLAB_MAX_MESSAGE_BYTES') === undefined) return {}
+  return { maxMessageBytes: positiveInteger(env, 'TOLARIA_COLLAB_MAX_MESSAGE_BYTES', 1, COLLAB_MAX_MESSAGE_BYTES) }
+}
+
 function collabSettings(env: Env): ServerConfig['collab'] {
   if (setting(env, 'TOLARIA_COLLAB') === '0') return null
   const { idleMs, maxWaitMs } = DEFAULT_FLUSH_POLICY
@@ -86,6 +116,8 @@ function collabSettings(env: Env): ServerConfig['collab'] {
       maxWaitMs: positiveInteger(env, 'TOLARIA_COLLAB_MAX_WAIT_MS', maxWaitMs, MAX_DELAY_MS),
     },
     lingerMs: positiveInteger(env, 'TOLARIA_COLLAB_LINGER_MS', DEFAULT_LINGER_MS, MAX_DELAY_MS),
+    limits: connectionLimits(env),
+    ...maxMessageBytes(env),
   }
 }
 
@@ -162,6 +194,7 @@ export function loadConfig(env: Env): ServerConfig {
     vaultDir: join(dataDir, 'vault'),
     stateDir,
     maxBodyBytes: positiveInteger(env, 'TOLARIA_SERVER_MAX_BODY_BYTES', DEFAULT_MAX_BODY_BYTES, 2 ** 31),
+    rateLimit: rateLimitSettings(env),
     collab: collabSettings(env),
     blobStore: blobStoreSettings(env, stateDir),
     indexSnapshots: indexSnapshotSettings(env),

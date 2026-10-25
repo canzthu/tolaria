@@ -65,6 +65,7 @@ async function main(): Promise<void> {
     store,
     token: config.token,
     maxBodyBytes: config.maxBodyBytes,
+    rateLimit: config.rateLimit,
     collab: config.collab ?? false,
     log,
     changes,

@@ -3,6 +3,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { isSupportedProtocolVersion, PROTOCOL_HEADER } from '../../../packages/protocol/src/index.ts'
 import type { ChangeEmitter } from './changeEmitter.ts'
 import { DEFAULT_FLUSH_POLICY, type FlushPolicy } from './collab/flush.ts'
+import { ConnectionCounter, type ConnectionLimits, DEFAULT_CONNECTION_LIMITS } from './collab/connectionLimits.ts'
 import { CollabHub } from './collab/hub.ts'
 import { TicketBook } from './collab/tickets.ts'
 import { attachCollab } from './collab/upgrade.ts'
@@ -10,6 +11,7 @@ import { DocIndex } from './docIndex.ts'
 import { VaultError } from './errors.ts'
 import { errorReply, isAuthorized, type Reply, readBody, send, singleHeader } from './httpIo.ts'
 import { isNote, type VaultPath } from './paths.ts'
+import { accountOf, DEFAULT_RATE_LIMIT, type RateLimit, RateLimited, RateLimiter } from './rateLimit.ts'
 import { route, type Services } from './routes.ts'
 import type { BlobStore } from './store.ts'
 import type { Vault } from './vault.ts'
@@ -27,12 +29,26 @@ export interface ServerOptions {
   changes: ChangeEmitter
   /** Called when the server is ready to serve requests. */
   onReady?: () => void
+  /** Requests per account on every route but `/healthz` and websocket upgrades; `DEFAULT_RATE_LIMIT` by default. */
+  rateLimit?: RateLimit
 }
 
 export interface CollabOptions {
   policy?: FlushPolicy
   /** How long a document without clients stays open. */
   lingerMs?: number
+  /** Websocket limits; each one left out is the default in `DEFAULT_CONNECTION_LIMITS`. */
+  limits?: Partial<ConnectionLimits>
+  /** Largest websocket message. Defaults to `maxBodyBytes`; never above the protocol's 16 MiB. */
+  maxMessageBytes?: number
+}
+
+/** What every request is answered with. */
+interface Handling {
+  services: Services
+  options: ServerOptions
+  server: Server
+  limiter: RateLimiter
 }
 
 const DEFAULT_LINGER_MS = 30_000
@@ -53,15 +69,23 @@ function checkAccess(request: IncomingMessage, token: string): void {
   }
 }
 
-async function answer(request: IncomingMessage, response: ServerResponse, services: Services, options: ServerOptions, server: Server): Promise<Reply> {
+function health(server: Server): Reply {
+  return READY.get(server)
+    ? { status: 200, body: { status: 'ok' } }
+    : { status: 503, body: { status: 'not_ready', message: 'vault is initializing' } }
+}
+
+/** Charges the request to its account's bucket, before anything else is done for it. */
+function checkRate(request: IncomingMessage, token: string, limiter: RateLimiter): void {
+  const wait = limiter.take(accountOf(singleHeader(request.headers, 'authorization'), token))
+  if (wait > 0) throw new RateLimited(wait)
+}
+
+async function answer(request: IncomingMessage, response: ServerResponse, { services, options, server, limiter }: Handling): Promise<Reply> {
   // The base only gives relative request targets something to resolve against.
   const url = new URL(request.url ?? '/', 'http://vault.invalid')
-  if (url.pathname === HEALTH_PATH) {
-    const ready = READY.get(server) ?? false
-    return ready
-      ? { status: 200, body: { status: 'ok' } }
-      : { status: 503, body: { status: 'not_ready', message: 'vault is initializing' } }
-  }
+  if (url.pathname === HEALTH_PATH) return health(server)
+  checkRate(request, options.token, limiter)
   checkAccess(request, options.token)
   return route(
     {
@@ -79,9 +103,13 @@ function failure(error: unknown, log: (message: string) => void): Reply {
   if (!(error instanceof VaultError)) log(`request failed: ${error instanceof Error ? error.stack : String(error)}`)
   const reply = errorReply(error)
   // The body may be unread, so the connection cannot be reused for another request.
-  const headers: Record<string, string> = { connection: 'close' }
-  if (reply.status === 401) headers['www-authenticate'] = 'Bearer'
-  return { ...reply, headers }
+  return { ...reply, headers: { connection: 'close', ...errorHeaders(error) } }
+}
+
+function errorHeaders(error: unknown): Record<string, string> {
+  if (error instanceof RateLimited) return { 'retry-after': String(error.retryAfterSeconds) }
+  if (error instanceof VaultError && error.status === 401) return { 'www-authenticate': 'Bearer' }
+  return {}
 }
 
 /** Builds the HTTP server of one vault. The caller decides where it listens. */
@@ -99,9 +127,10 @@ export async function createVaultServer(options: ServerOptions): Promise<Server>
   vault.onChange((vaultChanges) => search.apply(vaultChanges))
   const tickets = options.collab === false ? undefined : new TicketBook()
   const services: Services = { vault, docs, index, search, collab: tickets !== undefined, tickets, changes }
+  const limiter = new RateLimiter(options.rateLimit ?? DEFAULT_RATE_LIMIT)
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    answer(request, response, services, options, server)
+    answer(request, response, { services, options, server, limiter })
       .catch((error: unknown) => failure(error, log))
       .then((reply: Reply & { sse?: boolean }) => {
         // SSE handlers write directly to response and set a marker
@@ -113,7 +142,7 @@ export async function createVaultServer(options: ServerOptions): Promise<Server>
   READY.set(server, true)
   options.onReady?.()
   if (tickets) {
-    serveCollab(server, { options, docs, tickets, changes, log })
+    serveCollab(server, { options, docs, tickets, changes, limiter, log })
   } else {
     // Set up shutdown handler even without collab
     setupShutdown(server, { vault, changes, log })
@@ -126,10 +155,11 @@ interface CollabParts {
   docs: DocIndex
   tickets: TicketBook
   changes: ChangeEmitter
+  limiter: RateLimiter
   log(message: string): void
 }
 
-function serveCollab(server: Server, { options, docs, tickets, changes, log }: CollabParts): void {
+function serveCollab(server: Server, { options, docs, tickets, changes, limiter, log }: CollabParts): void {
   const { vault, store, token } = options
   const settings = options.collab || {}
   const hub = new CollabHub({
@@ -140,7 +170,18 @@ function serveCollab(server: Server, { options, docs, tickets, changes, log }: C
     policy: settings.policy ?? DEFAULT_FLUSH_POLICY,
     lingerMs: settings.lingerMs ?? DEFAULT_LINGER_MS,
   })
-  const sockets = attachCollab(server, { hub, tickets, docs, token, log, maxMessageBytes: options.maxBodyBytes })
+  const limits = { ...DEFAULT_CONNECTION_LIMITS, ...settings.limits }
+  const sockets = attachCollab(server, {
+    hub,
+    tickets,
+    docs,
+    token,
+    log,
+    maxMessageBytes: settings.maxMessageBytes ?? options.maxBodyBytes,
+    limiter,
+    connections: new ConnectionCounter(limits),
+    idleTimeoutMs: limits.idleTimeoutMs,
+  })
   setupShutdown(server, { vault, hub, sockets, changes, log })
 }
 

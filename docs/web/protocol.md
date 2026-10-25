@@ -1,8 +1,8 @@
-# Tolaria remote protocol, version 1.5
+# Tolaria remote protocol, version 1.6
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change.
 
 ## Design rules
 
@@ -46,6 +46,20 @@ Capabilities:
 - One token gives full access to the one vault. Accounts, per-user identity and permissions are outside this protocol version.
 - `GET /healthz` answers `200 {"status":"ok"}` and reveals nothing about the vault.
 
+## Limits
+
+Since 1.6 the server limits what one account (one token) may use, so one client cannot exhaust the vault's container. Front-line limits at the edge are separate and not part of this protocol.
+
+| Limit | Default | When exceeded |
+|---|---|---|
+| Requests, token bucket per account | 50 per second, bursts of 500 | `429 rate_limited` with `Retry-After` (whole seconds). Every route but `GET /healthz` counts, and so does every websocket upgrade, which is refused with `429` and `Retry-After`. Requests without the token share a bucket of their own, so they never use the account's. |
+| Open websockets per account | 128 | The upgrade is refused with `429`, without `Retry-After`: a place frees when one of the account's sockets closes. |
+| Open websockets per document | 32 | As above. |
+| Websocket message size | the body limit, at most 16 MiB | Closed with `1009`. |
+| Websocket idle timeout | 60 s | The server pings a socket every timeout; one that sent nothing since the last ping, not even a pong, is closed with `4408`. Browsers answer pings themselves, so this only closes a dead or stuck peer. |
+
+The reference server's settings are in `apps/server/README.md`. A client should back off on `429` and on a refused or closed websocket; the collaboration provider in `packages/collab-client` reconnects with a doubling delay.
+
 ## Paths
 
 A path is relative to the vault root, uses `/`, and is percent-encoded in URLs (`/v1/files/my%20notes/caf%C3%A9.md`). The server answers `400 invalid_path` for:
@@ -77,6 +91,7 @@ Every error has the same JSON body. `code` is stable; `message` is for people.
 | 412 | `precondition_failed` | Rename or delete with an `etag` that is no longer current. `details.current` has the current one. |
 | 413 | `payload_too_large` | The body exceeds the server's limit (25 MB by default). |
 | 428 | `precondition_required` | A write or delete without the header that says what it was based on. |
+| 429 | `rate_limited` | The account sent more requests than its limit (since 1.6). `Retry-After` and `details.retryAfterSeconds` give the seconds to wait. See "Limits". |
 | 500 | `internal` | Unexpected failure. The cause is logged, not returned. |
 | 426 | `upgrade_required` | A plain HTTP request to the websocket route of the collaboration channel. |
 | 501 | `not_implemented` | The collaboration channel on a server that does not serve it. |
@@ -327,7 +342,7 @@ Authentication, one of:
 - `?ticket=<ticket>` from the route above;
 - `Authorization: Bearer <token>` on the upgrade request, for clients that can send headers. It gives `write` access.
 
-The upgrade is refused with `401` without valid credentials and with `404` for an unknown document. A request without an upgrade gets `426 upgrade_required`.
+The upgrade is refused with `401` without valid credentials, with `404` for an unknown document and, since 1.6, with `429` beyond a limit (see "Limits"). A request without an upgrade gets `426 upgrade_required`.
 
 Messages are binary and framed as y-websocket frames them, so stock Yjs providers can connect: a varint message type, then the payload.
 
@@ -337,7 +352,7 @@ Messages are binary and framed as y-websocket frames them, so stock Yjs provider
 | `1` awareness | y-protocols awareness update | Presence. Clients publish `{ "user": { "name": "…", "color": "#rrggbb" } }` and BlockNote adds the cursor. The server relays it and withdraws a client's presence when its socket closes. The web client sends caret moves at most every 100 ms and renews its state about every 1.2 s, and drops a peer not renewed for 3.5 s (ADR 0291); receivers take only a `#rrggbb` colour and the first 64 characters of a name. Neither changes the wire format. |
 | `3` awareness query | none | The server answers with the awareness of everyone present. |
 
-Unknown message types are ignored. A message larger than 16 MiB (or the server's lower limit) closes the connection with `1009`; so does sending more than one message's worth before the document has opened. Bytes that are not a message close it with `4400`. When the note is deleted the server closes the room with `4410`.
+Unknown message types are ignored. A message larger than 16 MiB (or the server's lower limit) closes the connection with `1009`; so does sending more than one message's worth before the document has opened. Bytes that are not a message close it with `4400`. When the note is deleted the server closes the room with `4410`. A connection that answers no ping for the idle timeout is closed with `4408` (since 1.6).
 
 The server tries every change on a copy of the document before applying it. A change that would add a shared type other than the three of the format, a node type or attribute the editor schema does not have, or an unknown mark, is not applied, and the connection that sent it is closed with `4422`. The `meta` map is written by the server only; a client's change to it is reverted.
 
