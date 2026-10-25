@@ -17,8 +17,12 @@ for (const zoom of [80, 90, 100, 110, 125, 150]) {
 				root.setProperty("--tolaria-overlay-zoom-inverse", String(100 / level));
 				window.dispatchEvent(new Event("laputa-zoom-change"));
 			}, zoom);
+			await page
+				.getByTestId("note-title-row")
+				.filter({ hasText: "Alpha Project" })
+				.click();
 			const trigger = page.getByRole("button", {
-				name: "Open settings",
+				name: "Open note's neighborhood",
 				exact: true,
 			});
 			await trigger.hover();
