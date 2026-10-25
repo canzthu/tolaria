@@ -1,12 +1,15 @@
 import type { Block, BlockNoteEditor, BlockSchema, InlineContentSchema, StyleSchema } from '@blocknote/core'
 import { blocksToYXmlFragment, yXmlFragmentToBlocks } from '@blocknote/core/yjs'
 import * as Y from 'yjs'
+import { patchInPlace, sameShape } from './inPlacePatch.ts'
 import { type LineMatch, matchLines } from './lineMerge.ts'
 
 /**
  * Changes a live document to a new list of blocks while touching as little as possible:
  * top-level blocks that did not change keep their Yjs items, so cursors, selections and
- * concurrent edits inside them survive. Changed blocks are replaced whole.
+ * concurrent edits inside them survive. Changed blocks whose new versions line up one to one
+ * and only differ in their text are patched in place, so the same holds inside them
+ * (TOL-236); any other change replaces the changed blocks whole.
  */
 
 interface Gap {
@@ -44,6 +47,15 @@ function topLevelGroup(fragment: Y.XmlFragment): Y.XmlElement {
   return fragment.get(0) as Y.XmlElement
 }
 
+/** Patches the gap's blocks in place when each lines up with a new block of the same shape. */
+function patchedInPlace(group: Y.XmlElement, replacement: Y.XmlElement, gap: Gap): boolean {
+  const live = group.slice(gap.from, gap.to)
+  const next = replacement.slice(gap.insertFrom, gap.insertTo)
+  if (live.length !== next.length || !live.every((block, index) => sameShape(block, next[index]))) return false
+  for (const [index, block] of live.entries()) patchInPlace(block as Y.XmlElement, next[index] as Y.XmlElement)
+  return true
+}
+
 function clones(group: Y.XmlElement, from: number, to: number): Y.XmlElement[] {
   return group.slice(from, to).map((node) => (node as Y.XmlElement).clone())
 }
@@ -67,6 +79,7 @@ export function patchBlocks<B extends BlockSchema, I extends InlineContentSchema
   const group = topLevelGroup(fragment)
   // Back to front, so the positions of earlier gaps stay valid.
   for (const gap of gaps(matches, live.length, next.length).reverse()) {
+    if (patchedInPlace(group, replacement, gap)) continue
     group.delete(gap.from, gap.to - gap.from)
     group.insert(gap.from, clones(replacement, gap.insertFrom, gap.insertTo))
   }
