@@ -65,9 +65,15 @@ interface Call {
   init: RequestInit
 }
 
-/** Every request goes to the server this test started on loopback. */
+/** The only host these tests may call: the server they started on loopback. */
+const LOOPBACK_HOSTS = new Set(['127.0.0.1'])
+
 function call({ path, init }: Call): Promise<Response> {
-  return fetch(new URL(path, base), init)
+  const url = new URL(path, base)
+  if (LOOPBACK_HOSTS.has(url.hostname)) {
+    return fetch(url, init)
+  }
+  throw new Error(`the access tests only call the local test server, not ${url.host}`)
 }
 
 function as(credential: string, path: string, init: RequestInit = {}): Promise<Response> {
