@@ -310,52 +310,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VITEPRESS_BASE="/" pnpm docs:build
-          mkdir -p _site/alpha _site/stable _site/release-notes
+          mkdir -p _site
           cp -R site/.vitepress/dist/. _site/
-          if [ -d release-notes ]; then
-            for note in release-notes/*.md; do
-              [ -e "$note" ] || continue
-              awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{f=0;next} !f' "$note" > "_site/$note"
-            done
-          fi
-          fetch_releases() {
-            local attempt=1
-            local releases_file="_site/releases.json"
-            local temporary_file="${releases_file}.tmp"
-
-            while [ "$attempt" -le 4 ]; do
-              if gh api "repos/${{ github.repository }}/releases?per_page=100" --paginate > "$temporary_file"; then
-                mv "$temporary_file" "$releases_file"
-                return 0
-              fi
-
-              if [ "$attempt" -eq 4 ]; then
-                echo "::warning::GitHub releases API failed after 4 attempts; publishing pages without release history"
-                echo '[]' > "$releases_file"
-                rm -f "$temporary_file"
-                return 0
-              fi
-
-              sleep $((attempt * 2))
-              attempt=$((attempt + 1))
-            done
-          }
-          fetch_releases
-          STABLE_TAG=$(gh release list --repo ${{ github.repository }} --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')
-
-          gh release download --repo ${{ github.repository }} "${{ needs.version.outputs.tag }}" --pattern "alpha-latest.json" --output _site/alpha/latest.json || echo '{}' > _site/alpha/latest.json
-          if [ -n "$STABLE_TAG" ]; then
-            gh release download --repo ${{ github.repository }} "$STABLE_TAG" --pattern "stable-latest.json" --output _site/stable/latest.json || echo '{}' > _site/stable/latest.json
-          else
-            echo '{}' > _site/stable/latest.json
-          fi
-          bun scripts/build-release-download-page.ts --latest-json _site/stable/latest.json --releases-json _site/releases.json --output-file _site/stable/download/index.html
-          bun scripts/build-release-history-page.ts --releases-json _site/releases.json --output-file _site/releases/index.html
-          mkdir -p _site/download
-          cp _site/stable/download/index.html _site/download/index.html
-
-          cp _site/alpha/latest.json _site/latest.json
-          cp _site/alpha/latest.json _site/latest-canary.json
+          bash scripts/assemble-pages-site.sh _site "${{ needs.version.outputs.tag }}"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
