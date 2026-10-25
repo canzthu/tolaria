@@ -919,6 +919,8 @@
   "inspector.info.size": "Розмір",
   "update.available": "доступна",
   "update.checking": "Перевірка оновлень...",
+  "update.error.check": "Не вдалося перевірити наявність оновлень",
+  "update.error.download": "Не вдалося завантажити оновлення",
   "update.releaseNotes": "Примітки до випуску",
   "update.updateNow": "Оновити зараз",
   "update.dismiss": "Відхилити",

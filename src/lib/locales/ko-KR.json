@@ -919,6 +919,8 @@
   "inspector.info.size": "크기",
   "update.available": "사용 가능",
   "update.checking": "업데이트 확인 중...",
+  "update.error.check": "업데이트를 확인할 수 없습니다",
+  "update.error.download": "업데이트를 다운로드할 수 없습니다",
   "update.releaseNotes": "릴리스 노트",
   "update.updateNow": "지금 업데이트",
   "update.dismiss": "닫기",

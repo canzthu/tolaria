@@ -48,7 +48,7 @@ function makeStatus(
 function renderBanner(
 	status: UpdateStatus,
 	actions = makeActions(),
-	locale: "en" | "zh-CN" = "en",
+	locale: "en" | "zh-CN" | "it-IT" = "en",
 ) {
 	const view = render(
 		<UpdateBanner status={status} actions={actions} locale={locale} />,
@@ -64,11 +64,19 @@ describe("UpdateBanner", () => {
 	});
 
 	it("keeps updater errors in the bottom stack with the community banner", () => {
-		renderBanner({ state: "error", message: "Update check failed" });
+		renderBanner({ state: "error", kind: "check" });
 		const stack = screen.getByTestId("bottom-banner-stack");
 		expect(stack).toContainElement(screen.getByTestId("update-banner"));
 		expect(stack).toContainElement(screen.getByTestId("community-banner"));
-		expect(stack).toHaveTextContent("Update check failed");
+		expect(stack).toHaveTextContent("Could not check for updates");
+	});
+
+	it("localizes updater error states", () => {
+		renderBanner({ state: "error", kind: "download" }, makeActions(), "it-IT");
+
+		expect(screen.getByTestId("update-banner")).toHaveTextContent(
+			"Impossibile scaricare l'aggiornamento",
+		);
 	});
 
 	it("shows immediate feedback while checking for updates", () => {
@@ -76,10 +84,9 @@ describe("UpdateBanner", () => {
 
 		const stack = screen.getByTestId("bottom-banner-stack");
 		const banners = Array.from(stack.children);
-		expect(banners.map((banner) => banner.getAttribute("data-testid"))).toEqual([
-			"update-banner",
-			"community-banner",
-		]);
+		expect(banners.map((banner) => banner.getAttribute("data-testid"))).toEqual(
+			["update-banner", "community-banner"],
+		);
 		expect(stack).toHaveTextContent("Checking for updates");
 	});
 

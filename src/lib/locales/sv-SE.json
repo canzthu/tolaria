@@ -919,6 +919,8 @@
   "inspector.info.size": "Storlek",
   "update.available": "är tillgänglig",
   "update.checking": "Söker efter uppdateringar...",
+  "update.error.check": "Det gick inte att söka efter uppdateringar",
+  "update.error.download": "Det gick inte att ladda ner uppdateringen",
   "update.releaseNotes": "Versionsinformation",
   "update.updateNow": "Uppdatera nu",
   "update.dismiss": "Avfärda",

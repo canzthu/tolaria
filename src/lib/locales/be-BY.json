@@ -919,6 +919,8 @@
   "inspector.info.size": "Памер",
   "update.available": "даступна",
   "update.checking": "Праверка абнаўленняў...",
+  "update.error.check": "Не ўдалося праверыць наяўнасць абнаўленняў",
+  "update.error.download": "Не ўдалося спампаваць абнаўленне",
   "update.releaseNotes": "Што новага",
   "update.updateNow": "Абнавіць зараз",
   "update.dismiss": "Схаваць",

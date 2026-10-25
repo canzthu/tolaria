@@ -1,6 +1,6 @@
 import "./App.testUtils";
-import { useState } from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
 import {
@@ -12,8 +12,8 @@ import {
 	render,
 	SLOW_APP_READY_TIMEOUT_MS,
 } from "./App.testUtils";
-import { useUpdater } from "./hooks/useUpdater";
 import type { UpdateCheckResult, UpdateStatus } from "./hooks/useUpdater";
+import { useUpdater } from "./hooks/useUpdater";
 import type { Settings } from "./types";
 import { streamAiAgent } from "./utils/streamAiAgent";
 
@@ -36,7 +36,7 @@ function mockUpdaterWithStatus(
 							notes: undefined,
 						});
 					} else if (result.kind === "error") {
-						setStatus({ state: "error", message: result.message });
+						setStatus({ state: "error", kind: "check" });
 					} else {
 						setStatus({ state: "idle" });
 					}

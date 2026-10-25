@@ -919,6 +919,8 @@
   "inspector.info.size": "Ukuran",
   "update.available": "tersedia",
   "update.checking": "Memeriksa pembaruan...",
+  "update.error.check": "Tidak dapat memeriksa pembaruan",
+  "update.error.download": "Tidak dapat mengunduh pembaruan",
   "update.releaseNotes": "Catatan Rilis",
   "update.updateNow": "Perbarui Sekarang",
   "update.dismiss": "Tutup",

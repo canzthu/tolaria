@@ -919,6 +919,8 @@
   "inspector.info.size": "Veľkosť",
   "update.available": "je k dispozícii",
   "update.checking": "Kontrolujú sa aktualizácie...",
+  "update.error.check": "Nepodarilo sa skontrolovať aktualizácie",
+  "update.error.download": "Nepodarilo sa stiahnuť aktualizáciu",
   "update.releaseNotes": "Poznámky k vydaniu",
   "update.updateNow": "Aktualizovať teraz",
   "update.dismiss": "Zrušiť",

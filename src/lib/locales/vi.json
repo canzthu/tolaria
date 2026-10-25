@@ -919,6 +919,8 @@
   "inspector.info.size": "Dung lượng",
   "update.available": "đã có sẵn",
   "update.checking": "Checking for updates...",
+  "update.error.check": "Không thể kiểm tra các bản cập nhật",
+  "update.error.download": "Không thể tải xuống bản cập nhật",
   "update.releaseNotes": "Ghi chú phát hành",
   "update.updateNow": "Cập nhật ngay",
   "update.dismiss": "Bỏ qua",

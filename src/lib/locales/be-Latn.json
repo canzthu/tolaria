@@ -870,6 +870,8 @@
   "inspector.info.size": "Pamier",
   "update.available": "dastupna",
   "update.checking": "Pravierka abnaŭlienniaŭ...",
+  "update.error.check": "Nie ŭdalosia praveryć najaŭnasć abnaŭlienniaŭ",
+  "update.error.download": "Nie ŭdalosia spampavać abnaŭliennie",
   "update.releaseNotes": "Što novaha",
   "update.updateNow": "Abnavić zaraz",
   "update.dismiss": "Schavać",

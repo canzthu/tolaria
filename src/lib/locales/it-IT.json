@@ -919,6 +919,8 @@
   "inspector.info.size": "Dimensione",
   "update.available": "è disponibile",
   "update.checking": "Verifica degli aggiornamenti in corso...",
+  "update.error.check": "Impossibile verificare la presenza di aggiornamenti",
+  "update.error.download": "Impossibile scaricare l'aggiornamento",
   "update.releaseNotes": "Note sulla versione",
   "update.updateNow": "Aggiorna ora",
   "update.dismiss": "Ignora",

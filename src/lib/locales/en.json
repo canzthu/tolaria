@@ -919,6 +919,8 @@
   "inspector.info.size": "Size",
   "update.available": "is available",
   "update.checking": "Checking for updates...",
+  "update.error.check": "Could not check for updates",
+  "update.error.download": "Could not download the update",
   "update.releaseNotes": "Release Notes",
   "update.updateNow": "Update Now",
   "update.dismiss": "Dismiss",

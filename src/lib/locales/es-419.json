@@ -919,6 +919,8 @@
   "inspector.info.size": "Tamaño",
   "update.available": "está disponible",
   "update.checking": "Buscando actualizaciones...",
+  "update.error.check": "No se pudieron buscar actualizaciones",
+  "update.error.download": "No se pudo descargar la actualización",
   "update.releaseNotes": "Notas de la versión",
   "update.updateNow": "Actualizar ahora",
   "update.dismiss": "Omitir",

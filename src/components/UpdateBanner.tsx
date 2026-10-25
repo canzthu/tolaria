@@ -25,10 +25,7 @@ interface UpdateBannerProps {
 	locale?: AppLocale;
 }
 
-type VisibleUpdateStatus = Exclude<
-	UpdateStatus,
-	{ state: "idle" }
->;
+type VisibleUpdateStatus = Exclude<UpdateStatus, { state: "idle" }>;
 
 function isUpdateBannerVisible(
 	status: UpdateStatus,
@@ -232,7 +229,16 @@ function renderBannerContent(
 		case "ready":
 			return renderReadyContent(status, locale);
 		case "error":
-			return <span>{status.message}</span>;
+			return (
+				<span>
+					{translate(
+						locale,
+						status.kind === "check"
+							? "update.error.check"
+							: "update.error.download",
+					)}
+				</span>
+			);
 	}
 }
 
@@ -261,7 +267,10 @@ export function UpdateBanner({
 	}, [communityDismissed, updateVisible]);
 
 	return (
-		<div data-testid="bottom-banner-stack" style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+		<div
+			data-testid="bottom-banner-stack"
+			style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}
+		>
 			{updateVisible && (
 				<div data-testid="update-banner" style={bannerStyle}>
 					{renderBannerContent(status, actions, locale)}

@@ -919,6 +919,8 @@
   "inspector.info.size": "Размер",
   "update.available": "доступно",
   "update.checking": "Проверка наличия обновлений...",
+  "update.error.check": "Не удалось проверить наличие обновлений",
+  "update.error.download": "Не удалось загрузить обновление",
   "update.releaseNotes": "Примечания к выпуску",
   "update.updateNow": "Обновить сейчас",
   "update.dismiss": "Закрыть",

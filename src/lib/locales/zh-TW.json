@@ -919,6 +919,8 @@
   "inspector.info.size": "大小",
   "update.available": "可用",
   "update.checking": "正在檢查更新……",
+  "update.error.check": "無法檢查更新",
+  "update.error.download": "無法下載更新",
   "update.releaseNotes": "發行說明",
   "update.updateNow": "立即更新",
   "update.dismiss": "關閉",
