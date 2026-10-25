@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.7'
+export const PROTOCOL_VERSION = '1.8'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -17,6 +17,10 @@ export const ROUTES = {
   rename: `${API_PREFIX}/rename`,
   /** Renames a folder: every file in it moves in one commit (since 1.7). */
   folderRename: `${API_PREFIX}/folders/rename`,
+  /** Creates a folder: one commit adding its `.keep` file (since 1.8). */
+  folders: `${API_PREFIX}/folders`,
+  /** Deletes a folder: every file in it goes in one commit (since 1.8). */
+  folderDelete: `${API_PREFIX}/folders/delete`,
   search: `${API_PREFIX}/search`,
   sync: `${API_PREFIX}/sync`,
   /** Vault index of all entries. Supports ETag and `since` parameter for delta updates. */
@@ -108,6 +112,8 @@ export const FILE_CAPABILITIES = [
   'attachments.import',
   'files.rename.links',
   'folders.rename',
+  'folders.create',
+  'folders.delete',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
@@ -210,6 +216,31 @@ export interface FolderRenameResult {
   moved: { from: string; to: string }[]
   /** With `rewriteLinks`: the notes whose wikilinks were rewritten. */
   rewritten?: string[]
+}
+
+/**
+ * Body of `POST /v1/folders` and of `POST /v1/folders/delete` (since 1.8): `path` is the
+ * folder's path.
+ */
+export interface FolderRequest {
+  path: string
+}
+
+/** Git keeps no empty folder: a folder created through the protocol holds this empty file. */
+export const FOLDER_KEEP_FILE = '.keep'
+
+export interface FolderCreateResult {
+  path: string
+  commit: string
+  pushed: boolean
+}
+
+export interface FolderDeleteResult {
+  path: string
+  commit: string
+  pushed: boolean
+  /** Every file that was deleted. */
+  deleted: string[]
 }
 
 export interface DeleteResult {

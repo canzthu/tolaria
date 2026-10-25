@@ -1,4 +1,5 @@
 import type {
+	VaultFolderCreateRequest,
 	VaultFolderRenameRequest,
 	VaultFolderRenameResult,
 } from "../../../src/lib/vaultBackend/types";
@@ -6,6 +7,7 @@ import type { FolderNode } from "../../../src/types";
 import { isPortableName } from "../../../src/utils/portableName";
 import {
 	type FolderRenameRequest,
+	type FolderRequest,
 	ROUTES,
 } from "../../protocol/src/index.ts";
 import {
@@ -15,6 +17,7 @@ import {
 	ok,
 	RemoteError,
 	type Request,
+	released,
 } from "./remoteHttp.ts";
 import { followMoves, type Move, rewrittenCount } from "./remoteNoteLifecycle.ts";
 
@@ -22,7 +25,9 @@ import { followMoves, type Move, rewrittenCount } from "./remoteNoteLifecycle.ts
  * Folders on the Tolaria remote. Git keeps no empty folder, so the folder tree is the
  * folders of the vault's tracked files, hidden as the desktop's tree hides them (dot
  * folders and `type/`). A folder rename is one commit on the server (protocol 1.7) that
- * moves every file in it and rewrites the links that reach a moved note by its path.
+ * moves every file in it and rewrites the links that reach a moved note by its path. Creating
+ * and deleting a folder are one commit each (protocol 1.8): a new folder holds an empty
+ * `.keep` file, and a delete takes every file in the folder with it.
  */
 
 /** Folders the desktop's tree leaves out (`is_folder_tree_hidden_dir`). */
@@ -78,6 +83,21 @@ export async function listFolders(request: Request): Promise<FolderNode[]> {
 	return folderTree(filePaths(await response.json()));
 }
 
+function postJson(request: Request, route: string, body: unknown): Promise<Response> {
+	return request(route, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body),
+	});
+}
+
+/** The answer, or the desktop's `message` when the server refused it with `status`. */
+async function okUnless(response: Response, status: number, message: string): Promise<Response> {
+	if (response.status !== status) return ok(response);
+	await released(response);
+	throw new RemoteError(status, message);
+}
+
 function siblingPath(folderPath: string, name: string): string {
 	const parent = folderPath.slice(0, folderPath.lastIndexOf("/") + 1);
 	return `${parent}${name}`;
@@ -102,13 +122,31 @@ export async function renameFolder(
 	const to = siblingPath(folderPath, name);
 	if (to === folderPath) return { oldPath: folderPath, newPath: to, updatedFiles: 0 };
 	const body: FolderRenameRequest = { from: folderPath, to, rewriteLinks: true };
-	const response = await request(ROUTES.folderRename, {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify(body),
-	});
-	if (response.status === 409) throw new RemoteError(409, `Folder '${to}' already exists`);
-	const result = await jsonWithStrings(await ok(response), ["path"], "folder rename result");
+	const response = await postJson(request, ROUTES.folderRename, body);
+	const answer = await okUnless(response, 409, `Folder '${to}' already exists`);
+	const result = await jsonWithStrings(answer, ["path"], "folder rename result");
 	followMoves(movesOf(result));
 	return { oldPath: folderPath, newPath: result.path, updatedFiles: rewrittenCount(result) };
+}
+
+/** Creates an empty folder, refusing what the desktop's `create_vault_folder` refuses. */
+export async function createFolder(
+	request: Request,
+	{ parentPath, name }: VaultFolderCreateRequest,
+): Promise<void> {
+	if (!isPortableName(name)) throw new RemoteError(400, "Invalid folder name");
+	const path = parentPath ? `${parentPath}/${name}` : name;
+	assertVaultPath(path);
+	const body: FolderRequest = { path };
+	const response = await postJson(request, ROUTES.folders, body);
+	await released(await okUnless(response, 409, `Folder '${name}' already exists`));
+}
+
+/** Deletes a folder with every file in it, as the desktop's `delete_vault_folder` does. */
+export async function deleteFolder(request: Request, folderPath: string): Promise<string> {
+	assertVaultPath(folderPath);
+	const body: FolderRequest = { path: folderPath };
+	const response = await postJson(request, ROUTES.folderDelete, body);
+	await released(await okUnless(response, 404, `Folder does not exist: ${folderPath}`));
+	return folderPath;
 }

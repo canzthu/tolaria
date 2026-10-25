@@ -1,6 +1,6 @@
-import { invoke } from '@tauri-apps/api/core'
+import { announceRemoteFolderChange } from '../lib/remoteFolderChanges'
+import { createVaultBackend, hasRemoteVault } from '../lib/vaultBackend'
 import type { FolderCreationParent } from '../types'
-import { isTauri, mockInvoke } from '../mock-tauri'
 
 const PATH_SEPARATOR = /[/\\]/
 
@@ -39,15 +39,34 @@ export function vaultFolderCreationArgs(request: VaultFolderCreationRequest) {
   return { vaultPath: folderVaultPath(request), folderName: request.name, parentPath: folderParentPath(request.parent) }
 }
 
+/** An error shown as the desktop shows a command's error: its message alone. */
+class FolderCreationError extends Error {
+  override toString(): string {
+    return this.message
+  }
+}
+
+function remoteFolderPath(folderName: string, parentPath: string | null): string {
+  return parentPath ? `${parentPath}/${folderName}` : folderName
+}
+
+async function createFolder(request: VaultFolderCreationRequest): Promise<void> {
+  const { vaultPath, folderName, parentPath } = vaultFolderCreationArgs(request)
+  await createVaultBackend(vaultPath).files.createFolder({ parentPath, name: folderName })
+  announceRemoteFolderChange({ kind: 'created', path: remoteFolderPath(folderName, parentPath) })
+}
+
 /**
- * Creates a folder in the vault through the native command, or the browser mock outside Tauri.
- * The native command re-validates the name and keeps the path inside the vault boundary.
+ * Creates a folder in the vault through `createVaultBackend`: the native command on the
+ * desktop, which re-validates the name and keeps the path inside the vault boundary; one
+ * commit on a Tolaria remote, whose refusals read like the desktop's; the browser mock
+ * otherwise.
  */
 export async function createVaultFolder(request: VaultFolderCreationRequest) {
-  const args = vaultFolderCreationArgs(request)
-  if (isTauri()) {
-    await invoke('create_vault_folder', args)
-  } else {
-    await mockInvoke('create_vault_folder', args)
+  try {
+    await createFolder(request)
+  } catch (error) {
+    if (hasRemoteVault() && error instanceof Error) throw new FolderCreationError(error.message)
+    throw error
   }
 }

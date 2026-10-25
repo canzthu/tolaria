@@ -1,6 +1,5 @@
-import { invoke } from '@tauri-apps/api/core'
-import { createVaultBackend } from '../../lib/vaultBackend'
-import { isTauri, mockInvoke } from '../../mock-tauri'
+import { announceRemoteFolderChange } from '../../lib/remoteFolderChanges'
+import { createVaultBackend, hasRemoteVault } from '../../lib/vaultBackend'
 import type { SidebarSelection, VaultEntry } from '../../types'
 
 export interface FolderRenameResult {
@@ -73,11 +72,22 @@ export async function invokeRenameFolder(params: {
   return { old_path: oldPath, new_path: newPath }
 }
 
+/** Deletes a folder with everything in it; on a Tolaria remote, the other tabs are told. */
 export async function invokeDeleteFolder(params: { vaultPath: string; folderPath: string }): Promise<string> {
-  if (isTauri()) {
-    return invoke<string>('delete_vault_folder', params)
-  }
-  return mockInvoke<string>('delete_vault_folder', params)
+  const { vaultPath, folderPath } = params
+  const deletedPath = await createVaultBackend(vaultPath).files.deleteFolder(folderPath)
+  announceRemoteFolderChange({ kind: 'deleted', path: folderPath })
+  return deletedPath
+}
+
+/** Where entry paths live: under the vault folder on the desktop, vault-relative (`''`) on a remote. */
+export function entryVaultPath(vaultPath: string): string {
+  return hasRemoteVault() ? '' : vaultPath
+}
+
+/** The remote's errors carry the desktop's wording in their message; the desktop's are shown as they are. */
+export function folderActionError(error: unknown): string {
+  return hasRemoteVault() && error instanceof Error ? error.message : String(error)
 }
 
 export function updateSelectionAfterFolderRename(params: {
@@ -167,7 +177,7 @@ export function clearDeletedFolderTabs(params: {
     setTabs,
     vaultPath,
   } = params
-  const folderPrefix = folderAbsolutePath({ vaultPath, folderPath })
+  const folderPrefix = entryFolderPath({ vaultPath, folderPath })
   const hasActiveTabInFolder = !!activeTabPathRef.current
     && isWithinPrefix({ path: activeTabPathRef.current, prefix: folderPrefix })
 
@@ -201,7 +211,7 @@ export function resetSelectionIfFolderDeleted(params: {
 
   if (selection.kind !== 'entity') return
 
-  const folderPrefix = folderAbsolutePath({ vaultPath, folderPath })
+  const folderPrefix = entryFolderPath({ vaultPath, folderPath })
   if (!isWithinPrefix({ path: selection.entry.path, prefix: folderPrefix })) return
 
   const replacement = refreshedEntries.find((entry) => entry.path === selection.entry.path)

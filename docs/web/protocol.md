@@ -1,8 +1,8 @@
-# Tolaria remote protocol, version 1.7
+# Tolaria remote protocol, version 1.8
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change. Version 1.7 added folder renames (`POST /v1/folders/rename`, capability `folders.rename`); nothing else changed.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change. Version 1.7 added folder renames (`POST /v1/folders/rename`, capability `folders.rename`); nothing else changed. Version 1.8 added creating and deleting folders (`POST /v1/folders`, capability `folders.create`; `POST /v1/folders/delete`, capability `folders.delete`); nothing else changed.
 
 ## Design rules
 
@@ -37,6 +37,8 @@ Capabilities:
 | `attachments.import` | `POST /v1/attachments/imports` downloads a public image into `attachments/` (since 1.3). |
 | `files.rename.links` | `POST /v1/rename` rewrites the wikilinks to the renamed note on request (since 1.4). |
 | `folders.rename` | `POST /v1/folders/rename` moves every file of a folder in one commit (since 1.7). |
+| `folders.create` | `POST /v1/folders` creates an empty folder in one commit (since 1.8). |
+| `folders.delete` | `POST /v1/folders/delete` deletes every file of a folder in one commit (since 1.8). |
 | `collab.yjs`, `collab.awareness` | The collaboration channel is served (since 1.1). |
 | `collab.tickets` | `POST /v1/collab/tickets` issues websocket tickets (since 1.1). |
 
@@ -106,8 +108,8 @@ A write that ends in a conflict copy is not an error body: see `PUT` below.
 
 ```json
 {
-  "protocolVersion": "1.7",
-  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "files.rename.links", "folders.rename", "collab.yjs", "collab.awareness", "collab.tickets"],
+  "protocolVersion": "1.8",
+  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "files.rename.links", "folders.rename", "folders.create", "folders.delete", "collab.yjs", "collab.awareness", "collab.tickets"],
   "vault": { "name": "my-vault", "branch": "main", "head": "eea2db93a391d110c4707fa1f6c6078c2f39c1ca" },
   "collab": { "available": true, "path": "/v1/collab/docs", "docFormat": "tolaria.blocknote/1", "blocksFragment": "blocks", "frontmatterField": "frontmatter", "metaMap": "meta" }
 }
@@ -240,6 +242,34 @@ A move to another folder is a rename whose `to` is in that folder; with `rewrite
 ```
 
 `rewritten` is present only with `rewriteLinks`. `404 not_found` when no tracked file is under `from`, `409 destination_exists` when something exists at `to` or a parent of `to` is a file, `400 invalid_request` when `to` is `from` or inside it. The server applies its path rules only; the reference web client also refuses a new name that Windows cannot hold (the desktop's `filename_rules.rs`) before sending anything.
+
+### `POST /v1/folders` (since 1.8)
+
+```json
+{ "path": "projects/drafts" }
+```
+
+Creates an empty folder, as one commit, pushed, with the subject `Create folder <path>`. Git keeps no empty folder, so the folder holds an empty file named `.keep` (`projects/drafts/.keep`), which is an ordinary tracked file: it is listed, moves with a folder rename and goes with a folder delete. The desktop app hides dot files, so it shows the folder empty; the reference web client leaves dot files out of its note list too. Missing folders above `path` are created. `201`:
+
+```json
+{ "path": "projects/drafts", "commit": "…", "pushed": true }
+```
+
+`409 destination_exists` when a file or a folder already exists at `path` or a parent of `path` is a file. The server applies its path rules only; the reference web client also refuses a name that Windows cannot hold, with the desktop's `Invalid folder name`, before sending anything.
+
+### `POST /v1/folders/delete` (since 1.8)
+
+```json
+{ "path": "projects" }
+```
+
+Deletes every tracked file under the folder, nested folders included, as one commit, pushed, with the subject `Delete folder <path>`. This is what the desktop's folder delete does after its confirmation; it takes no precondition. Files outside the folder are untouched, also those whose path only starts with the same characters (`projects-old/`). Live documents of the deleted notes are closed as for any deletion (`4410`); one with edits that were not written yet writes them back, which restores that note (see "What the server does with a document"), so nothing typed is lost.
+
+```json
+{ "path": "projects", "commit": "…", "pushed": true, "deleted": ["projects/alpha.md", "projects/deep/beta.md"] }
+```
+
+`404 not_found` when no tracked file is under `path`.
 
 ### `GET /v1/search?q=<text>[&limit=<n>]`
 

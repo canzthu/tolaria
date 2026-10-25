@@ -233,6 +233,22 @@ describe('createCommandVaultBackend', () => {
       expect(calls).toEqual([{ command: 'rename_vault_folder', args: { vaultPath: VAULT, folderPath: 'projects', newName: 'work' } }])
       expect(result).toEqual({ oldPath: 'projects', newPath: 'work', updatedFiles: 0 })
     })
+
+    it.each(['tauri', 'mock'] as const)('creates a folder through create_vault_folder in the %s dialect', async (dialect) => {
+      const { backend, calls } = harness(dialect, { create_vault_folder: () => 'Drafts' })
+
+      await backend.files.createFolder({ parentPath: 'projects', name: 'Drafts' })
+
+      expect(calls).toEqual([{ command: 'create_vault_folder', args: { vaultPath: VAULT, folderName: 'Drafts', parentPath: 'projects' } }])
+    })
+
+    it.each(['tauri', 'mock'] as const)('deletes a folder through delete_vault_folder in the %s dialect', async (dialect) => {
+      const { backend, calls } = harness(dialect, { delete_vault_folder: () => 'projects' })
+
+      await expect(backend.files.deleteFolder('projects')).resolves.toBe('projects')
+
+      expect(calls).toEqual([{ command: 'delete_vault_folder', args: { vaultPath: VAULT, folderPath: 'projects' } }])
+    })
   })
 
   it('deletes through the dialect-specific batch command', async () => {

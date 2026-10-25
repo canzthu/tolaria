@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { createVaultFolder, vaultFolderCreationArgs } from './vaultFolderCreation'
 
@@ -81,5 +81,54 @@ describe('createVaultFolder', () => {
 
     expect(mockInvoke).toHaveBeenCalledWith('create_vault_folder', { vaultPath: '/vault', folderName: 'Projects', parentPath: 'notes' })
     expect(invoke).not.toHaveBeenCalled()
+  })
+})
+
+describe('createVaultFolder on a Tolaria remote', () => {
+  const sent: Array<{ url: string; body: unknown }> = []
+  let answer: () => Response
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(isTauri).mockReturnValue(false)
+    sent.length = 0
+    answer = () => Response.json({ path: 'notes/Projects', commit: 'c', pushed: true }, { status: 201 })
+    Object.assign(window, { TOLARIA_REMOTE_URL: 'https://vault.test', TOLARIA_REMOTE_TOKEN: 'token' })
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      sent.push({ url, body: JSON.parse(String(init?.body)) })
+      return answer()
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    Object.assign(window, { TOLARIA_REMOTE_URL: undefined, TOLARIA_REMOTE_TOKEN: undefined })
+  })
+
+  it('creates the folder on the server, not through the mock, and tells the other tabs', async () => {
+    const otherTab = new BroadcastChannel('tolaria:remote-folders:https://vault.test')
+    const told = new Promise((resolve) => { otherTab.onmessage = ({ data }) => resolve(data) })
+
+    await createVaultFolder({ name: 'Projects', parent: { path: 'notes', rootPath: '/vault' }, defaultVaultPath: '/vault' })
+
+    expect(sent).toEqual([{ url: 'https://vault.test/v1/folders', body: { path: 'notes/Projects' } }])
+    expect(mockInvoke).not.toHaveBeenCalled()
+    await expect(told).resolves.toEqual({ kind: 'created', path: 'notes/Projects' })
+    otherTab.close()
+  })
+
+  it('reads a refusal like the desktop: the message alone', async () => {
+    answer = () => Response.json({ error: { code: 'destination_exists' } }, { status: 409 })
+
+    const error = await createVaultFolder({ name: 'Projects', defaultVaultPath: '/vault' }).catch((caught: unknown) => caught)
+
+    expect(`${error}`).toBe("Folder 'Projects' already exists")
+  })
+
+  it('refuses a name Windows cannot hold before any request', async () => {
+    const error = await createVaultFolder({ name: 'LPT1', defaultVaultPath: '/vault' }).catch((caught: unknown) => caught)
+
+    expect(`${error}`).toBe('Invalid folder name')
+    expect(sent).toEqual([])
   })
 })

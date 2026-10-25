@@ -10,10 +10,10 @@ import type { Vault } from '../../../apps/server/src/vault.ts'
 import { createFixture, type Fixture } from '../../../apps/server/test/helpers.ts'
 import type { VaultBackend, VaultCollabDoc } from '../../../src/lib/vaultBackend/types'
 import type { SocketLike } from '../src/collabProvider.ts'
-import { folderTree, listFolders, renameFolder } from '../src/remoteFolders.ts'
+import { createFolder, deleteFolder, folderTree, listFolders, renameFolder } from '../src/remoteFolders.ts'
 import { createRemoteVaultBackend, type RemoteBindings } from '../src/remoteVaultBackend.ts'
 
-/** TOL-227: the folder tree and folder renames on the Tolaria remote. */
+/** TOL-227 and TOL-233: the folder tree, folder renames, creates and deletes on the Tolaria remote. */
 
 const TOKEN = 'test-token-0123456789'
 
@@ -124,5 +124,58 @@ describe('renaming a folder on the web', () => {
       updatedFiles: 0,
     })
     expect(sent).toEqual([{ from: 'a/b', to: 'a/c', rewriteLinks: true }])
+  })
+})
+
+describe('creating and deleting a folder on the web', () => {
+  it('creates an empty folder in one commit that the folder tree shows', async () => {
+    await backend.files.createFolder({ parentPath: 'projects', name: 'Drafts' })
+
+    expect((await fixture.desktop.log())[0]).toBe('Create folder projects/Drafts')
+    expect(await fixture.desktop.read('projects/Drafts/.keep')).toBe('')
+    expect(await backend.chrome.listFolders()).toContainEqual({
+      name: 'projects',
+      path: 'projects',
+      children: [{ name: 'Drafts', path: 'projects/Drafts', children: [] }],
+    })
+  })
+
+  it('creates a folder at the vault root without a parent', async () => {
+    await backend.files.createFolder({ parentPath: null, name: 'Ideas' })
+
+    expect((await fixture.desktop.log())[0]).toBe('Create folder Ideas')
+  })
+
+  it('answers a taken name with the desktop message', async () => {
+    await expect(backend.files.createFolder({ parentPath: null, name: 'projects' })).rejects.toThrow(
+      "Folder 'projects' already exists",
+    )
+  })
+
+  it.each(['quarterly:plan', 'LPT1', 'con.txt', 'trailing.', '', 'a/b'])('refuses %j before any request', async (name) => {
+    await expect(createFolder(noRequest, { parentPath: null, name })).rejects.toThrow('Invalid folder name')
+  })
+
+  it('deletes a folder with its notes in one commit and closes their documents', async () => {
+    await backend.files.write('projects/deep/beta.md', '# Beta\n', { baseRevision: null })
+    await backend.files.write('projects-old/kept.md', '# Kept\n', { baseRevision: null })
+    const alpha = await open('projects/alpha.md')
+    const closed = new Promise<void>((resolve) => alpha.provider.onStatus((status) => {
+      if (status !== 'synced') resolve()
+    }))
+
+    await expect(backend.files.deleteFolder('projects')).resolves.toBe('projects')
+
+    await closed
+    expect((await fixture.desktop.log())[0]).toBe('Delete folder projects')
+    expect((await vault.list()).files.map((file) => file.path)).toEqual(['attachments/pixel.bin', 'projects-old/kept.md', 'welcome.md'])
+  })
+
+  it('answers a missing folder with the desktop message', async () => {
+    await expect(backend.files.deleteFolder('nowhere')).rejects.toThrow('Folder does not exist: nowhere')
+  })
+
+  it('refuses a path that is not a vault path before any request', async () => {
+    await expect(deleteFolder(noRequest, '../escape')).rejects.toMatchObject({ status: 400 })
   })
 })

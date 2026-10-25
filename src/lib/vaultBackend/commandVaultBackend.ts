@@ -9,6 +9,7 @@ import {
   type VaultChromeOps,
   type VaultFile,
   type VaultFileOps,
+  type VaultFolderCreateRequest,
   type VaultFolderRenameRequest,
   type VaultFolderRenameResult,
   type VaultRenameRequest,
@@ -136,6 +137,14 @@ async function renameFolderCommand(
   return { oldPath: raw.old_path, newPath: raw.new_path, updatedFiles: 0 }
 }
 
+/** Both dialects take the same arguments for creating and deleting a folder too. */
+async function createFolderCommand(
+  { invoke, vaultPath }: CommandVaultBackendOptions,
+  { parentPath, name }: VaultFolderCreateRequest,
+): Promise<void> {
+  await invoke<string>('create_vault_folder', { vaultPath, folderName: name, parentPath })
+}
+
 function createFileOps(options: CommandVaultBackendOptions): VaultFileOps {
   const { dialect, invoke, vaultPath } = options
   const isTauri = dialect === 'tauri'
@@ -200,6 +209,8 @@ function createFileOps(options: CommandVaultBackendOptions): VaultFileOps {
     write,
     rename,
     renameFolder: (request) => renameFolderCommand(options, request),
+    createFolder: (request) => createFolderCommand(options, request),
+    deleteFolder: (folderPath) => invoke<string>('delete_vault_folder', { vaultPath, folderPath }),
     delete: (paths) => invoke<string[]>(isTauri ? 'batch_delete_notes_async' : 'batch_delete_notes', { paths, vaultPath }),
     search,
     saveAttachment,

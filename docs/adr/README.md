@@ -288,3 +288,4 @@ proposed → active → superseded
 | [0290](0290-live-document-keeps-its-edits-on-a-desktop-conflict.md) | A live document keeps its edits on a desktop conflict; the incoming version becomes the conflict copy | active |
 | [0291](0291-presence-in-the-web-note-view.md) | Presence in the web note view: device names, paced awareness, clear within 5 s | active |
 | [0292](0292-in-process-request-and-websocket-limits-on-the-server.md) | In-process request and websocket limits on the server, per account | active |
+| [0293](0293-folder-create-and-delete-on-the-server.md) | Folders created on the server hold a .keep file; folder deletes take every file in one commit | active |

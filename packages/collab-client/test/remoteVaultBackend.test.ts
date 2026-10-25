@@ -137,6 +137,13 @@ describe('the remote vault backend', () => {
     expect(entries.length).toBe(3)
   })
 
+  it('leaves dot files out of the entries, as the desktop does, so a new folder adds no note', async () => {
+    await backend.files.createFolder({ parentPath: null, name: 'ideas' })
+
+    expect((await backend.files.list()).map((entry) => entry.path)).not.toContain('ideas/.keep')
+    expect((await backend.files.reload()).map((entry) => entry.path)).not.toContain('ideas/.keep')
+  })
+
   it('searches notes by content', async () => {
     const result = await backend.files.search('welcome')
 

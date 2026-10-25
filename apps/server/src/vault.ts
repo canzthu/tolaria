@@ -2,6 +2,8 @@ import { basename } from 'node:path'
 import type {
   DeleteResult,
   FileEntry,
+  FolderCreateResult,
+  FolderDeleteResult,
   FolderRenameResult,
   ListResponse,
   RenameResult,
@@ -14,6 +16,7 @@ import { notFound, stale, VaultError } from './errors.ts'
 import { GitRepo, REMOTE, type RepoOptions } from './gitRepo.ts'
 import { GitSync, type VaultChange } from './gitSync.ts'
 import { blobEtag, conflictCopyPath, type VaultPath } from './paths.ts'
+import { type StagedFolderChange, stageFolderCreate, stageFolderDelete } from './folderLifecycle.ts'
 import { FolderRenameTransaction } from './folderRenameTransaction.ts'
 import { type RenameOptions, RenameTransaction } from './renameTransaction.ts'
 import { searchVault } from './search.ts'
@@ -106,6 +109,12 @@ export function writeOutcome(
 function commitMessage(outcome: WriteOutcome, path: VaultPath): string {
   if (outcome === 'conflict') return `Conflict copy of ${path}`
   return `${outcome === 'updated' ? 'Update' : 'Create'} ${path}`
+}
+
+/** The paths a change touches, for the change feed. */
+function changedPaths(change: VaultChange): VaultPath[] {
+  if (change.kind === 'rename') return [change.from, change.to]
+  return [change.path]
 }
 
 function parseTreeRecord(record: string): FileEntry | null {
@@ -288,19 +297,39 @@ export class Vault {
    * Moves every file of a folder in one commit; with `rewriteLinks`, the wikilinks that reach
    * a moved note by its path are rewritten in that same commit (see `FolderRenameTransaction`).
    */
-  renameFolder(from: VaultPath, to: VaultPath, options: { rewriteLinks?: boolean } = {}): Promise<FolderRenameResult> {
+  async renameFolder(from: VaultPath, to: VaultPath, options: { rewriteLinks?: boolean } = {}): Promise<FolderRenameResult> {
+    const transaction = new FolderRenameTransaction(this.repo, { ...options, from, to })
+    const { staged, commit, pushed } = await this.commitFolderChange((files) => transaction.stage(files))
+    const result: FolderRenameResult = { from, path: to, commit, pushed, moved: staged.moved }
+    return options.rewriteLinks ? { ...result, rewritten: staged.rewritten } : result
+  }
+
+  /** Creates an empty folder in one commit: git keeps it through its `.keep` file. */
+  async createFolder(path: VaultPath): Promise<FolderCreateResult> {
+    const { commit, pushed } = await this.commitFolderChange((files) => stageFolderCreate(this.repo, files, path))
+    return { path, commit, pushed }
+  }
+
+  /** Deletes every file of a folder in one commit; live documents of its notes close. */
+  async deleteFolder(path: VaultPath): Promise<FolderDeleteResult> {
+    const { staged, commit, pushed } = await this.commitFolderChange((files) => stageFolderDelete(this.repo, files, path))
+    return { path, commit, pushed, deleted: staged.deleted }
+  }
+
+  /** Stages a folder change from the tracked files after the pull, commits it once and pushes it. */
+  private commitFolderChange<T extends StagedFolderChange>(
+    stage: (files: VaultPath[]) => Promise<T>,
+  ): Promise<{ staged: T; commit: string; pushed: boolean }> {
     return this.locked(async () => {
       await this.sync.pull()
       const { files } = await this.list()
-      const staged = await new FolderRenameTransaction(this.repo, { ...options, from, to }).stage(files.map((file) => file.path as VaultPath))
+      const staged = await stage(files.map((file) => file.path as VaultPath))
       await this.repo.commitStaged(staged.message)
       await this.emit(staged.changes)
       const head = await this.repo.head()
-      const paths = staged.moved.flatMap((move) => [move.from, move.to])
-      this.onVaultEvent?.({ type: 'commit', head, paths: [...paths, ...staged.rewritten] })
+      this.onVaultEvent?.({ type: 'commit', head, paths: staged.changes.flatMap(changedPaths) })
       const pushed = await this.pushNow(head)
-      const result: FolderRenameResult = { from, path: to, commit: await this.repo.head(), pushed, moved: staged.moved }
-      return options.rewriteLinks ? { ...result, rewritten: staged.rewritten } : result
+      return { staged, commit: await this.repo.head(), pushed }
     })
   }
 

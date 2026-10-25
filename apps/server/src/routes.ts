@@ -194,6 +194,18 @@ async function renameFolder(request: ApiRequest, { vault }: Services): Promise<R
   return { status: 200, body: result }
 }
 
+async function folderPath(request: ApiRequest): Promise<VaultPath> {
+  return vaultPath(jsonObject(await request.body()).path)
+}
+
+async function createFolder(request: ApiRequest, { vault }: Services): Promise<Reply> {
+  return { status: 201, body: await vault.createFolder(await folderPath(request)) }
+}
+
+async function deleteFolder(request: ApiRequest, { vault }: Services): Promise<Reply> {
+  return { status: 200, body: await vault.deleteFolder(await folderPath(request)) }
+}
+
 function searchLimit(raw: string | null): number {
   if (raw === null) return DEFAULT_SEARCH_LIMIT
   const limit = Number(raw)
@@ -289,6 +301,8 @@ const EXACT_ROUTES = new Map<string, Methods>([
   [ROUTES.files, new Map([['GET', listFiles]])],
   [ROUTES.rename, new Map([['POST', renameFile]])],
   [ROUTES.folderRename, new Map([['POST', renameFolder]])],
+  [ROUTES.folders, new Map([['POST', createFolder]])],
+  [ROUTES.folderDelete, new Map([['POST', deleteFolder]])],
   [ROUTES.search, new Map([['GET', search]])],
   [ROUTES.sync, new Map([['POST', sync]])],
   [ROUTES.entries, new Map([['GET', listEntries]])],

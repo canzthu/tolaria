@@ -80,6 +80,13 @@ export interface VaultFolderRenameResult {
   updatedFiles: number
 }
 
+export interface VaultFolderCreateRequest {
+  /** Vault-relative path of the parent folder; `null` for the vault root. */
+  parentPath: string | null
+  /** The new folder's name, one path segment. */
+  name: string
+}
+
 export interface VaultSearchOptions {
   limit?: number
   excludeFrontmatter?: boolean
@@ -110,6 +117,9 @@ export interface VaultFileOps {
   write(path: string, content: string, options?: VaultWriteOptions): Promise<VaultWriteResult>
   rename(request: VaultRenameRequest): Promise<VaultRenameResult>
   renameFolder(request: VaultFolderRenameRequest): Promise<VaultFolderRenameResult>
+  createFolder(request: VaultFolderCreateRequest): Promise<void>
+  /** Deletes a folder with everything in it; resolves with its vault-relative path. */
+  deleteFolder(folderPath: string): Promise<string>
   /** Resolves with the paths that were actually deleted. */
   delete(paths: string[]): Promise<string[]>
   search(query: string, options?: VaultSearchOptions): Promise<VaultSearchResponse>

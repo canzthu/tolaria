@@ -34,7 +34,12 @@ import {
 import { BROWSER_PRESENCE_PACING } from "./awarenessPacing.ts";
 import { CollabProvider, type SocketLike } from "./collabProvider.ts";
 import { type RemoteAttachments, remoteAttachments } from "./remoteAttachments.ts";
-import { listFolders, renameFolder } from "./remoteFolders.ts";
+import {
+	createFolder,
+	deleteFolder,
+	listFolders,
+	renameFolder,
+} from "./remoteFolders.ts";
 import { writeCache } from "./entriesCache.ts";
 import { takeCache } from "./entriesCachePrefetch.ts";
 import {
@@ -136,6 +141,11 @@ function definedFields<T extends object>(value: T): Partial<T> {
 	) as Partial<T>;
 }
 
+/** The desktop's vault scan leaves dot files out (`is_visible_vault_file`), a folder's `.keep` among them. */
+function visibleEntries(entries: AppVaultEntry[]): AppVaultEntry[] {
+	return entries.filter((entry) => !entry.filename.startsWith("."));
+}
+
 function mapProtocolEntryToApp(entry: ProtocolVaultEntry): AppVaultEntry {
 	return { ...appEntryDefaults(), ...definedFields(entry) } as AppVaultEntry;
 }
@@ -196,7 +206,7 @@ async function listFromCache(request: Request): Promise<AppVaultEntry[] | null> 
 	if (!revalidating) {
 		revalidateInBackground(request, cached.head);
 	}
-	return Array.from(cachedEntries.values());
+	return visibleEntries(Array.from(cachedEntries.values()));
 }
 
 function sharedCacheList(request: Request): Promise<AppVaultEntry[] | null> {
@@ -226,7 +236,7 @@ async function listEntries(request: Request): Promise<AppVaultEntry[]> {
 		});
 	}
 
-	return entries;
+	return visibleEntries(entries);
 }
 
 const DELTA_CHUNK_SIZE = 50;
@@ -408,7 +418,7 @@ async function reloadEntries(request: Request): Promise<AppVaultEntry[]> {
 		});
 	}
 
-	return entries;
+	return visibleEntries(entries);
 }
 
 function fileOps(request: Request): VaultFileOps {
@@ -421,6 +431,8 @@ function fileOps(request: Request): VaultFileOps {
 		reloadEntry: unsupported("reloading a single entry"),
 		rename: (renameRequest) => renameNote(request, renameRequest),
 		renameFolder: (folderRequest) => renameFolder(request, folderRequest),
+		createFolder: (folderRequest) => createFolder(request, folderRequest),
+		deleteFolder: (folderPath) => deleteFolder(request, folderPath),
 		delete: (paths) => deleteFiles(request, paths),
 		search: (query, options = {}) => searchFiles(request, query, options),
 		saveAttachment: (upload) => remoteAttachments(request).save(upload),

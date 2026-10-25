@@ -362,6 +362,39 @@ describe('POST /v1/folders/rename (since 1.7)', () => {
   })
 })
 
+describe('POST /v1/folders and POST /v1/folders/delete (since 1.8)', () => {
+  function post(route: string, body: unknown): Promise<Response> {
+    const payload = typeof body === 'string' ? body : JSON.stringify(body)
+    return api(route, { method: 'POST', body: payload })
+  }
+
+  it('creates a folder in one commit and deletes it in another', async () => {
+    const created = await post('/v1/folders', { path: 'ideas' })
+    expect(created.status).toBe(201)
+    expect(await created.json()).toMatchObject({ path: 'ideas', pushed: true })
+    expect((await fixture.desktop.log())[0]).toBe('Create folder ideas')
+    expect((await api('/v1/files/ideas/.keep')).status).toBe(200)
+
+    const deleted = await post('/v1/folders/delete', { path: 'ideas' })
+    expect(deleted.status).toBe(200)
+    expect(await deleted.json()).toMatchObject({ path: 'ideas', pushed: true, deleted: ['ideas/.keep'] })
+    expect((await fixture.desktop.log())[0]).toBe('Delete folder ideas')
+  })
+
+  it.each([
+    ['/v1/folders', 'not json', 400, 'invalid_request'],
+    ['/v1/folders', {}, 400, 'invalid_path'],
+    ['/v1/folders', { path: '../escape' }, 400, 'invalid_path'],
+    ['/v1/folders', { path: 'projects' }, 409, 'destination_exists'],
+    ['/v1/folders/delete', { path: '.git' }, 400, 'invalid_path'],
+    ['/v1/folders/delete', { path: 'nowhere' }, 404, 'not_found'],
+  ])('answers %s %j with %i %s', async (route, body, status, code) => {
+    const response = await post(route, body)
+    expect(response.status).toBe(status)
+    expect(await errorCode(response)).toBe(code)
+  })
+})
+
 describe('GET /v1/search', () => {
   it('searches note text', async () => {
     const response = await api('/v1/search?q=heron&limit=5')

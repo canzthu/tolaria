@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { invokeRenameFolder } from './folder-actions/folderActionUtils'
+import { invokeDeleteFolder, invokeRenameFolder } from './folder-actions/folderActionUtils'
 import { performFilenameRename, performMoveNoteToFolder, performRename } from './useNoteRename'
 
 /**
@@ -77,6 +77,16 @@ describe('moves and folder renames on the desktop (TOL-227)', () => {
     expect(tauriInvoke.mock.calls[0][0]).toBe('rename_vault_folder')
     expect(sentArgs()).toEqual({ vaultPath: '/vault', folderPath: 'projects', newName: 'work' })
     expect(result).toEqual({ old_path: 'projects', new_path: 'work' })
+  })
+
+  it('sends delete_vault_folder with the vault and the folder (TOL-233)', async () => {
+    setTauriRuntime(true)
+    tauriInvoke.mockResolvedValue('projects')
+
+    await expect(invokeDeleteFolder({ vaultPath: '/vault', folderPath: 'projects' })).resolves.toBe('projects')
+
+    expect(tauriInvoke.mock.calls[0][0]).toBe('delete_vault_folder')
+    expect(sentArgs()).toEqual({ vaultPath: '/vault', folderPath: 'projects' })
   })
 })
 
