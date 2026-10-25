@@ -60,8 +60,19 @@ afterEach(async () => {
   await fixture.cleanup()
 })
 
+interface Call {
+  path: string
+  init: RequestInit
+}
+
+/** Every request goes to the server this test started on loopback. */
+function call({ path, init }: Call): Promise<Response> {
+  return fetch(new URL(path, base), init)
+}
+
 function as(credential: string, path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(new URL(path, base), { ...init, headers: { ...bearer(credential), ...(init.headers as Record<string, string>) } })
+  const headers = { ...bearer(credential), ...(init.headers as Record<string, string>) }
+  return call({ path, init: { ...init, headers } })
 }
 
 function json(body: object): RequestInit {
