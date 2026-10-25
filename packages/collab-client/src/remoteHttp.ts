@@ -25,9 +25,14 @@ export function etagOf(response: Response): string {
  * Lets go of a body the caller does not read. In a browser an unread body keeps its request
  * open until the response is garbage collected, holding a connection meanwhile, and the page
  * never goes network-idle.
+ *
+ * The body is read to its end, not cancelled (TOL-230): in WebKit, cancelling a body the
+ * service worker is serving can leave every later request of the page waiting forever, so
+ * the next note's collaboration ticket never comes back. The bodies let go of here are small:
+ * a note read for its headers, a write's or an error's answer.
  */
 export async function released(response: Response): Promise<Response> {
-	await response.body?.cancel();
+	await response.arrayBuffer().catch(() => undefined);
 	return response;
 }
 
