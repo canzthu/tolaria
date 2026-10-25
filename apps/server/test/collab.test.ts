@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { Awareness } from 'y-protocols/awareness'
 import * as Y from 'yjs'
 import { baseRevision } from '../../../packages/markdown-yjs/src/index.ts'
+import { awarenessMessage, receive, updateMessage } from '../../../packages/protocol/src/collabWire.ts'
 import type { VaultPath } from '../src/paths.ts'
 import { codec, createHarness, type Harness, NOTE, settle } from './collabHelpers.ts'
 import { text } from './helpers.ts'
@@ -66,6 +68,26 @@ describe('a room', () => {
     await settle()
 
     expect([...luca.provider.awareness.getStates().keys()]).toEqual([luca.doc.clientID])
+  })
+
+  it('does not let a client publish or withdraw the presence of another', async () => {
+    const ada = await harness.client()
+    const luca = await harness.client()
+    const mallory = await harness.client()
+    ada.provider.awareness.setLocalStateField('user', { name: 'Ada', color: '#d33' })
+    await settle()
+    const impostor = new Y.Doc()
+    impostor.clientID = ada.doc.clientID
+    const forged = new Awareness(impostor)
+    for (let clock = 0; clock < 10; clock++) forged.setLocalState({ user: { name: 'Not Ada', color: '#000000' } })
+
+    mallory.sockets[0].send(awarenessMessage(forged, [ada.doc.clientID]))
+    forged.setLocalState(null)
+    mallory.sockets[0].send(awarenessMessage(forged, [ada.doc.clientID]))
+    await settle()
+
+    expect(luca.provider.awareness.getStates().get(ada.doc.clientID)).toEqual({ user: { name: 'Ada', color: '#d33' } })
+    expect(mallory.sockets[0].closeCode).toBeNull()
   })
 
   it('sends a late joiner the presence of who is already there', async () => {
@@ -145,6 +167,106 @@ describe('a room', () => {
 
   it('refuses a document id that names no note', async () => {
     expect(await harness.hub.connect('no-such-doc', { send: () => {}, close: () => {} }, 'write')).toBeNull()
+  })
+})
+
+/** A client that writes the wire by hand, to send exactly the change a test needs. */
+interface RawPeer {
+  received: Uint8Array[]
+  closeCode: number | null
+  send(data: Uint8Array): void
+  /** Answers the last sync step 1 the server sent with what `doc` has and the server lacks. */
+  answer(doc: Y.Doc): void
+}
+
+/** A sync step 1 begins with the sync message type, then the step: both 0. */
+function isSyncStep1(data: Uint8Array): boolean {
+  return data[0] === 0 && data[1] === 0
+}
+
+async function rawPeer(): Promise<RawPeer> {
+  const peer: RawPeer = { received: [], closeCode: null, send: () => {}, answer: () => {} }
+  const socket = { send: (data: Uint8Array) => peer.received.push(data), close: (code: number) => (peer.closeCode ??= code) }
+  const connection = await harness.hub.connect(harness.docId(), socket, 'write')
+  if (!connection) throw new Error('no document')
+  peer.send = (data) => connection.receive(data)
+  peer.answer = (doc) => {
+    const step1 = peer.received.findLast(isSyncStep1)
+    if (!step1) throw new Error('the server sent no sync step 1')
+    const { reply } = receive(step1, { doc, awareness: new Awareness(doc) }, { origin: peer, readOnly: false })
+    peer.send(reply as Uint8Array)
+  }
+  return peer
+}
+
+function copyOf(doc: Y.Doc): Y.Doc {
+  const copy = new Y.Doc()
+  Y.applyUpdate(copy, Y.encodeStateAsUpdate(doc))
+  return copy
+}
+
+/** Makes a change to `doc` and returns it as an update, without sending it anywhere. */
+function changeOf(doc: Y.Doc, change: (blocks: Y.XmlElement) => void): Uint8Array {
+  const before = Y.encodeStateVector(doc)
+  change(doc.getXmlFragment('blocks').get(0) as Y.XmlElement)
+  return Y.encodeStateAsUpdate(doc, before)
+}
+
+describe('a change that builds on what the server has not seen (TOL-235)', () => {
+  it('is kept out of the document unchecked, and cannot get the editor who sends what it builds on closed', async () => {
+    const ada = await harness.client()
+    ada.type('Alpha', ' by Ada')
+    await settle()
+    // Ada's other tab adds a paragraph the server has not seen yet...
+    const adaTab = copyOf(ada.doc)
+    const fromTab = changeOf(adaTab, (blocks) => {
+      const paragraph = (blocks.get(1) as Y.XmlElement).clone()
+      paragraph.setAttribute('id', 'from-the-other-tab')
+      blocks.insert(2, [paragraph])
+    })
+    // ...and Mallory, who has it, puts a script after it and sends only her own change.
+    const malloryDoc = copyOf(adaTab)
+    const script = changeOf(malloryDoc, (blocks) => blocks.insert(3, [new Y.XmlElement('script')]))
+    const mallory = await rawPeer()
+    const { doc } = await harness.session()
+
+    mallory.send(updateMessage(script))
+    expect(doc.store.pendingStructs).toBeNull()
+    Y.applyUpdate(ada.doc, fromTab)
+    await settle()
+
+    expect(ada.sockets[0].closeCode).toBeNull()
+    expect(doc.getXmlFragment('blocks').toString()).toContain('from-the-other-tab')
+    expect(doc.getXmlFragment('blocks').toString()).not.toContain('script')
+    // The server asked Mallory for what it lacked: her answer is checked, and turned down.
+    mallory.answer(malloryDoc)
+    await settle()
+    expect(mallory.closeCode).toBe(4422)
+    expect(ada.sockets[0].closeCode).toBeNull()
+    ada.type('Alpha', ' again')
+    await settle()
+    expect(codec.read(doc)).toBe(ada.markdown())
+    expect(ada.markdown()).toContain('# Alpha by Ada again')
+  })
+
+  it('reaches the document once the client answers the sync step 1 the server sends it', async () => {
+    const bea = await rawPeer()
+    const ada = await harness.client()
+    const { doc } = await harness.session()
+    const beaDoc = copyOf(doc)
+    changeOf(beaDoc, (blocks) => blocks.insert(2, [(blocks.get(1) as Y.XmlElement).clone()]))
+    const second = changeOf(beaDoc, (blocks) => (blocks.get(2) as Y.XmlElement).setAttribute('id', 'from-bea'))
+
+    bea.send(updateMessage(second))
+    bea.send(updateMessage(second))
+    expect(doc.getXmlFragment('blocks').toString()).not.toContain('from-bea')
+    expect(bea.received.filter(isSyncStep1)).toHaveLength(2)
+    bea.answer(beaDoc)
+    await settle()
+
+    expect(bea.closeCode).toBeNull()
+    expect(Y.encodeStateVector(doc)).toEqual(Y.encodeStateVector(beaDoc))
+    expect(ada.doc.getXmlFragment('blocks').toString()).toContain('from-bea')
   })
 })
 
