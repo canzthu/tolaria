@@ -11,6 +11,7 @@ import {
 	type CollabDocumentState,
 	useCollabDocument,
 } from "./useCollabDocument";
+import { useLocalPresence } from "./useLocalPresence";
 
 /**
  * How the rich editor of the active note gets and keeps its content:
@@ -99,6 +100,7 @@ export function useCollabEditorBinding(
 		path,
 		enabled: path !== null,
 	});
+	useLocalPresence(state.doc);
 	const binding = resolveCollabEditorBinding(path, state);
 	const nowBound = binding.kind === "bound" ? path : null;
 	if (nowBound !== boundPath) setBoundPath(nowBound);

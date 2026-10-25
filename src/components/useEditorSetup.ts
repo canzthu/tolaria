@@ -10,6 +10,7 @@ import {
 	type UploadImageFileResult,
 	uploadImageFile,
 } from "../hooks/useImageDrop";
+import { localPresenceUser } from "../lib/presenceIdentity";
 import { RUNTIME_STYLE_NONCE } from "../lib/runtimeStyleNonce";
 import { markStartupPhase } from "../lib/startupPerformance";
 import type { NoteStatus, VaultEntry } from "../types";
@@ -18,6 +19,7 @@ import {
 	type CollabEditorBinding,
 	useLiveTitleReporter,
 } from "./collabEditorBinding";
+import { renderCollabCursor } from "./collabCursor";
 import {
 	type PendingRawExitContent,
 	resolvePendingRawExitContent,
@@ -119,10 +121,10 @@ function blockNoteCollaboration(binding: CollabEditorBinding) {
 	return {
 		fragment: binding.doc.fragment,
 		provider: binding.doc.provider,
-		user: {
-			name: "User",
-			color: "#30bced",
-		},
+		user: localPresenceUser(binding.doc.doc.clientID),
+		// A name shows while its person types or moves, then folds back to the caret.
+		showCursorLabels: "activity" as const,
+		renderCursor: renderCollabCursor,
 	};
 }
 

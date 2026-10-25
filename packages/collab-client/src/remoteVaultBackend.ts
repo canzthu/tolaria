@@ -31,6 +31,7 @@ import {
 	type SearchResponse,
 	type WriteResult,
 } from "../../protocol/src/index.ts";
+import { BROWSER_PRESENCE_PACING } from "./awarenessPacing.ts";
 import { CollabProvider, type SocketLike } from "./collabProvider.ts";
 import { type RemoteAttachments, remoteAttachments } from "./remoteAttachments.ts";
 import { writeCache } from "./entriesCache.ts";
@@ -485,6 +486,7 @@ async function openDoc(
 	const doc = new Y.Doc();
 	const provider = new CollabProvider({
 		doc,
+		...BROWSER_PRESENCE_PACING,
 		openSocket: async () =>
 			createSocket(await ticketUrl(request, options, grant)),
 	});

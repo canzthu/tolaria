@@ -334,7 +334,7 @@ Messages are binary and framed as y-websocket frames them, so stock Yjs provider
 | Type | Payload | Meaning |
 |---|---|---|
 | `0` sync | y-protocols sync message: step 1 (state vector), step 2 (missing updates) or update | Both sides send step 1 on connect and answer the other's with step 2; afterwards every change is an update. A sync message of any other subtype is ignored. |
-| `1` awareness | y-protocols awareness update | Presence. Clients publish `{ "user": { "name": "…", "color": "#rrggbb" } }` and BlockNote adds the cursor. The server relays it and withdraws a client's presence when its socket closes. |
+| `1` awareness | y-protocols awareness update | Presence. Clients publish `{ "user": { "name": "…", "color": "#rrggbb" } }` and BlockNote adds the cursor. The server relays it and withdraws a client's presence when its socket closes. The web client sends caret moves at most every 100 ms and renews its state about every 1.2 s, and drops a peer not renewed for 3.5 s (ADR 0291); receivers take only a `#rrggbb` colour and the first 64 characters of a name. Neither changes the wire format. |
 | `3` awareness query | none | The server answers with the awareness of everyone present. |
 
 Unknown message types are ignored. A message larger than 16 MiB (or the server's lower limit) closes the connection with `1009`; so does sending more than one message's worth before the document has opened. Bytes that are not a message close it with `4400`. When the note is deleted the server closes the room with `4410`.

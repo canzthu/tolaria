@@ -1,6 +1,7 @@
 import { Awareness, removeAwarenessStates } from 'y-protocols/awareness'
 import type * as Y from 'yjs'
 import { awarenessMessage, receive, syncStep1, updateMessage } from '../../protocol/src/collabWire.ts'
+import { AwarenessThrottle, keepPresenceFresh, type PresencePacing } from './awarenessPacing.ts'
 
 /**
  * The client end of the collaboration channel: keeps a local `Y.Doc` and its awareness in
@@ -23,7 +24,7 @@ export interface SocketLike {
   close(): void
 }
 
-export interface ProviderOptions {
+export interface ProviderOptions extends PresencePacing {
   doc: Y.Doc
   /**
    * Opens a websocket to the document. Called for every attempt, because the URL carries a
@@ -41,12 +42,20 @@ interface AwarenessChange {
   removed: number[]
 }
 
+/** Ends something that was started. */
+type Stop = () => void
+
 const OPEN = 1
 const DEFAULT_RETRY_MS = 500
 const DEFAULT_MAX_RETRY_MS = 15_000
 
-function asBytes(data: unknown): Uint8Array {
-  return data instanceof ArrayBuffer ? new Uint8Array(data) : (data as Uint8Array)
+/** A binary frame's bytes, or null for a frame that is not binary. */
+type Frame = Uint8Array | null
+
+/** The bytes of a binary frame; null for anything else (a text frame carries nothing of ours). */
+function asBytes(data: unknown): Frame {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data)
+  return data instanceof Uint8Array ? data : null
 }
 
 export class CollabProvider {
@@ -58,11 +67,20 @@ export class CollabProvider {
   private current: CollabStatus = 'connecting'
   private attempts = 0
   private retry: ReturnType<typeof setTimeout> | null = null
+  private readonly outgoingAwareness: AwarenessThrottle
+  private readonly stopPresenceRenewal: Stop
 
   constructor(options: ProviderOptions) {
     this.options = options
     this.doc = options.doc
     this.awareness = new Awareness(options.doc)
+    this.outgoingAwareness = new AwarenessThrottle(
+      (clients) => this.send(awarenessMessage(this.awareness, clients)),
+      options.awarenessThrottleMs,
+    )
+    this.stopPresenceRenewal = options.presenceTimeoutMs
+      ? keepPresenceFresh(this.awareness, options.presenceTimeoutMs, this)
+      : () => {}
     this.doc.on('update', this.sendUpdate)
     this.awareness.on('update', this.sendAwareness)
     this.connect()
@@ -94,6 +112,9 @@ export class CollabProvider {
   destroy(): void {
     if (this.current === 'closed') return
     removeAwarenessStates(this.awareness, [this.doc.clientID], 'destroy')
+    this.outgoingAwareness.flush()
+    this.outgoingAwareness.stop()
+    this.stopPresenceRenewal()
     this.setStatus('closed')
     if (this.retry) clearTimeout(this.retry)
     this.doc.off('update', this.sendUpdate)
@@ -118,7 +139,10 @@ export class CollabProvider {
     this.socket = socket
     socket.binaryType = 'arraybuffer'
     socket.onopen = () => this.opened(socket)
-    socket.onmessage = (event) => this.received(socket, asBytes(event.data))
+    socket.onmessage = (event) => {
+      const bytes = asBytes(event.data)
+      if (bytes) this.received(socket, bytes)
+    }
     socket.onclose = () => this.dropped(socket)
     socket.onerror = () => socket.close()
     if (socket.readyState === OPEN) this.opened(socket)
@@ -133,7 +157,15 @@ export class CollabProvider {
 
   private received(socket: SocketLike, data: Uint8Array): void {
     if (socket !== this.socket) return
-    const { kind, reply } = receive(data, this, { origin: this, readOnly: false })
+    let received: ReturnType<typeof receive>
+    try {
+      received = receive(data, this, { origin: this, readOnly: false })
+    } catch {
+      // A frame that does not decode means the connection is broken: start over on a new one.
+      socket.close()
+      return
+    }
+    const { kind, reply } = received
     if (reply) socket.send(reply)
     if (kind !== 'sync-step2') return
     this.attempts = 0
@@ -157,7 +189,7 @@ export class CollabProvider {
   }
 
   private readonly sendAwareness = ({ added, updated, removed }: AwarenessChange, origin: unknown): void => {
-    if (origin !== this) this.send(awarenessMessage(this.awareness, [...added, ...updated, ...removed]))
+    if (origin !== this) this.outgoingAwareness.push([...added, ...updated, ...removed])
   }
 
   private send(data: Uint8Array): void {

@@ -1,6 +1,7 @@
 import type { EditorView } from "@codemirror/view";
 import { act, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
 import { DOC_FRONTMATTER_FIELD } from "../../packages/protocol/src/index";
@@ -45,10 +46,10 @@ function deferred() {
 function liveDocument(synced: Promise<void>): VaultCollabDoc<RemoteBindings> {
 	return {
 		path: mockTab.entry.path,
-		doc: { id: "doc" } as unknown as RemoteBindings["doc"],
+		doc: { id: "doc", clientID: 1 } as unknown as RemoteBindings["doc"],
 		fragment: { id: "fragment" } as unknown as RemoteBindings["fragment"],
 		provider: { id: "provider" } as unknown as RemoteBindings["provider"],
-		awareness: {} as RemoteBindings["awareness"],
+		awareness: new Awareness(new Y.Doc()),
 		synced,
 		close: vi.fn(),
 	};
