@@ -1,16 +1,15 @@
 import { invoke } from '@tauri-apps/api/core'
-import { isTauri } from '../mock-tauri'
-import type { VaultEntry, VaultPropertyValue } from '../types'
 import type { FrontmatterValue } from '../components/Inspector'
-import { updateMockFrontmatter, deleteMockFrontmatterProperty } from './mockFrontmatterHelpers'
-import { updateMockContent, trackMockChange } from '../mock-tauri'
+import { updateFrontmatterContent } from '../lib/frontmatterText'
+import { assertVaultWritable } from '../lib/offline/offlineMode'
+import { editRemoteFrontmatter } from '../lib/remoteFrontmatter'
+import { createVaultBackend, hasRemoteVault, type VaultFileOps } from '../lib/vaultBackend'
+import { isTauri, trackMockChange, updateMockContent } from '../mock-tauri'
+import type { VaultEntry, VaultPropertyValue } from '../types'
 import { parseFrontmatter } from '../utils/frontmatter'
 import { normalizeNoteFormat } from '../utils/noteFormat'
-import { canonicalFrontmatterKey, isSystemMetadataKey } from '../utils/systemMetadata'
 import { normalizeNoteWidthMode } from '../utils/noteWidth'
-import { assertVaultWritable } from '../lib/offline/offlineMode'
-import { createVaultBackend, hasRemoteVault, type VaultFileOps } from '../lib/vaultBackend'
-import { editRemoteFrontmatter } from '../lib/remoteFrontmatter'
+import { canonicalFrontmatterKey, isSystemMetadataKey } from '../utils/systemMetadata'
 
 type FrontmatterCommand = 'update_frontmatter' | 'delete_frontmatter_property'
 type FrontmatterKey = string
@@ -237,16 +236,6 @@ async function persistMockContent(files: VaultFileOps, path: VaultPath, content:
   rememberMockContent(path, content)
 }
 
-function applyMockFrontmatterUpdate(path: VaultPath, key: FrontmatterKey, value: FrontmatterValue): MarkdownContent {
-  const content = updateMockFrontmatter(path, key, value)
-  return content
-}
-
-function applyMockFrontmatterDelete(path: VaultPath, key: FrontmatterKey): MarkdownContent {
-  const content = deleteMockFrontmatterProperty(path, key)
-  return content
-}
-
 interface FrontmatterOpRequest {
   op: FrontmatterOp
   path: VaultPath
@@ -257,13 +246,9 @@ interface FrontmatterOpRequest {
 
 async function executeMockFrontmatterOp(files: VaultFileOps, { op, path, key, value }: FrontmatterOpRequest): Promise<MarkdownContent> {
   assertVaultWritable('editing properties')
-  seedMockContent(path, await loadMockContent(files, path))
-  let content: MarkdownContent
-  if (op === 'update') {
-    content = applyMockFrontmatterUpdate(path, key, requireUpdateValue(value))
-  } else {
-    content = applyMockFrontmatterDelete(path, key)
-  }
+  const loadedContent = await loadMockContent(files, path)
+  seedMockContent(path, loadedContent)
+  const content = updateFrontmatterContent(loadedContent, key, op === 'delete' ? undefined : requireUpdateValue(value))
   await persistMockContent(files, path, content)
   return content
 }
