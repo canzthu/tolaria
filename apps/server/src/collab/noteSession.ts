@@ -230,7 +230,7 @@ export class NoteSession {
     const canonical = await codec.canonical(incoming.markdown)
     // From here to the end of each branch only microtasks run: no edit can arrive in between.
     const outcome = reconcile({ base: this.base.canonical, live: codec.read(this.doc), incoming: canonical })
-    if (outcome.kind === 'conflict') return this.fork(incoming)
+    if (outcome.kind === 'conflict') return this.fork({ ...incoming, canonical })
     if (outcome.kind === 'adopt') return this.adopt(incoming)
     if (outcome.kind === 'merged') await codec.write(this.doc, { ...incoming, markdown: outcome.markdown }, SERVER_ORIGIN)
     this.rebaseTo({ ...incoming, canonical })
@@ -244,22 +244,25 @@ export class NoteSession {
   }
 
   /**
-   * The file and the document changed the same lines. The file keeps the path, as for any
-   * stale write; the document's version is saved next to it as a conflict copy, and the
-   * document takes the file's content. Nothing is dropped.
+   * The file and the document changed the same lines. The document keeps its edits: the
+   * people typing in it lose nothing under their cursor. It moves on to the incoming file as
+   * its base and is written over it, and the incoming version is then committed next to it
+   * as a conflict copy, named in `meta` so editors are told. Nothing is dropped.
    */
-  private async fork(incoming: NoteVersion): Promise<void> {
-    const { codec, vault, log } = this.services
-    const stale = this.base
-    const versions = { source: stale.markdown, canonicalSource: stale.canonical, canonical: codec.read(this.doc) }
-    const { markdown } = await codec.fileContent(versions)
-    await this.adopt(incoming)
-    this.background(async () => {
-      const copy = await vault.write(this.path, Buffer.from(markdown), { kind: 'match', etag: stale.revision })
-      log(`collab: ${this.path} changed on both sides; live edits saved as ${copy.path}`)
-      this.conflictCopy = copy.path
-      this.doc.transact(() => this.meta.set(DOC_META.conflictCopy, copy.path), SERVER_ORIGIN)
-    })
+  private fork(incoming: Base): void {
+    this.rebaseTo(incoming)
+    this.background(() => this.keepIncomingAsCopy(incoming))
+  }
+
+  /** Runs once the vault lock is free: the document takes the path, the incoming version a copy. */
+  private async keepIncomingAsCopy(incoming: NoteVersion): Promise<void> {
+    const { vault, log } = this.services
+    await this.flush()
+    const copy = await vault.write(this.path, Buffer.from(incoming.markdown), { kind: 'match', etag: incoming.revision })
+    if (copy.outcome !== 'conflict') return
+    log(`collab: ${this.path} changed on both sides; the incoming version is saved as ${copy.path}`)
+    this.conflictCopy = copy.path
+    this.doc.transact(() => this.meta.set(DOC_META.conflictCopy, copy.path), SERVER_ORIGIN)
   }
 
   private async rebase(version: NoteVersion): Promise<void> {

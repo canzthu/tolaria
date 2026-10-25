@@ -1075,7 +1075,9 @@
   "collab.status.synced": "所有更改已同步",
   "collab.status.offline": "已离线。您的更改将保留，并在重新连接时发送。",
   "collab.status.closed": "已断开连接",
-  "collab.conflict": "您的编辑与在其他地方所做的更改发生冲突，已另存为 {file}。",
+  "collab.conflictCopy": "来自另一台设备的更改无法与您的编辑内容合并，因此已另存为 {file}。笔记保留了您的编辑内容。",
+  "collab.conflictNotice.title": "冲突副本已保存",
+  "collab.conflictNotice.close": "关闭",
   "collab.presence.label": "此笔记中的人员",
   "collab.presence.you": "{name}（您）",
   "collab.error.open": "无法打开此笔记。",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "加入 Discord",
   "communityBanner.dismiss": "拒绝社区邀请",
   "phone.action.notes": "笔记",
-  "phone.action.backToNotes": "返回笔记"
+  "phone.action.backToNotes": "返回笔记",
+  "noteList.conflictCopyBadge": "冲突副本"
 }

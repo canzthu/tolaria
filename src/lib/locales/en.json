@@ -1075,7 +1075,9 @@
   "collab.status.synced": "All changes synced",
   "collab.status.offline": "Offline. Your changes are kept and sent when you reconnect.",
   "collab.status.closed": "Disconnected",
-  "collab.conflict": "Your edits conflicted with a change made elsewhere and were saved as {file}.",
+  "collab.conflictCopy": "A change from another device could not be merged with your edits, so it was saved as {file}. The note keeps your edits.",
+  "collab.conflictNotice.title": "Conflict copy saved",
+  "collab.conflictNotice.close": "Close",
   "collab.presence.label": "People in this note",
   "collab.presence.you": "{name} (you)",
   "collab.error.open": "This note could not be opened.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Join Discord",
   "communityBanner.dismiss": "Dismiss community invitation",
   "phone.action.notes": "Notes",
-  "phone.action.backToNotes": "Back to notes"
+  "phone.action.backToNotes": "Back to notes",
+  "noteList.conflictCopyBadge": "Conflict copy"
 }

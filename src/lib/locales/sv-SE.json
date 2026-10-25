@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Alla ändringar har synkroniserats",
   "collab.status.offline": "Offline. Dina ändringar sparas och skickas när du återansluter.",
   "collab.status.closed": "Frånkopplad",
-  "collab.conflict": "Dina ändringar stod i konflikt med en ändring som gjorts någon annanstans och sparades som {file}.",
+  "collab.conflictCopy": "En ändring från en annan enhet kunde inte slås samman med dina ändringar, så den sparades som {file}. Anteckningen behåller dina ändringar.",
+  "collab.conflictNotice.title": "Konfliktkopia sparad",
+  "collab.conflictNotice.close": "Stäng",
   "collab.presence.label": "Personer i den här anteckningen",
   "collab.presence.you": "{name} (du)",
   "collab.error.open": "Den här anteckningen kunde inte öppnas.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Gå med i Discord",
   "communityBanner.dismiss": "Avvisa inbjudan till communityn",
   "phone.action.notes": "Anteckningar",
-  "phone.action.backToNotes": "Tillbaka till anteckningar"
+  "phone.action.backToNotes": "Tillbaka till anteckningar",
+  "noteList.conflictCopyBadge": "Konfliktkopia"
 }

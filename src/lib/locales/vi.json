@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Đã đồng bộ tất cả các thay đổi",
   "collab.status.offline": "Ngoại tuyến. Các thay đổi của bạn được lưu lại và sẽ được gửi khi bạn kết nối lại.",
   "collab.status.closed": "Đã ngắt kết nối",
-  "collab.conflict": "Các thay đổi của bạn xung đột với một thay đổi được thực hiện ở nơi khác và đã được lưu dưới dạng {file}.",
+  "collab.conflictCopy": "Không thể hợp nhất thay đổi từ thiết bị khác với các chỉnh sửa của bạn, vì vậy thay đổi đó đã được lưu dưới dạng {file}. Ghi chú giữ lại các nội dung chỉnh sửa của bạn.",
+  "collab.conflictNotice.title": "Đã lưu bản sao xung đột",
+  "collab.conflictNotice.close": "Đóng",
   "collab.presence.label": "Những người trong ghi chú này",
   "collab.presence.you": "{name} (bạn)",
   "collab.error.open": "Không thể mở ghi chú này.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Tham gia Discord",
   "communityBanner.dismiss": "Bỏ qua lời mời tham gia cộng đồng",
   "phone.action.notes": "Ghi chú",
-  "phone.action.backToNotes": "Quay lại ghi chú"
+  "phone.action.backToNotes": "Quay lại ghi chú",
+  "noteList.conflictCopyBadge": "Bản sao xung đột"
 }

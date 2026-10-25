@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.4'
+export const PROTOCOL_VERSION = '1.5'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -46,7 +46,10 @@ export const DOC_META = {
   format: 'format',
   /** Etag of the markdown file the document was last reconciled with. */
   baseRevision: 'baseRevision',
-  /** Path of the conflict copy holding edits that could not be merged with the file. */
+  /**
+   * Path of the conflict copy holding a version that could not be merged with the document.
+   * Since 1.5 that is the incoming file's version: the document keeps its edits.
+   */
   conflictCopy: 'conflictCopy',
 } as const
 

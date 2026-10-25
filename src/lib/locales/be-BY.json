@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Усе змены сінхранізаваны",
   "collab.status.offline": "Аўтаномны рэжым. Вашы змены захоўваюцца і адпраўляюцца пры паўторным падключэнні.",
   "collab.status.closed": "Адключана",
-  "collab.conflict": "Вашы праўкі канфліктавалі са зменай, зробленай у іншым месцы, і былі захаваны як {file}.",
+  "collab.conflictCopy": "Змену з іншай прылады не ўдалося аб'яднаць з вашымі зменамі, таму яна была захавана як {file}. У нататцы захоўваюцца вашыя змены.",
+  "collab.conflictNotice.title": "Копія канфлікту захавана",
+  "collab.conflictNotice.close": "Закрыць",
   "collab.presence.label": "Людзі ў гэтай нататцы",
   "collab.presence.you": "{name} (вы)",
   "collab.error.open": "Гэтую нататку не ўдалося адкрыць.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Далучыцца да Discord",
   "communityBanner.dismiss": "Адхіліць запрашэнне ў супольнасць",
   "phone.action.notes": "Нататкі",
-  "phone.action.backToNotes": "Назад да нататак"
+  "phone.action.backToNotes": "Назад да нататак",
+  "noteList.conflictCopyBadge": "Копія канфлікту"
 }

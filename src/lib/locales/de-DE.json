@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Alle Änderungen wurden synchronisiert",
   "collab.status.offline": "Offline. Ihre Änderungen werden gespeichert und beim erneuten Verbinden gesendet.",
   "collab.status.closed": "Verbindung getrennt",
-  "collab.conflict": "Ihre Änderungen standen im Konflikt mit einer an anderer Stelle vorgenommenen Änderung und wurden als {file} gespeichert.",
+  "collab.conflictCopy": "Eine Änderung von einem anderen Gerät konnte nicht mit Ihren Bearbeitungen zusammengeführt werden, daher wurde sie als {file} gespeichert. Die Notiz behält Ihre Änderungen bei.",
+  "collab.conflictNotice.title": "Konfliktkopie gespeichert",
+  "collab.conflictNotice.close": "Schließen",
   "collab.presence.label": "Personen in dieser Notiz",
   "collab.presence.you": "{name} (Sie)",
   "collab.error.open": "Diese Notiz konnte nicht geöffnet werden.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Discord beitreten",
   "communityBanner.dismiss": "Community-Einladung verwerfen",
   "phone.action.notes": "Notizen",
-  "phone.action.backToNotes": "Zurück zu den Notizen"
+  "phone.action.backToNotes": "Zurück zu den Notizen",
+  "noteList.conflictCopyBadge": "Konfliktkopie"
 }

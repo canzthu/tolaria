@@ -1077,7 +1077,9 @@ files:
     collab.status.synced: 9168ea748695dd9405ddceda0caf52d8
     collab.status.offline: d91bd16c8b273210ae6a7e34c7fc55a1
     collab.status.closed: ef70e46fd3bbc21e3e1f0b6815e750c0
-    collab.conflict: b5deac9b01926ea3fcfec8be58dfa199
+    collab.conflictCopy: 19505da9b2a51a832dd8ec71e4d71c47
+    collab.conflictNotice.title: dc10921a908c30e3e243115deb0b7479
+    collab.conflictNotice.close: d3d2e617335f08df83599665eef8a418
     collab.presence.label: bf4d8656b98dec65392089af27b4fe04
     collab.presence.you: 2f42560ef5401cbf55847b22cff66f1a
     collab.error.open: 799ae0bab73d97e81222f9417ef969ed
@@ -1316,3 +1318,4 @@ files:
     communityBanner.dismiss: df9374f4356460c586a8e9c3bae697dc
     phone.action.notes: f4c6f851b00d5518bf888815de279aba
     phone.action.backToNotes: 6bb45b1cc12f68ac668f5bc8036e2aa4
+    noteList.conflictCopyBadge: 6c3971119ba0316e6a21bd347295f463

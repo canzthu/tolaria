@@ -341,21 +341,59 @@ describe('a desktop commit that lands on a live document', () => {
     expect({ text: resolved?.type.toString(), index: resolved?.index }).toEqual({ text: 'First paragraph.', index: 5 })
   })
 
-  it('forks a conflict copy when both changed the same line', async () => {
+  it('keeps the live edits and saves the desktop version as a conflict copy when both changed the same line', async () => {
     const ada = await harness.client('plan.md')
     ada.type('Second', ' Web version.')
     await settle()
+    const desktopVersion = LONG_NOTE.replace('Second paragraph.', 'Second paragraph. Desktop version.')
 
-    await harness.fixture.desktop.commit('plan.md', LONG_NOTE.replace('Second paragraph.', 'Second paragraph. Desktop version.'))
+    await harness.fixture.desktop.commit('plan.md', desktopVersion)
     await harness.vault.syncNow()
     await (await harness.session('plan.md')).settled()
     await settle()
 
     const copy = ada.doc.getMap<string>('meta').get('conflictCopy') as string
     expect(copy).toMatch(/^plan \(conflict .+\)\.md$/)
-    expect(await harness.fixture.desktop.read(copy)).toBe(LONG_NOTE.replace('Second paragraph.', 'Second paragraph. Web version.'))
-    expect(await harness.fixture.desktop.read('plan.md')).toContain('Second paragraph. Desktop version.')
-    expect(ada.markdown()).toContain('Second paragraph. Desktop version.')
+    expect(await harness.fixture.desktop.read(copy)).toBe(desktopVersion)
+    expect(await harness.fixture.desktop.read('plan.md')).toBe(LONG_NOTE.replace('Second paragraph.', 'Second paragraph. Web version.'))
+    expect(ada.markdown()).toContain('Second paragraph. Web version.')
+    expect(ada.markdown()).not.toContain('Desktop version.')
+  })
+
+  it('keeps typing that arrives after the fork in the note, not in the copy', async () => {
+    const ada = await harness.client('plan.md')
+    ada.type('Second', ' Web version.')
+    await settle()
+    const session = await harness.session('plan.md')
+
+    await harness.fixture.desktop.commit('plan.md', LONG_NOTE.replace('Second paragraph.', 'Second paragraph. Desktop version.'))
+    await harness.vault.syncNow()
+    ada.type('First', ' Typed after the fork.')
+    await settle()
+    await session.settled()
+    await session.flush()
+
+    const copy = ada.doc.getMap<string>('meta').get('conflictCopy') as string
+    const file = await harness.fixture.desktop.read('plan.md')
+    expect(file).toContain('First paragraph. Typed after the fork.')
+    expect(file).toContain('Second paragraph. Web version.')
+    expect(await harness.fixture.desktop.read(copy)).toContain('Second paragraph. Desktop version.')
+  })
+
+  it('saves the conflict copy when the desktop commit arrives in the pull of the flush itself', async () => {
+    const ada = await harness.client('plan.md')
+    ada.type('Second', ' Web version.')
+    await settle()
+    const session = await harness.session('plan.md')
+    await harness.fixture.desktop.commit('plan.md', LONG_NOTE.replace('Second paragraph.', 'Second, desktop.'))
+
+    await session.flush()
+    await session.settled()
+    await settle()
+
+    const copy = ada.doc.getMap<string>('meta').get('conflictCopy') as string
+    expect(await harness.fixture.desktop.read(copy)).toContain('Second, desktop.')
+    expect(await harness.fixture.desktop.read('plan.md')).toContain('Second paragraph. Web version.')
   })
 
   it('follows a rename made on the desktop', async () => {

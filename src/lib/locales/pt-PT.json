@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Todas as alterações sincronizadas",
   "collab.status.offline": "Offline. As suas alterações são guardadas e enviadas quando voltar a ligar-se.",
   "collab.status.closed": "Desligado",
-  "collab.conflict": "As suas edições entraram em conflito com uma alteração feita noutro local e foram guardadas como {file}.",
+  "collab.conflictCopy": "Não foi possível efetuar a união de uma alteração de outro dispositivo com as suas edições, pelo que foi guardada como {file}. A nota mantém as suas edições.",
+  "collab.conflictNotice.title": "Cópia de conflito guardada",
+  "collab.conflictNotice.close": "Fechar",
   "collab.presence.label": "Pessoas nesta nota",
   "collab.presence.you": "{name} (você)",
   "collab.error.open": "Não foi possível abrir esta nota.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Juntar-se ao Discord",
   "communityBanner.dismiss": "Ignorar convite da comunidade",
   "phone.action.notes": "Notas",
-  "phone.action.backToNotes": "Voltar às notas"
+  "phone.action.backToNotes": "Voltar às notas",
+  "noteList.conflictCopyBadge": "Cópia em conflito"
 }

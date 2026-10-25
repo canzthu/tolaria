@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Usie zmieny sinchranizavany",
   "collab.status.offline": "Aŭtanomny režym. Vašy zmieny zachoŭvajucca i adpraŭlajucca pry paŭtornym padklučenni.",
   "collab.status.closed": "Adklučana",
-  "collab.conflict": "Vašy praŭki kanfliktavali sa zmienaj, zroblenaj u inšym miescy, i byli zachavany jak {file}.",
+  "collab.conflictCopy": "Zmienu z inšaj prylady nie ŭdałosia abjadnać z vašymi zmienami, tamu jana była zachavana jak {file}. U natatcy zachoŭvajucca vašyja zmieny.",
+  "collab.conflictNotice.title": "Kopija kanfliktu zachavana",
+  "collab.conflictNotice.close": "Zakryć",
   "collab.presence.label": "Ludzi ŭ hetaj natatcy",
   "collab.presence.you": "{name} (vy)",
   "collab.error.open": "Hetuju natatku nie ŭdałosia adkryć.",
@@ -1313,5 +1315,6 @@
   "communityBanner.ios": "Spampavać prykładańnie dla iOS",
   "communityBanner.joinCommunity": "Dałučycca da Discord",
   "phone.action.notes": "Natatki",
-  "phone.action.backToNotes": "Nazad da natatak"
+  "phone.action.backToNotes": "Nazad da natatak",
+  "noteList.conflictCopyBadge": "Kopija kanfliktu"
 }

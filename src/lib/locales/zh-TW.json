@@ -1075,7 +1075,9 @@
   "collab.status.synced": "所有變更已同步",
   "collab.status.offline": "離線中。您的變更會被保留，並在重新連線時傳送。",
   "collab.status.closed": "已中斷連線",
-  "collab.conflict": "您的編輯與在其他地方所做的變更發生衝突，並已另存為 {file}。",
+  "collab.conflictCopy": "來自另一台裝置的變更無法與您的編輯內容合併，因此已另存為 {file}。該筆記會保留您的編輯內容。",
+  "collab.conflictNotice.title": "衝突副本已儲存",
+  "collab.conflictNotice.close": "關閉",
   "collab.presence.label": "此筆記中的人員",
   "collab.presence.you": "{name}（您）",
   "collab.error.open": "無法開啟此筆記。",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "加入 Discord",
   "communityBanner.dismiss": "關閉社群邀請",
   "phone.action.notes": "備註",
-  "phone.action.backToNotes": "返回備註"
+  "phone.action.backToNotes": "返回備註",
+  "noteList.conflictCopyBadge": "衝突副本"
 }

@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Všetky zmeny sú synchronizované",
   "collab.status.offline": "Offline. Vaše zmeny sa uchovajú a odošlú sa, keď sa znova pripojíte.",
   "collab.status.closed": "Odpojené",
-  "collab.conflict": "Vaše úpravy boli v konflikte so zmenou vykonanou inde a boli uložené ako {file}.",
+  "collab.conflictCopy": "Zmenu z iného zariadenia sa nepodarilo zlúčiť s vašimi úpravami, preto bola uložená ako {file}. Poznámka si ponecháva vaše úpravy.",
+  "collab.conflictNotice.title": "Kópia konfliktu bola uložená",
+  "collab.conflictNotice.close": "Zatvoriť",
   "collab.presence.label": "Osoby v tejto poznámke",
   "collab.presence.you": "{name} (vy)",
   "collab.error.open": "Túto poznámku sa nepodarilo otvoriť.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Pripojte sa k Discordu",
   "communityBanner.dismiss": "Odmietnuť pozvánku do komunity",
   "phone.action.notes": "Poznámky",
-  "phone.action.backToNotes": "Späť na poznámky"
+  "phone.action.backToNotes": "Späť na poznámky",
+  "noteList.conflictCopyBadge": "Kópia v prípade konfliktu"
 }

@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Усі зміни синхронізовано",
   "collab.status.offline": "Офлайн. Ваші зміни зберігаються та надсилаються після повторного підключення.",
   "collab.status.closed": "З'єднання відсутнє",
-  "collab.conflict": "Ваші зміни конфліктували зі зміною, внесеною в іншому місці, і були збережені як {file}.",
+  "collab.conflictCopy": "Зміну з іншого пристрою не вдалося об’єднати з вашими правками, тому її збережено як {file}. У нотатці зберігаються ваші зміни.",
+  "collab.conflictNotice.title": "Копію конфлікту збережено",
+  "collab.conflictNotice.close": "Закрити",
   "collab.presence.label": "Люди в цій нотатці",
   "collab.presence.you": "{name} (ви)",
   "collab.error.open": "Цю нотатку не вдалося відкрити.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Приєднатися до Discord",
   "communityBanner.dismiss": "Відхилити запрошення до спільноти",
   "phone.action.notes": "Нотатки",
-  "phone.action.backToNotes": "Назад до нотаток"
+  "phone.action.backToNotes": "Назад до нотаток",
+  "noteList.conflictCopyBadge": "Копія з конфліктом"
 }

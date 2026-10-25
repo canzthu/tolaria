@@ -1075,7 +1075,9 @@
   "collab.status.synced": "すべての変更が同期されました",
   "collab.status.offline": "オフラインです。変更内容は保持され、再接続時に送信されます。",
   "collab.status.closed": "接続が切断されました",
-  "collab.conflict": "あなたの編集内容が別の場所で行われた変更と競合したため、{file}として保存されました。",
+  "collab.conflictCopy": "別のデバイスからの変更をあなたの編集内容とマージできなかったため、{file}として保存されました。ノートにはあなたの編集内容が保持されます。",
+  "collab.conflictNotice.title": "競合コピーが保存されました",
+  "collab.conflictNotice.close": "閉じる",
   "collab.presence.label": "このノートにいる人",
   "collab.presence.you": "{name}（あなた）",
   "collab.error.open": "このノートを開けませんでした。",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Discordに参加する",
   "communityBanner.dismiss": "コミュニティへの招待を閉じる",
   "phone.action.notes": "ノート",
-  "phone.action.backToNotes": "ノートに戻る"
+  "phone.action.backToNotes": "ノートに戻る",
+  "noteList.conflictCopyBadge": "競合コピー"
 }

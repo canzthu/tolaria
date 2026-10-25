@@ -84,7 +84,7 @@ export function syncPillDescription(
 		return browserOffline
 			? "status.offline.readOnlyTitle"
 			: "collab.status.offline";
-	if (state === "conflict") return "collab.conflict";
+	if (state === "conflict") return "collab.conflictCopy";
 	if (state === "synced") return "collab.status.synced";
 	return stateLabel(state);
 }

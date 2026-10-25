@@ -138,7 +138,7 @@ describe('the collaboration channel over websockets', () => {
   it('is advertised with protocol 1.2 and the collaboration capabilities', async () => {
     const meta = (await (await api('/v1/vault')).json()) as VaultResponse
 
-    expect(meta.protocolVersion).toBe('1.4')
+    expect(meta.protocolVersion).toBe('1.5')
     expect(meta.capabilities).toEqual(expect.arrayContaining(['collab.yjs', 'collab.awareness', 'collab.tickets']))
     expect(meta.collab.available).toBe(true)
   })

@@ -1477,6 +1477,8 @@ The tablet layout on the web (ADR 0287) adds `useMediaQueryMatch` (which `usePho
 
 Touch input on the web (ADR 0288) adds `installTouchInput` (`TOUCH_INPUT_QUERY`, `TOUCH_INPUT_ATTRIBUTE`, `LONG_PRESS_MS`) in `src/lib/touchInput.ts`, `useTouchInput` (web build and `pointer: coarse`), and `TouchEmptyState`, the editor empty state for a finger.
 
+Conflict surfaces on the web (ADR 0290) add `ConflictCopyNotice` (rendered by `WebSyncPill` for the copy `useConflictCopy` reads from `meta.conflictCopy`), `ConflictCopyBadge` in note list rows, `isConflictCopyPath` and `fileNameOf` in `src/lib/conflictCopyPaths.ts`, and `requestVaultEntriesReload` / `useVaultEntriesStaleReload` (`VAULT_ENTRIES_STALE_EVENT`) in `src/lib/vaultEntriesStale.ts`, which `useVaultLoader` uses. On the server, `NoteSession.fork` keeps the live document and `keepIncomingAsCopy` commits the incoming version as the copy.
+
 In `apps/server`:
 
 - `Vault` (`src/vault.ts`) runs every mutation under one lock as pull, change, commit, push. `writeOutcome(current, incoming, precondition)` is the whole write decision.

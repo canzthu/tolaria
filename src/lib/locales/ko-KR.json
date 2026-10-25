@@ -1075,7 +1075,9 @@
   "collab.status.synced": "모든 변경 사항이 동기화되었습니다",
   "collab.status.offline": "오프라인 상태입니다. 변경 사항은 저장되었다가 다시 연결되면 전송됩니다.",
   "collab.status.closed": "연결 해제됨",
-  "collab.conflict": "수정하신 내용이 다른 곳에서 이루어진 변경과 충돌하여 {file}(으)로 저장되었습니다.",
+  "collab.conflictCopy": "다른 기기에서 변경한 내용을 사용자의 편집 내용과 병합할 수 없어 {file}(으)로 저장되었습니다. 노트에 사용자의 수정 사항이 그대로 유지됩니다.",
+  "collab.conflictNotice.title": "충돌 사본이 저장되었습니다",
+  "collab.conflictNotice.close": "닫기",
   "collab.presence.label": "이 노트에 포함된 사용자",
   "collab.presence.you": "{name} (본인)",
   "collab.error.open": "이 노트를 열 수 없습니다.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Discord에 가입하기",
   "communityBanner.dismiss": "커뮤니티 초대 거절",
   "phone.action.notes": "노트",
-  "phone.action.backToNotes": "노트로 돌아가기"
+  "phone.action.backToNotes": "노트로 돌아가기",
+  "noteList.conflictCopyBadge": "충돌 사본"
 }

@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Toutes les modifications ont été synchronisées",
   "collab.status.offline": "Hors ligne. Vos modifications sont conservées et envoyées lorsque vous vous reconnecterez.",
   "collab.status.closed": "Déconnecté",
-  "collab.conflict": "Vos modifications étaient en conflit avec une modification effectuée ailleurs et ont été enregistrées sous {file}.",
+  "collab.conflictCopy": "Une modification provenant d'un autre appareil n'a pas pu être fusionnée avec vos modifications ; elle a donc été enregistrée sous {file}. La note conserve vos modifications.",
+  "collab.conflictNotice.title": "Copie du conflit enregistrée",
+  "collab.conflictNotice.close": "Fermer",
   "collab.presence.label": "Personnes dans cette note",
   "collab.presence.you": "{name} (vous)",
   "collab.error.open": "Cette note n'a pas pu être ouverte.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Rejoindre Discord",
   "communityBanner.dismiss": "Rejeter l’invitation à rejoindre la communauté",
   "phone.action.notes": "Notes",
-  "phone.action.backToNotes": "Retour aux notes"
+  "phone.action.backToNotes": "Retour aux notes",
+  "noteList.conflictCopyBadge": "Copie en cas de conflit"
 }

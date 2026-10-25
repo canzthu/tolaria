@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Все изменения синхронизированы",
   "collab.status.offline": "Режим офлайн. Ваши изменения сохраняются и будут отправлены при повторном подключении.",
   "collab.status.closed": "Отключено",
-  "collab.conflict": "Ваши изменения вступили в конфликт с изменением, сделанным в другом месте, и были сохранены как {file}.",
+  "collab.conflictCopy": "Изменение с другого устройства не удалось объединить с вашими правками, поэтому оно было сохранено как {file}. В заметке сохраняются ваши изменения.",
+  "collab.conflictNotice.title": "Конфликтующая копия сохранена",
+  "collab.conflictNotice.close": "Закрыть",
   "collab.presence.label": "Люди в этой заметке",
   "collab.presence.you": "{name} (вы)",
   "collab.error.open": "Не удалось открыть эту заметку.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Присоединиться к Discord",
   "communityBanner.dismiss": "Отклонить приглашение в сообщество",
   "phone.action.notes": "Заметки",
-  "phone.action.backToNotes": "Назад к заметкам"
+  "phone.action.backToNotes": "Назад к заметкам",
+  "noteList.conflictCopyBadge": "Копия с конфликтом"
 }

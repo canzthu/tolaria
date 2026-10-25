@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Semua perubahan telah disinkronkan",
   "collab.status.offline": "Offline. Perubahan Anda disimpan dan akan dikirim saat Anda terhubung kembali.",
   "collab.status.closed": "Terputus",
-  "collab.conflict": "Perubahan Anda bertentangan dengan perubahan yang dilakukan di tempat lain dan disimpan sebagai {file}.",
+  "collab.conflictCopy": "Perubahan dari perangkat lain tidak dapat digabungkan dengan editan Anda, jadi perubahan tersebut disimpan sebagai {file}. Catatan menyimpan perubahan Anda.",
+  "collab.conflictNotice.title": "Salinan konflik disimpan",
+  "collab.conflictNotice.close": "Tutup",
   "collab.presence.label": "Orang-orang dalam catatan ini",
   "collab.presence.you": "{name} (Anda)",
   "collab.error.open": "Catatan ini tidak dapat dibuka.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Bergabunglah dengan Discord",
   "communityBanner.dismiss": "Tolak undangan komunitas",
   "phone.action.notes": "Catatan",
-  "phone.action.backToNotes": "Kembali ke catatan"
+  "phone.action.backToNotes": "Kembali ke catatan",
+  "noteList.conflictCopyBadge": "Salinan konflik"
 }

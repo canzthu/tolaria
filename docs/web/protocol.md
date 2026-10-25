@@ -1,8 +1,8 @@
-# Tolaria remote protocol, version 1.3
+# Tolaria remote protocol, version 1.5
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed.
 
 ## Design rules
 
@@ -300,7 +300,7 @@ One Y.Doc per note, with three shared types:
 |---|---|---|
 | `blocks` | `Y.XmlFragment` | The note body, in the shape BlockNote's `collaboration.fragment` binds to (y-prosemirror). |
 | `frontmatter` | `Y.Text` | The frontmatter block exactly as in the file, delimiters and final newline included; empty when the note has none. |
-| `meta` | `Y.Map` | `format` (`tolaria.blocknote/1`); `baseRevision`, the `etag` of the file the document is in step with; `conflictCopy`, the path of a conflict copy holding edits that could not be merged with the file. Written by the server only: a client's change to this map is reverted. |
+| `meta` | `Y.Map` | `format` (`tolaria.blocknote/1`); `baseRevision`, the `etag` of the file the document is in step with; `conflictCopy`, the path of the conflict copy holding a version that could not be merged with the document (since 1.5, the incoming file's version; the document kept its edits). Written by the server only: a client's change to this map is reverted. |
 
 `Y.Text` holding raw markdown is deliberately not the body format: BlockNote's binding needs a `Y.XmlFragment`, and a text document would lose cursors and block identity. The format string leaves room for other formats.
 
@@ -347,7 +347,8 @@ A `read` session receives everything and may publish awareness; sync step 2 and 
 
 - **Open.** The document is loaded from its stored snapshot when there is one, otherwise built from the markdown file. A snapshot whose `baseRevision` is not the file's current `etag` is reconciled with the file first.
 - **Flush.** An edited document is written to its file, as one commit through the same write path as `PUT`, 5 seconds after the last edit or 60 seconds after the first unwritten one, when the last client has left, and when the server stops. Lines that were not edited keep the bytes they have in the file. A result identical to the file makes no commit. After a flush the server sets `meta.baseRevision`.
-- **Reconcile.** When the file changes underneath a live document (a commit pulled from the git remote): a document without unwritten edits takes the file's content; edits on different lines are merged three ways; edits on the same lines are forked, the file keeps its path, the document's version is committed as a conflict copy and `meta.conflictCopy` names it.
+- **Reconcile.** When the file changes underneath a live document (a commit pulled from the git remote): a document without unwritten edits takes the file's content; edits on different lines are merged three ways, as one server transaction that every client receives; edits on the same lines are forked. Since 1.5 a fork keeps the document: the people typing in it lose nothing under their cursor. The document is rebased on the incoming file and written over it, the incoming version is committed next to it as a conflict copy, and `meta.conflictCopy` names that copy. (Up to 1.4 the file kept its path and the document's version became the copy.)
+- **Rename and delete underneath.** A rename pulled from git moves the open document with the note: it keeps its `docId` and its unwritten edits, and the next flush writes to the new path. A deletion closes the room with `4410`; unwritten edits are written back to the deleted path first, which restores the note with them.
 - **Persist.** Snapshots are kept by `docId` in the server's blob store. They exist so that a reconnecting client and the server share one Yjs history; the markdown file remains what the document is rebuilt from.
 
 Measured cadence and the reasons are in `docs/web/s4-spike-report.md`.

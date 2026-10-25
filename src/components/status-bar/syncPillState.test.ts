@@ -65,7 +65,7 @@ describe("syncPillDescription", () => {
 	});
 
 	it("describes the other states", () => {
-		expect(syncPillDescription("conflict", false)).toBe("collab.conflict");
+		expect(syncPillDescription("conflict", false)).toBe("collab.conflictCopy");
 		expect(syncPillDescription("synced", false)).toBe("collab.status.synced");
 		expect(syncPillDescription("syncing", false)).toBe("collab.status.syncing");
 	});

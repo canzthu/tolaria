@@ -1075,7 +1075,9 @@
   "collab.status.synced": "Wszystkie zmiany zostały zsynchronizowane",
   "collab.status.offline": "Tryb offline. Twoje zmiany są zachowywane i zostaną wysłane po ponownym połączeniu.",
   "collab.status.closed": "Brak połączenia",
-  "collab.conflict": "Twoje zmiany weszły w konflikt ze zmianą wprowadzoną w innym miejscu i zostały zapisane jako {file}.",
+  "collab.conflictCopy": "Zmiany wprowadzonej na innym urządzeniu nie udało się scalić z Twoimi poprawkami, dlatego została zapisana jako {file}. Notatka zachowuje Twoje zmiany.",
+  "collab.conflictNotice.title": "Zapisano kopię konfliktu",
+  "collab.conflictNotice.close": "Zamknij",
   "collab.presence.label": "Osoby w tej nocie",
   "collab.presence.you": "{name} (Ty)",
   "collab.error.open": "Nie udało się otworzyć tej notatki.",
@@ -1313,5 +1315,6 @@
   "communityBanner.joinCommunity": "Dołącz do Discorda",
   "communityBanner.dismiss": "Odrzuć zaproszenie do społeczności",
   "phone.action.notes": "Notatki",
-  "phone.action.backToNotes": "Powrót do notatek"
+  "phone.action.backToNotes": "Powrót do notatek",
+  "noteList.conflictCopyBadge": "Kopia konfliktu"
 }

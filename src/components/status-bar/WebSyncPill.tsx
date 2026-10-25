@@ -11,6 +11,7 @@ import {
 } from "../../lib/activeCollabDocument";
 import { type AppLocale, translate } from "../../lib/i18n";
 import { SyncPill } from "../SyncPill";
+import { ConflictCopyNotice } from "./ConflictCopyNotice";
 import {
 	isSyncPillReadOnly,
 	resolveSyncPillState,
@@ -63,14 +64,17 @@ export function WebSyncPill({
 	});
 	const description = syncPillDescription(state, isOffline);
 	return (
-		<SyncPill
-			state={state}
-			label={translate(locale, syncPillLabel(state, isOffline))}
-			readOnly={isSyncPillReadOnly(state, isOffline)}
-			description={translate(locale, description, {
-				file: String(conflictCopy),
-			})}
-			testId="status-sync-pill"
-		/>
+		<>
+			<SyncPill
+				state={state}
+				label={translate(locale, syncPillLabel(state, isOffline))}
+				readOnly={isSyncPillReadOnly(state, isOffline)}
+				description={translate(locale, description, {
+					file: String(conflictCopy),
+				})}
+				testId="status-sync-pill"
+			/>
+			<ConflictCopyNotice conflictCopy={conflictCopy} locale={locale} />
+		</>
 	);
 }

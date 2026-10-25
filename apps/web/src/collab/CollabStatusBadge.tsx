@@ -36,13 +36,13 @@ export function CollabStatusBadge({ provider, locale }: StatusProps) {
   )
 }
 
-/** Tells the user where their edits went when they could not be merged with the file. */
+/** Tells the user where a change from elsewhere went when it could not be merged with their edits. */
 export function ConflictNotice({ doc, locale }: { doc: Y.Doc; locale: AppLocale }) {
   const copy = useConflictCopy(doc)
   if (!copy) return null
   return (
     <p className="collab-conflict" role="alert" data-testid="collab-conflict">
-      {translate(locale, 'collab.conflict', { file: copy })}
+      {translate(locale, 'collab.conflictCopy', { file: copy })}
     </p>
   )
 }
