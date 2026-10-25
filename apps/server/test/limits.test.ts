@@ -71,8 +71,13 @@ interface Upgrade {
   socket: NodeWebSocket
 }
 
-/** Opens a websocket with the bearer token: 101 and the open socket, or the status it was refused with. */
-function upgrade(docId: string, options: { autoPong?: boolean } = {}): Promise<Upgrade> {
+interface UpgradeOptions {
+  autoPong?: boolean
+  headers?: Record<string, string>
+}
+
+/** Opens a websocket, with the bearer token by default: 101 and the open socket, or the status it was refused with. */
+function upgrade(docId: string, options: UpgradeOptions = {}): Promise<Upgrade> {
   const socket = new NodeWebSocket(`${origin.replace('http', 'ws')}/v1/collab/docs/${docId}`, { headers: BEARER, ...options })
   sockets.push(socket)
   socket.on('error', () => {})
@@ -173,6 +178,23 @@ describe('the request rate limit', () => {
 
     expect((await upgrade(docId)).status).toBe(101)
     expect(await upgrade(docId)).toMatchObject({ status: 429, retryAfter: '100' })
+  })
+
+  it('charges refused websocket upgrades without the token to their own bucket', async () => {
+    await start({ rateLimit: { perSecond: SLOW, burst: 2 } })
+    const docId = await docIdOf('welcome.md')
+
+    expect((await upgrade(docId, { headers: {} })).status).toBe(401)
+    expect((await upgrade('unknown-doc', { headers: {} })).status).toBe(404)
+    expect(await upgrade(docId, { headers: {} })).toMatchObject({ status: 429, retryAfter: '100' })
+    expect((await upgrade(docId)).status).toBe(101)
+  })
+
+  it('charges a refused websocket upgrade with the token to the account', async () => {
+    await start({ rateLimit: { perSecond: SLOW, burst: 2 } })
+
+    expect((await upgrade('unknown-doc')).status).toBe(404)
+    expect(await upgrade(await docIdOf('welcome.md'))).toMatchObject({ status: 429, retryAfter: '100' })
   })
 })
 

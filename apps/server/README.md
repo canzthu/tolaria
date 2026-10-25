@@ -42,7 +42,7 @@ Use `pnpm run server`: bare `pnpm server` is a pnpm built-in command.
 | `TOLARIA_COLLAB_IDLE_MS` | `5000` | Write an edited document this long after its last edit |
 | `TOLARIA_COLLAB_MAX_WAIT_MS` | `60000` | Write it at the latest this long after its first unwritten edit |
 | `TOLARIA_COLLAB_LINGER_MS` | `30000` | Keep a document without clients open this long |
-| `TOLARIA_RATE_LIMIT_PER_SECOND` | `50` | Requests one account (the token) gains per second: a token bucket over every route but `/healthz` and every websocket upgrade. Beyond it: `429 rate_limited` with `Retry-After`. Callers without the token share a bucket of their own |
+| `TOLARIA_RATE_LIMIT_PER_SECOND` | `50` | Requests one account (the token) gains per second: a token bucket over every route but `/healthz` and every websocket upgrade admitted (token or ticket) or refused with the token. Beyond it: `429 rate_limited` with `Retry-After`. Requests without the token, and websocket upgrades refused (`401`, `404`) without it, share a bucket of their own |
 | `TOLARIA_RATE_LIMIT_BURST` | `500` | Requests a full bucket allows at once |
 | `TOLARIA_COLLAB_MAX_CONNECTIONS` | `128` | Open websockets of the account over every document; one more is refused with `429` |
 | `TOLARIA_COLLAB_MAX_CONNECTIONS_PER_DOC` | `32` | Open websockets of one document |

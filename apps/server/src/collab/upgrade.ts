@@ -4,7 +4,7 @@ import { type RawData, type WebSocket, WebSocketServer } from 'ws'
 import { COLLAB_MAX_MESSAGE_BYTES, COLLAB_TICKET_PARAM, type CollabAccess, ROUTES } from '../../../../packages/protocol/src/index.ts'
 import type { DocId, DocIndex } from '../docIndex.ts'
 import { isAuthorized, singleHeader } from '../httpIo.ts'
-import { ACCOUNT, type RateLimiter, retryAfterSeconds } from '../rateLimit.ts'
+import { ACCOUNT, accountOf, type RateLimiter, retryAfterSeconds } from '../rateLimit.ts'
 import { type ConnectionCounter, watchIdle } from './connectionLimits.ts'
 import type { CollabHub, Connection } from './hub.ts'
 import type { TicketBook } from './tickets.ts'
@@ -15,7 +15,7 @@ export interface UpgradeOptions {
   docs: DocIndex
   token: string
   maxMessageBytes: number
-  /** Every upgrade is charged to the account's request bucket. */
+  /** Every upgrade is charged: an admitted one to the account, a refused one like an HTTP request. */
   limiter: RateLimiter
   connections: ConnectionCounter
   idleTimeoutMs: number
@@ -65,14 +65,32 @@ function admit(request: IncomingMessage, { token, tickets, docs }: UpgradeOption
   return { docId, access }
 }
 
+/** Charges one upgrade to `account`'s request bucket; a `429` refusal once it is empty. */
+function charge(account: string, limiter: RateLimiter): void {
+  const wait = limiter.take(account)
+  if (wait > 0) throw new Refusal(429, retryAfterSeconds(wait))
+}
+
+/**
+ * Admits the upgrade, or charges its refusal to the bucket an HTTP request with the same
+ * credentials would use: the anonymous one without the token, so refusals cost the account nothing.
+ */
+function admitCharged(request: IncomingMessage, options: UpgradeOptions): Admission {
+  try {
+    return admit(request, options)
+  } catch (refusal) {
+    charge(accountOf(singleHeader(request.headers, 'authorization'), options.token), options.limiter)
+    throw refusal
+  }
+}
+
 /**
  * Takes the account's place for one more websocket on this document, freed when its TCP socket
  * closes, however the upgrade ends. The account is the token's, whichever credential was used:
  * only the token holder gets tickets.
  */
 function reserve(socket: Duplex, { docId }: Admission, { limiter, connections }: UpgradeOptions): void {
-  const wait = limiter.take(ACCOUNT)
-  if (wait > 0) throw new Refusal(429, retryAfterSeconds(wait))
+  charge(ACCOUNT, limiter)
   const release = connections.admit(ACCOUNT, docId)
   if (!release) throw new Refusal(429)
   socket.once('close', release)
@@ -172,7 +190,7 @@ export function attachCollab(server: Server, options: UpgradeOptions): WebSocket
   const sockets = new WebSocketServer({ noServer: true, maxPayload })
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     try {
-      const admission = admit(request, options)
+      const admission = admitCharged(request, options)
       reserve(socket, admission, options)
       sockets.handleUpgrade(request, socket, head, (ws) => serve(ws, admission, options))
     } catch (error) {

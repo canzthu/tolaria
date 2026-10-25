@@ -53,7 +53,7 @@ Since 1.6 the server limits what one account (one token) may use, so one client 
 
 | Limit | Default | When exceeded |
 |---|---|---|
-| Requests, token bucket per account | 50 per second, bursts of 500 | `429 rate_limited` with `Retry-After` (whole seconds). Every route but `GET /healthz` counts, and so does every websocket upgrade, which is refused with `429` and `Retry-After`. Requests without the token share a bucket of their own, so they never use the account's. |
+| Requests, token bucket per account | 50 per second, bursts of 500 | `429 rate_limited` with `Retry-After` (whole seconds). Every route but `GET /healthz` counts, before authentication. Every websocket upgrade counts too: an admitted one to the account, whether it came with the token or a ticket; a refused one (`401`, `404`) to the bucket an HTTP request with the same `Authorization` header would use. Beyond the budget the upgrade is refused with `429` and `Retry-After` instead. Requests and refused upgrades without the token share a bucket of their own, so they never use the account's. |
 | Open websockets per account | 128 | The upgrade is refused with `429`, without `Retry-After`: a place frees when one of the account's sockets closes. |
 | Open websockets per document | 32 | As above. |
 | Websocket message size | the body limit, at most 16 MiB | Closed with `1009`. |

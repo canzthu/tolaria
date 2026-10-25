@@ -178,7 +178,7 @@ The desktop Tauri app has extensive CSP configured in `src-tauri/tauri.conf.json
 - ✅ Git operations are serialized per vault (mutex via `queue`)
 - ✅ Y.Doc updates validated before acceptance
 
-- ✅ Per-account token bucket on every `/v1` request and websocket upgrade: 50 requests/s, bursts of 500, `429 rate_limited` with `Retry-After`; callers without the token share their own bucket (TOL-208, ADR 0292)
+- ✅ Per-account token bucket on every `/v1` request and websocket upgrade, refused upgrades included (TOL-231): 50 requests/s, bursts of 500, `429 rate_limited` with `Retry-After`; callers without the token share their own bucket (TOL-208, ADR 0292)
 - ✅ At most 128 open websockets per account and 32 per document; idle sockets closed with `4408` (TOL-208)
 
 **Missing protections:**
