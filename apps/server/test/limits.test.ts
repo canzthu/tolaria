@@ -51,8 +51,13 @@ function call({ path, headers = BEARER }: Call): Promise<Response> {
   return fetch(new URL(path, origin), { headers })
 }
 
-function api(path: string, headers?: Record<string, string>): Promise<Response> {
-  return call({ path, headers })
+function api(path: string): Promise<Response> {
+  return call({ path })
+}
+
+/** A request without the token. */
+function anonymous(path: string): Promise<Response> {
+  return call({ path, headers: {} })
 }
 
 async function docIdOf(path: string): Promise<string> {
@@ -155,11 +160,11 @@ describe('the request rate limit', () => {
   it('charges callers without the token to their own bucket and never limits /healthz', async () => {
     await start({ rateLimit: { perSecond: SLOW, burst: 1 } })
 
-    expect((await api('/v1/vault', {})).status).toBe(401)
-    expect((await api('/v1/vault', {})).status).toBe(429)
+    expect((await anonymous('/v1/vault')).status).toBe(401)
+    expect((await anonymous('/v1/vault')).status).toBe(429)
     expect((await api('/v1/vault')).status).toBe(200)
-    expect((await api('/healthz', {})).status).toBe(200)
-    expect((await api('/healthz', {})).status).toBe(200)
+    expect((await anonymous('/healthz')).status).toBe(200)
+    expect((await anonymous('/healthz')).status).toBe(200)
   })
 
   it('charges websocket upgrades to the account', async () => {
