@@ -454,12 +454,15 @@ malformed and symlinked data is never pruned; a corrupt active journal blocks
 cleanup. This does not delete vault/provider content or establish a total backup
 quota (ADR 0237).
 
-Asynchronous repository note reads join the existing per-root operation queue
-before calling synchronous native recovery. Opening a note therefore waits for
-that vault's active save/Git work without entering a blocking native lock from
-JavaScript. Cached bytes are still rejected after recovery or an external
-conflict. Snapshot reads remain a synchronous lifecycle boundary; this does not
-claim that every filesystem read is nonblocking.
+Asynchronous repository note reads join the per-root operation queue before
+synchronous native recovery, so they remain ordered with writes and Git. During
+the marked native linked-folder merge only, note reads bypass that queue and
+read the app-managed copy through Expo's async file API; sync has already
+flushed writes/recovery, and each changed file is atomically replaced. Recovery
+is skipped only for that window, while writes remain queued until sync ends.
+Cached bytes are still rejected after recovery or an external conflict.
+Snapshot reads remain a synchronous lifecycle boundary; this does not claim
+that every filesystem read is nonblocking (ADR 0295).
 
 `WorkspaceTextRecord` owns version-two text batches and completion fingerprints,
 including decoding of version-one single-save records. `WorkspaceTextRecovery`

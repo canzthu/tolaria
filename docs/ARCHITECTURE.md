@@ -282,6 +282,12 @@ does not emit filesystem writes or change modified timestamps. The native
 read-only benchmark measures hydration separately from initial indexing and
 type filtering; these are data-path timings, not screen-transition timings.
 
+Mobile note reads remain ordered with writes and recovery, except during the
+native linked-folder merge. That merge atomically replaces files in the
+app-managed copy, so an individual async note read can proceed without waiting
+on the full-vault sync lock; writes remain queued until sync completes (ADR
+0295).
+
 Storage verification can also run against an optimized local binary using the
 explicit `TOLARIA_QA` Swift condition (ADR 0208). A read-only native capability
 enables the existing loopback-only probes without Metro or development JavaScript.
