@@ -34,6 +34,7 @@ import {
 import { BROWSER_PRESENCE_PACING } from "./awarenessPacing.ts";
 import { CollabProvider, type SocketLike } from "./collabProvider.ts";
 import { type RemoteAttachments, remoteAttachments } from "./remoteAttachments.ts";
+import { listFolders, renameFolder } from "./remoteFolders.ts";
 import { writeCache } from "./entriesCache.ts";
 import { takeCache } from "./entriesCachePrefetch.ts";
 import {
@@ -419,15 +420,16 @@ function fileOps(request: Request): VaultFileOps {
 		reload: () => reloadEntries(request),
 		reloadEntry: unsupported("reloading a single entry"),
 		rename: (renameRequest) => renameNote(request, renameRequest),
+		renameFolder: (folderRequest) => renameFolder(request, folderRequest),
 		delete: (paths) => deleteFiles(request, paths),
 		search: (query, options = {}) => searchFiles(request, query, options),
 		saveAttachment: (upload) => remoteAttachments(request).save(upload),
 	};
 }
 
-function chromeOps(): VaultChromeOps {
+function chromeOps(request: Request): VaultChromeOps {
 	return {
-		listFolders: unsupported("listing folders"),
+		listFolders: () => listFolders(request),
 		listViews: unsupported("listing views"),
 	};
 }
@@ -518,6 +520,7 @@ export function createRemoteAttachments(
 export function createRemoteVaultBackend(
 	options: RemoteOptions,
 ): VaultBackend<RemoteBindings> {
+	const request = requester(options);
 	return {
 		kind: "remote",
 		interfaceVersion: VAULT_BACKEND_INTERFACE_VERSION,
@@ -526,8 +529,8 @@ export function createRemoteVaultBackend(
 			atomicRevisions: true,
 			attachments: true,
 		},
-		files: fileOps(requester(options)),
-		chrome: chromeOps(),
+		files: fileOps(request),
+		chrome: chromeOps(request),
 		collab: {
 			openDoc: (path, openOptions) => openDoc(options, path, openOptions),
 		},

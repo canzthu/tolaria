@@ -27,6 +27,9 @@ export interface LinkRewrite {
   replacement: LinkTarget
 }
 
+/** One rename's rewrite, or the rewrites of every note a folder rename moves, applied in one pass. */
+export type LinkRewrites = LinkRewrite | readonly LinkRewrite[]
+
 /** One replacement in a text: `[start, end)` becomes `text`. */
 export interface TextEdit {
   start: Offset
@@ -65,14 +68,25 @@ export function renameLinkRewrite({ from, to, oldTitle }: RenamedNote): LinkRewr
   return { targets, replacement: pathStem(to) }
 }
 
+/** A folder rename's rewrites: each note it moves, linked by its path, follows the folder. */
+export function folderLinkRewrites(moves: readonly { from: NotePath; to: NotePath }[]): LinkRewrite[] {
+  return moves
+    .filter(({ from }) => from.endsWith(NOTE_EXTENSION))
+    .map(({ from, to }) => ({ targets: [pathStem(from)], replacement: pathStem(to) }))
+}
+
+function rewriteList(rewrites: LinkRewrites): readonly LinkRewrite[] {
+  return Array.isArray(rewrites) ? rewrites : [rewrites as LinkRewrite]
+}
+
 /** The links of one text that a rename rewrites, found the way the desktop's regex finds them. */
 class LinkScan {
   private readonly text: NoteText
-  private readonly rewrite: LinkRewrite
+  private readonly rewrites: readonly LinkRewrite[]
 
-  constructor(text: NoteText, rewrite: LinkRewrite) {
+  constructor(text: NoteText, rewrites: LinkRewrites) {
     this.text = text
-    this.rewrite = rewrite
+    this.rewrites = rewriteList(rewrites)
   }
 
   /** Left to right and without overlaps: after a match the scan goes on past it. */
@@ -89,16 +103,24 @@ class LinkScan {
 
   /** The first target that matches at `open` wins, as with the regex's alternation. */
   private editAt(open: Offset): TextEdit | null {
-    for (const target of this.rewrite.targets) {
-      const span = this.linkTo(open, target)
-      if (span) return this.replacement(open, span)
+    for (const rewrite of this.rewrites) {
+      const edit = this.rewriteAt(open, rewrite)
+      if (edit) return edit
     }
     return null
   }
 
-  private replacement(open: Offset, { aliasFrom, close }: LinkSpan): TextEdit {
+  private rewriteAt(open: Offset, rewrite: LinkRewrite): TextEdit | null {
+    for (const target of rewrite.targets) {
+      const span = this.linkTo(open, target)
+      if (span) return this.replacement(open, span, rewrite.replacement)
+    }
+    return null
+  }
+
+  private replacement(open: Offset, { aliasFrom, close }: LinkSpan, target: LinkTarget): TextEdit {
     const alias = this.text.slice(aliasFrom, close)
-    return { start: open, end: close + LINK_CLOSE.length, text: `${LINK_OPEN}${this.rewrite.replacement}${alias}${LINK_CLOSE}` }
+    return { start: open, end: close + LINK_CLOSE.length, text: `${LINK_OPEN}${target}${alias}${LINK_CLOSE}` }
   }
 
   /** `[[target]]`, or `[[target|alias]]` whose alias holds no `]`. Null for anything else. */
@@ -113,7 +135,7 @@ class LinkScan {
 }
 
 /** Every link the rename rewrites in `text`. */
-export function linkEdits(text: NoteText, rewrite: LinkRewrite): TextEdit[] {
+export function linkEdits(text: NoteText, rewrite: LinkRewrites): TextEdit[] {
   return new LinkScan(text, rewrite).edits()
 }
 
@@ -129,7 +151,7 @@ export function applyEdits(text: NoteText, edits: readonly TextEdit[]): NoteText
 }
 
 /** `replace_wikilinks_in_content`: the rewritten text, unchanged when nothing links to the note. */
-export function rewriteLinks(text: NoteText, rewrite: LinkRewrite): NoteText {
+export function rewriteLinks(text: NoteText, rewrite: LinkRewrites): NoteText {
   return applyEdits(text, linkEdits(text, rewrite))
 }
 

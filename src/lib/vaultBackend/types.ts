@@ -46,15 +46,38 @@ export type VaultWriteResult =
    */
   | { status: 'conflict'; current: VaultFile | null; copyPath?: string }
 
-export type VaultRenameRequest =
+/** A rename in place: a new title (the file name follows it) or a new file name. */
+export type VaultNoteRenameRequest =
   | { path: string; newTitle: string; oldTitle?: string }
   | { path: string; newFilenameStem: string }
+
+/** A move into another folder, keeping the file name; `''` is the vault root. */
+export interface VaultNoteMoveRequest {
+  path: string
+  folderPath: string
+}
+
+export type VaultRenameRequest = VaultNoteRenameRequest | VaultNoteMoveRequest
 
 export interface VaultRenameResult {
   newPath: string
   /** Other notes whose wikilinks were rewritten to follow the rename. */
   updatedFiles: number
   failedUpdates: number
+}
+
+export interface VaultFolderRenameRequest {
+  /** Vault-relative path of the folder. */
+  folderPath: string
+  /** Its new name, in the same parent folder. */
+  newName: string
+}
+
+export interface VaultFolderRenameResult {
+  oldPath: string
+  newPath: string
+  /** Notes whose wikilinks were rewritten to follow the moved notes. */
+  updatedFiles: number
 }
 
 export interface VaultSearchOptions {
@@ -86,6 +109,7 @@ export interface VaultFileOps {
   read(path: string): Promise<VaultFile>
   write(path: string, content: string, options?: VaultWriteOptions): Promise<VaultWriteResult>
   rename(request: VaultRenameRequest): Promise<VaultRenameResult>
+  renameFolder(request: VaultFolderRenameRequest): Promise<VaultFolderRenameResult>
   /** Resolves with the paths that were actually deleted. */
   delete(paths: string[]): Promise<string[]>
   search(query: string, options?: VaultSearchOptions): Promise<VaultSearchResponse>

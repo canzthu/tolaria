@@ -56,28 +56,7 @@ interface ReloadTabsAfterRenameRequest {
   updateTabContent: (path: string, content: string) => void
 }
 
-type RenameCommand = 'move_note_to_folder' | 'move_note_to_workspace'
-type NoteCommandExtra = Record<string, unknown>
-
-interface NoteCommandRequest {
-  command: RenameCommand
-  mockExtra: NoteCommandExtra
-  path: string
-  tauriExtra: NoteCommandExtra
-  vaultPath: string
-}
-
-interface SingleValueNoteCommand {
-  command: RenameCommand
-  mockKey: string
-  tauriKey: string
-}
-
-const FOLDER_MOVE_COMMAND: SingleValueNoteCommand = {
-  command: 'move_note_to_folder',
-  mockKey: 'folder_path',
-  tauriKey: 'folderPath',
-}
+type RenameCommand = 'move_note_to_workspace'
 
 /** Check if a note's filename doesn't match the slug of its current title. */
 export function needsRenameOnSave(title: string, filename: string): boolean {
@@ -105,64 +84,6 @@ function invokeRenameCommand(params: {
     : mockInvoke<RenameResult>(params.command, params.mockArgs)
 }
 
-function invokeStructuredRenameCommand(params: {
-  command: RenameCommand
-  args: Record<string, unknown>
-  mockArgs: Record<string, unknown>
-}): Promise<RenameResult> {
-  return invokeRenameCommand({
-    command: params.command,
-    tauriArgs: { args: params.args },
-    mockArgs: params.mockArgs,
-  })
-}
-
-function noteCommandArgs({
-  mockExtra,
-  path,
-  style,
-  tauriExtra,
-  vaultPath,
-}: {
-  mockExtra: NoteCommandExtra
-  path: string
-  style: 'mock' | 'tauri'
-  tauriExtra: NoteCommandExtra
-  vaultPath: string
-}) {
-  return style === 'tauri'
-    ? { vaultPath, oldPath: path, ...tauriExtra }
-    : { vault_path: vaultPath, old_path: path, ...mockExtra }
-}
-
-function invokeNoteCommand(params: NoteCommandRequest): Promise<RenameResult> {
-  return invokeStructuredRenameCommand({
-    command: params.command,
-    args: noteCommandArgs({ ...params, style: 'tauri' }),
-    mockArgs: noteCommandArgs({ ...params, style: 'mock' }),
-  })
-}
-
-function performSingleValueNoteCommand({
-  descriptor,
-  path,
-  value,
-  vaultPath,
-}: {
-  descriptor: SingleValueNoteCommand
-  path: string
-  value: string
-  vaultPath: string
-}) {
-  return invokeNoteCommand({
-    command: descriptor.command,
-    path,
-    vaultPath,
-    tauriExtra: { [descriptor.tauriKey]: value },
-    mockExtra: { [descriptor.mockKey]: value },
-  })
-}
-
 export async function performFilenameRename({
   path,
   newFilenameStem,
@@ -176,12 +97,7 @@ export async function performMoveNoteToFolder({
   folderPath,
   vaultPath,
 }: FolderMoveRequest): Promise<RenameResult> {
-  return performSingleValueNoteCommand({
-    descriptor: FOLDER_MOVE_COMMAND,
-    path,
-    value: folderPath,
-    vaultPath,
-  })
+  return renameThroughBackend(vaultPath, { path, folderPath })
 }
 
 export async function performMoveNoteToWorkspace({

@@ -3,7 +3,8 @@ import type { GitRepo } from './gitRepo.ts'
 import type { VaultChange } from './gitSync.ts'
 import { blobEtag, type VaultPath } from './paths.ts'
 import { noteTitle } from './noteTitle.ts'
-import { type LinkRewrite, renameLinkRewrite, rewriteLinks, withTitle } from './renameLinks.ts'
+import { renameLinkRewrite, withTitle } from './renameLinks.ts'
+import { isMarkdownNote, noteText, stageFile, stageRewrites } from './stagedRewrites.ts'
 
 /**
  * One rename as one commit: the file moves, its `title` property follows a title rename, and
@@ -40,22 +41,6 @@ interface SourceNote {
   /** Null for a file that is not a UTF-8 markdown note: it moves, but nothing in it changes. */
   content: string | null
   oldTitle: string
-}
-
-const utf8 = new TextDecoder('utf-8', { fatal: true })
-
-/** The text of a note, or null for bytes that are not UTF-8: the desktop skips those too. */
-function noteText(bytes: Uint8Array): string | null {
-  try {
-    return utf8.decode(bytes)
-  } catch {
-    return null
-  }
-}
-
-/** Notes are what the desktop renames and rewrites (`is_replaceable_md_file`); other files only move. */
-function isMarkdownNote(path: VaultPath): boolean {
-  return path.endsWith('.md')
 }
 
 /** A note other than the renamed one. */
@@ -137,31 +122,12 @@ export class RenameTransaction {
     if (this.title === undefined || this.title === source.oldTitle || source.content === null) return false
     const content = withTitle(source.content, this.title)
     if (content === source.content) return false
-    await this.stageFile(this.request.to, content)
+    await stageFile(this.repo, this.request.to, content)
     return true
   }
 
-  private async rewriteAll(notes: readonly VaultPath[], oldTitle: string): Promise<VaultPath[]> {
+  private rewriteAll(notes: readonly VaultPath[], oldTitle: string): Promise<VaultPath[]> {
     const rewrite = renameLinkRewrite({ from: this.request.from, to: this.request.to, oldTitle })
-    const rewritten: VaultPath[] = []
-    for (const path of notes) {
-      if (linksMayChange(path, this.request) && (await this.rewriteOne(path, rewrite))) rewritten.push(path)
-    }
-    return rewritten
-  }
-
-  private async rewriteOne(path: VaultPath, rewrite: LinkRewrite): Promise<boolean> {
-    const bytes = await this.repo.readIfExists(path)
-    const content = bytes && noteText(bytes)
-    if (!content) return false
-    const next = rewriteLinks(content, rewrite)
-    if (next === content) return false
-    await this.stageFile(path, next)
-    return true
-  }
-
-  private async stageFile(path: VaultPath, content: string): Promise<void> {
-    await this.repo.writeAtomic(path, Buffer.from(content))
-    await this.repo.run(['add', '-f', '--', path])
+    return stageRewrites(this.repo, notes.filter((path) => linksMayChange(path, this.request)), rewrite)
   }
 }

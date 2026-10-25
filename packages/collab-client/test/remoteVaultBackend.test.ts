@@ -367,10 +367,6 @@ describe('the remote vault backend', () => {
     })
   })
 
-  it('chrome operations throw unsupported errors for listFolders', async () => {
-    await expect(backend.chrome.listFolders()).rejects.toThrow('listing folders')
-  })
-
   it('chrome operations throw unsupported errors for listViews', async () => {
     await expect(backend.chrome.listViews()).rejects.toThrow('listing views')
   })

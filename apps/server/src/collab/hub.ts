@@ -4,7 +4,7 @@ import { COLLAB_CLOSE, type CollabAccess } from '../../../../packages/protocol/s
 import type { DocId, DocIndex } from '../docIndex.ts'
 import type { VaultChange } from '../gitSync.ts'
 import type { VaultPath } from '../paths.ts'
-import type { LinkRewrite } from '../renameLinks.ts'
+import type { LinkRewrites } from '../renameLinks.ts'
 import type { BlobStore } from '../store.ts'
 import type { Vault } from '../vault.ts'
 import type { FlushPolicy, Timers } from './flush.ts'
@@ -159,7 +159,7 @@ export class CollabHub {
   }
 
   /** A rename's link rewrite is patched into the document; any other change is reconciled. */
-  private changed(session: NoteSession, links: LinkRewrite | undefined): Promise<void> {
+  private changed(session: NoteSession, links: LinkRewrites | undefined): Promise<void> {
     return links ? session.relink(links) : session.fileChanged()
   }
 

@@ -1,6 +1,6 @@
 import * as Y from 'yjs'
 import { DOC_BLOCKS_FRAGMENT, DOC_FRONTMATTER_FIELD } from '../../../../packages/protocol/src/index.ts'
-import { type LinkRewrite, linkEdits, rewriteLinks, type TextEdit } from '../renameLinks.ts'
+import { type LinkRewrites, linkEdits, rewriteLinks, type TextEdit } from '../renameLinks.ts'
 
 /**
  * A rename's wikilink rewrite applied to a live document with the smallest changes Yjs has:
@@ -50,12 +50,12 @@ function patchRanges(text: Y.Text, edits: readonly TextEdit[]): void {
   }
 }
 
-function patchText(text: Y.Text, rewrite: LinkRewrite): void {
+function patchText(text: Y.Text, rewrite: LinkRewrites): void {
   const edits = linkEdits(plainText(text), rewrite)
   if (edits.length > 0) patchRanges(text, edits)
 }
 
-function patchWikilink(element: Y.XmlElement, rewrite: LinkRewrite): void {
+function patchWikilink(element: Y.XmlElement, rewrite: LinkRewrites): void {
   const target = element.getAttribute(TARGET_ATTRIBUTE)
   if (typeof target !== 'string') return
   const link = `[[${target}]]`
@@ -63,7 +63,7 @@ function patchWikilink(element: Y.XmlElement, rewrite: LinkRewrite): void {
   if (rewritten !== link) element.setAttribute(TARGET_ATTRIBUTE, rewritten.slice(2, -2))
 }
 
-function patchChildren(parent: Y.XmlFragment | Y.XmlElement, rewrite: LinkRewrite): void {
+function patchChildren(parent: Y.XmlFragment | Y.XmlElement, rewrite: LinkRewrites): void {
   for (const child of parent.toArray()) {
     if (child instanceof Y.XmlText) patchText(child, rewrite)
     if (!(child instanceof Y.XmlElement)) continue
@@ -72,7 +72,7 @@ function patchChildren(parent: Y.XmlFragment | Y.XmlElement, rewrite: LinkRewrit
   }
 }
 
-export function patchLiveLinks(doc: Y.Doc, rewrite: LinkRewrite): void {
+export function patchLiveLinks(doc: Y.Doc, rewrite: LinkRewrites): void {
   patchText(doc.getText(DOC_FRONTMATTER_FIELD), rewrite)
   patchChildren(doc.getXmlFragment(DOC_BLOCKS_FRAGMENT), rewrite)
 }

@@ -1,8 +1,8 @@
-# Tolaria remote protocol, version 1.6
+# Tolaria remote protocol, version 1.7
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change. Version 1.7 added folder renames (`POST /v1/folders/rename`, capability `folders.rename`); nothing else changed.
 
 ## Design rules
 
@@ -36,6 +36,7 @@ Capabilities:
 | `changes.feed` | `GET /v1/changes` Server-Sent Events stream of vault changes (since 1.2). |
 | `attachments.import` | `POST /v1/attachments/imports` downloads a public image into `attachments/` (since 1.3). |
 | `files.rename.links` | `POST /v1/rename` rewrites the wikilinks to the renamed note on request (since 1.4). |
+| `folders.rename` | `POST /v1/folders/rename` moves every file of a folder in one commit (since 1.7). |
 | `collab.yjs`, `collab.awareness` | The collaboration channel is served (since 1.1). |
 | `collab.tickets` | `POST /v1/collab/tickets` issues websocket tickets (since 1.1). |
 
@@ -105,8 +106,8 @@ A write that ends in a conflict copy is not an error body: see `PUT` below.
 
 ```json
 {
-  "protocolVersion": "1.4",
-  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "files.rename.links", "collab.yjs", "collab.awareness", "collab.tickets"],
+  "protocolVersion": "1.7",
+  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "files.rename.links", "folders.rename", "collab.yjs", "collab.awareness", "collab.tickets"],
   "vault": { "name": "my-vault", "branch": "main", "head": "eea2db93a391d110c4707fa1f6c6078c2f39c1ca" },
   "collab": { "available": true, "path": "/v1/collab/docs", "docFormat": "tolaria.blocknote/1", "blocksFragment": "blocks", "frontmatterField": "frontmatter", "metaMap": "meta" }
 }
@@ -223,6 +224,22 @@ Since 1.4 the body may also carry:
 ```
 
 The rewrite is the desktop's (`src-tauri/src/vault/rename.rs`): links to the old title, the old path without `.md` or the old file name without `.md`, case-sensitive, become links to the new path without `.md`; an alias after `|` is kept; `[[old#heading]]` and other spellings are left alone; links in frontmatter and code are rewritten too, the renamed note's own links are not. A note open as a live document gets the same rewrite as a Yjs transaction on its `wikilink` targets and text, so edits that are not written yet are kept and its `meta.baseRevision` moves to the rewritten file. The golden cases are in `apps/server/test/fixtures/rename-golden.json` (ADR 0289).
+
+A move to another folder is a rename whose `to` is in that folder; with `rewriteLinks` the desktop's `move_note_to_folder` rewrite applies (the same targets as above).
+
+### `POST /v1/folders/rename` (since 1.7)
+
+```json
+{ "from": "projects", "to": "work", "rewriteLinks": true }
+```
+
+`from` and `to` are folder paths. Every tracked file under `from` moves to the same place under `to`, as one commit, pushed, with the subject `Rename folder <from> to <to>`; missing folders above `to` are created and notes keep their `docId`. With `rewriteLinks: true`, a wikilink that reaches a moved note by its path (`[[projects/alpha]]`, `[[projects/alpha|alias]]`) becomes a link to its new path (`[[work/alpha]]`) in every tracked `.md` file, the moved ones included, in the same commit. Links by title or by bare file name still resolve after the move and are left alone. Notes open as live documents follow their files and get the rewrite as a Yjs transaction, as with `POST /v1/rename`.
+
+```json
+{ "from": "projects", "path": "work", "commit": "…", "pushed": true, "moved": [ { "from": "projects/alpha.md", "to": "work/alpha.md" } ], "rewritten": ["index.md"] }
+```
+
+`rewritten` is present only with `rewriteLinks`. `404 not_found` when no tracked file is under `from`, `409 destination_exists` when something exists at `to` or a parent of `to` is a file, `400 invalid_request` when `to` is `from` or inside it. The server applies its path rules only; the reference web client also refuses a new name that Windows cannot hold (the desktop's `filename_rules.rs`) before sending anything.
 
 ### `GET /v1/search?q=<text>[&limit=<n>]`
 

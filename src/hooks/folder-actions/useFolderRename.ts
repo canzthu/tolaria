@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { hasRemoteVault } from '../../lib/vaultBackend'
 import type { SidebarSelection, VaultEntry } from '../../types'
 import {
   folderLabel,
@@ -18,6 +19,11 @@ interface UseFolderRenameInput {
   setTabs: React.Dispatch<React.SetStateAction<FolderTab[]>>
   setToastMessage: (message: string | null) => void
   vaultPath: string
+}
+
+/** The remote's errors carry the desktop's wording in their message; the desktop's are shown as they are. */
+function folderRenameError(error: unknown): string {
+  return hasRemoteVault() && error instanceof Error ? error.message : String(error)
 }
 
 export function useFolderRename(options: UseFolderRenameInput) {
@@ -44,25 +50,26 @@ export function useFolderRename(options: UseFolderRenameInput) {
       setRenamingFolderPath(null)
       await reloadFolders()
       const refreshedEntries = await reloadVault()
+      const entryVaultPath = hasRemoteVault() ? '' : vaultPath
       updateTabsAfterFolderRename({
         activeTabPathRef,
         handleSwitchTab,
         refreshedEntries,
         renameResult,
         setTabs,
-        vaultPath,
+        vaultPath: entryVaultPath,
       })
       updateSelectionAfterFolderRename({
         refreshedEntries,
         renameResult,
         selection,
         setSelection,
-        vaultPath,
+        vaultPath: entryVaultPath,
       })
       setToastMessage(`Renamed folder to "${trimmedName}"`)
       return true
     } catch (error) {
-      setToastMessage(`Failed to rename folder: ${error}`)
+      setToastMessage(`Failed to rename folder: ${folderRenameError(error)}`)
       return false
     }
     },

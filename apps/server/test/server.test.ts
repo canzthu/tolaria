@@ -328,6 +328,40 @@ describe('POST /v1/rename', () => {
   })
 })
 
+describe('POST /v1/folders/rename (since 1.7)', () => {
+  function renameFolder(body: unknown): Promise<Response> {
+    const payload = typeof body === 'string' ? body : JSON.stringify(body)
+    return api('/v1/folders/rename', { method: 'POST', body: payload })
+  }
+
+  it('moves the folder in one commit and keeps the doc ids of its notes', async () => {
+    const before = (await api('/v1/files/projects/alpha.md')).headers.get(DOC_ID_HEADER)
+    const response = await renameFolder({ from: 'projects', to: 'work', rewriteLinks: true })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      from: 'projects',
+      path: 'work',
+      moved: [{ from: 'projects/alpha.md', to: 'work/alpha.md' }],
+      rewritten: [],
+    })
+    expect((await api('/v1/files/work/alpha.md')).headers.get(DOC_ID_HEADER)).toBe(before)
+    expect((await fixture.desktop.log())[0]).toBe('Rename folder projects to work')
+  })
+
+  it.each([
+    ['not json', 400, 'invalid_request'],
+    [{ from: 'projects' }, 400, 'invalid_path'],
+    [{ from: 'projects', to: '../escape' }, 400, 'invalid_path'],
+    [{ from: 'projects', to: 'work', rewriteLinks: 'yes' }, 400, 'invalid_request'],
+    [{ from: 'nowhere', to: 'work' }, 404, 'not_found'],
+    [{ from: 'projects', to: 'attachments' }, 409, 'destination_exists'],
+  ])('answers %j with %i %s', async (body, status, code) => {
+    const response = await renameFolder(body)
+    expect(response.status).toBe(status)
+    expect(await errorCode(response)).toBe(code)
+  })
+})
+
 describe('GET /v1/search', () => {
   it('searches note text', async () => {
     const response = await api('/v1/search?q=heron&limit=5')

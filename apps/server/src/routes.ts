@@ -187,6 +187,13 @@ async function renameFile(request: ApiRequest, { vault, docs }: Services): Promi
   return { status: 200, body: withDocId(result, docs) }
 }
 
+async function renameFolder(request: ApiRequest, { vault }: Services): Promise<Reply> {
+  const body = jsonObject(await request.body())
+  const rewriteLinks = optionalFlag(body.rewriteLinks, 'rewriteLinks')
+  const result = await vault.renameFolder(vaultPath(body.from), vaultPath(body.to), { rewriteLinks })
+  return { status: 200, body: result }
+}
+
 function searchLimit(raw: string | null): number {
   if (raw === null) return DEFAULT_SEARCH_LIMIT
   const limit = Number(raw)
@@ -281,6 +288,7 @@ const EXACT_ROUTES = new Map<string, Methods>([
   [ROUTES.vault, new Map([['GET', describeVault]])],
   [ROUTES.files, new Map([['GET', listFiles]])],
   [ROUTES.rename, new Map([['POST', renameFile]])],
+  [ROUTES.folderRename, new Map([['POST', renameFolder]])],
   [ROUTES.search, new Map([['GET', search]])],
   [ROUTES.sync, new Map([['POST', sync]])],
   [ROUTES.entries, new Map([['GET', listEntries]])],

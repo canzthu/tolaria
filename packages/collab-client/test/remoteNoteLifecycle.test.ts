@@ -180,6 +180,35 @@ describe('renaming a note on the web rewrites links to it (TOL-22)', () => {
   })
 })
 
+describe('moving a note to a folder on the web (TOL-227)', () => {
+  it('moves it under its file name, rewrites the links in the same commit, and its document follows', async () => {
+    const welcome = await open('welcome.md')
+
+    const result = await backend.files.rename({ path: 'welcome.md', folderPath: 'archive/old' })
+
+    expect(result).toEqual({ newPath: 'archive/old/welcome.md', updatedFiles: 1, failedUpdates: 0 })
+    expect(welcome.path).toBe('archive/old/welcome.md')
+    expect(await fixture.desktop.read('projects/alpha.md')).toBe('# Alpha\n\nLinks to [[archive/old/welcome]] and mentions the Heron.\n')
+    expect((await fixture.desktop.log())[0]).toBe('Rename welcome.md to archive/old/welcome.md')
+  })
+
+  it('moves a note to the vault root, and stays put when it is already in the folder', async () => {
+    const request = () => Promise.reject(new Error('no request expected'))
+
+    const result = await backend.files.rename({ path: 'projects/alpha.md', folderPath: '' })
+
+    expect(result.newPath).toBe('alpha.md')
+    await expect(renameNote(request, { path: 'a/b.md', folderPath: 'a' })).resolves.toEqual({ newPath: 'a/b.md', updatedFiles: 0, failedUpdates: 0 })
+  })
+
+  it('refuses a folder that already has a note of that name, with the desktop message', async () => {
+    await backend.files.write('projects/welcome.md', '# Other\n', { baseRevision: null })
+
+    await expect(backend.files.rename({ path: 'welcome.md', folderPath: 'projects' })).rejects.toThrow('A note with that name already exists')
+    expect(await desktopHas('welcome.md')).toBe(true)
+  })
+})
+
 describe('rename naming', () => {
   it('follows the desktop: the slug, then numbered candidates in the same folder', () => {
     expect([0, 1, 2].map((attempt) => renameCandidate({ path: 'a/b/untitled-note-1.md', stem: 'idea' }, attempt))).toEqual([
@@ -193,10 +222,10 @@ describe('rename naming', () => {
     expect(renameCandidate({ path: 'untitled-note-1.md', stem: 'idea' }, 0)).toBe('idea.md')
   })
 
-  it.each(['', '..', '../escape', 'a/b', 'a\\b'])('refuses the stem %j, which does not name one file', async (stem) => {
+  it.each(['', '..', '../escape', 'a/b', 'a\\b', 'quarterly:plan', 'NUL', 'draft.'])('refuses the stem %j, which does not name one file everywhere', async (stem) => {
     const request = () => Promise.reject(new Error('no request expected'))
 
-    await expect(renameNote(request, { path: 'x.md', newFilenameStem: stem })).rejects.toMatchObject({ status: 400 })
+    await expect(renameNote(request, { path: 'x.md', newFilenameStem: stem })).rejects.toMatchObject({ status: 400, message: 'Invalid filename' })
   })
 
   it.each(['', '/abs.md', 'a/../b.md', 'a//b.md', 'a\\b.md'])('refuses to rename %j, which is not a vault path', async (path) => {

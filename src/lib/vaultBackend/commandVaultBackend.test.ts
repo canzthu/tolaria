@@ -211,6 +211,30 @@ describe('createCommandVaultBackend', () => {
     })
   })
 
+  describe('moves and folder renames (TOL-227)', () => {
+    it('moves a note into a folder in each dialect', async () => {
+      const moved = () => ({ new_path: '/vault/archive/note.md', updated_files: 1 })
+      const tauri = harness('tauri', { move_note_to_folder: moved })
+      const mock = harness('mock', { move_note_to_folder: moved })
+
+      const result = await tauri.backend.files.rename({ path: NOTE, folderPath: 'archive' })
+      await mock.backend.files.rename({ path: NOTE, folderPath: 'archive' })
+
+      expect(tauri.calls[0].args).toEqual({ args: { vaultPath: VAULT, oldPath: NOTE, folderPath: 'archive' } })
+      expect(mock.calls[0].args).toEqual({ vault_path: VAULT, old_path: NOTE, folder_path: 'archive' })
+      expect(result).toEqual({ newPath: '/vault/archive/note.md', updatedFiles: 1, failedUpdates: 0 })
+    })
+
+    it.each(['tauri', 'mock'] as const)('renames a folder through rename_vault_folder in the %s dialect', async (dialect) => {
+      const { backend, calls } = harness(dialect, { rename_vault_folder: () => ({ old_path: 'projects', new_path: 'work' }) })
+
+      const result = await backend.files.renameFolder({ folderPath: 'projects', newName: 'work' })
+
+      expect(calls).toEqual([{ command: 'rename_vault_folder', args: { vaultPath: VAULT, folderPath: 'projects', newName: 'work' } }])
+      expect(result).toEqual({ oldPath: 'projects', newPath: 'work', updatedFiles: 0 })
+    })
+  })
+
   it('deletes through the dialect-specific batch command', async () => {
     const echo: Responder = (args) => args.paths
     const desktop = harness('tauri', { batch_delete_notes_async: echo })

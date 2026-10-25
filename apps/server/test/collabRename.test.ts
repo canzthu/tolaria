@@ -110,4 +110,35 @@ describe('a rename with link rewrite and live documents', () => {
     expect(session.path).toBe('archive/hello.md')
     expect(ada.markdown()).toContain('A throwaway vault for tests.')
   })
+
+  it('follows a folder rename: a moved note keeps its document and a linking note is patched live', async () => {
+    await harness.fixture.desktop.commit(PERSON, '# Ada\n\nWorks on [[projects/alpha|the alpha]].\n')
+    await harness.vault.syncNow()
+    await harness.docs.reconcile([PERSON as VaultPath])
+    const ada = await harness.client(PERSON)
+    const [link] = wikilinks(ada.doc)
+
+    await harness.vault.renameFolder('projects' as VaultPath, 'work' as VaultPath, { rewriteLinks: true })
+    await settle()
+
+    expect(wikilinks(ada.doc)).toEqual([link])
+    expect(link.getAttribute('target')).toBe('work/alpha|the alpha')
+    expect(await harness.file(PERSON)).toBe('# Ada\n\nWorks on [[work/alpha|the alpha]].\n')
+    expect((await harness.session(PERSON)).dirty).toBe(false)
+    expect((await harness.commits())[0]).toBe('Rename folder projects to work')
+  })
+
+  it('moves the documents of the notes in a renamed folder, with their edits', async () => {
+    const alpha = await harness.client()
+    const session = await harness.session()
+    alpha.type('mentions the Heron.', ' Typed live.')
+    await settle()
+
+    await harness.vault.renameFolder('projects' as VaultPath, 'work' as VaultPath, { rewriteLinks: true })
+    await session.flush()
+
+    expect(session.path).toBe('work/alpha.md')
+    expect(await harness.file('work/alpha.md')).toBe('# Alpha\n\nLinks to [[welcome]] and mentions the Heron. Typed live.\n')
+  })
 })
+

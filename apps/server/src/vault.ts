@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 import type {
   DeleteResult,
   FileEntry,
+  FolderRenameResult,
   ListResponse,
   RenameResult,
   SearchResponse,
@@ -13,6 +14,7 @@ import { notFound, stale, VaultError } from './errors.ts'
 import { GitRepo, REMOTE, type RepoOptions } from './gitRepo.ts'
 import { GitSync, type VaultChange } from './gitSync.ts'
 import { blobEtag, conflictCopyPath, type VaultPath } from './paths.ts'
+import { FolderRenameTransaction } from './folderRenameTransaction.ts'
 import { type RenameOptions, RenameTransaction } from './renameTransaction.ts'
 import { searchVault } from './search.ts'
 
@@ -278,6 +280,26 @@ export class Vault {
       const pushed = await this.pushNow(head)
       const path = this.sync.relocated.get(to) ?? to
       const result: RenameResult = { from, path, etag: staged.etag, commit: await this.repo.head(), pushed }
+      return options.rewriteLinks ? { ...result, rewritten: staged.rewritten } : result
+    })
+  }
+
+  /**
+   * Moves every file of a folder in one commit; with `rewriteLinks`, the wikilinks that reach
+   * a moved note by its path are rewritten in that same commit (see `FolderRenameTransaction`).
+   */
+  renameFolder(from: VaultPath, to: VaultPath, options: { rewriteLinks?: boolean } = {}): Promise<FolderRenameResult> {
+    return this.locked(async () => {
+      await this.sync.pull()
+      const { files } = await this.list()
+      const staged = await new FolderRenameTransaction(this.repo, { ...options, from, to }).stage(files.map((file) => file.path as VaultPath))
+      await this.repo.commitStaged(staged.message)
+      await this.emit(staged.changes)
+      const head = await this.repo.head()
+      const paths = staged.moved.flatMap((move) => [move.from, move.to])
+      this.onVaultEvent?.({ type: 'commit', head, paths: [...paths, ...staged.rewritten] })
+      const pushed = await this.pushNow(head)
+      const result: FolderRenameResult = { from, path: to, commit: await this.repo.head(), pushed, moved: staged.moved }
       return options.rewriteLinks ? { ...result, rewritten: staged.rewritten } : result
     })
   }

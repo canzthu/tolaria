@@ -1,8 +1,11 @@
 import type {
+	VaultNoteMoveRequest,
+	VaultNoteRenameRequest,
 	VaultRenameRequest,
 	VaultRenameResult,
 } from "../../../src/lib/vaultBackend/types";
 import { slugifyNoteStem } from "../../../src/utils/noteSlug";
+import { isPortableName } from "../../../src/utils/portableName";
 import { type RenameRequest, ROUTES } from "../../protocol/src/index.ts";
 import {
 	assertVaultPath,
@@ -55,7 +58,7 @@ export function followRenames(doc: { path: string }): () => void {
 }
 
 /** A note moving from one path to another. */
-interface Move {
+export interface Move {
 	from: string;
 	to: string;
 }
@@ -73,6 +76,11 @@ function moveOpenDocs({ from, to }: Move): void {
 	for (const doc of openDocs) if (doc.path === from) doc.path = to;
 }
 
+/** Live documents of notes that moved together (a folder rename) follow their files. */
+export function followMoves(moves: readonly Move[]): void {
+	for (const move of moves) moveOpenDocs(move);
+}
+
 /** The note to rename and the file stem it should get. */
 interface RenameTarget {
 	path: string;
@@ -82,13 +90,17 @@ interface RenameTarget {
 /** A stem names one file: no folder separators, no dot segments, not empty. */
 const UNSAFE_STEM = /[/\\]|^\.{0,2}$/u;
 
-function renameTarget(rename: VaultRenameRequest): RenameTarget {
-	const stem =
-		"newTitle" in rename
-			? slugifyNoteStem(rename.newTitle)
-			: rename.newFilenameStem.trim();
-	if (UNSAFE_STEM.test(stem))
-		throw new RemoteError(400, `"${stem}" is not a file name`);
+/** The desktop's answer to a file name Windows cannot hold, shown as it is. */
+const INVALID_FILENAME = "Invalid filename";
+/** The desktop's answer when the destination folder already has a note of that name. */
+const NAME_TAKEN = "A note with that name already exists";
+
+function renameTarget(rename: VaultNoteRenameRequest): RenameTarget {
+	if ("newTitle" in rename)
+		return { path: rename.path, stem: slugifyNoteStem(rename.newTitle) };
+	const stem = rename.newFilenameStem.trim();
+	if (UNSAFE_STEM.test(stem) || !isPortableName(stem))
+		throw new RemoteError(400, INVALID_FILENAME);
 	return { path: rename.path, stem };
 }
 
@@ -103,17 +115,17 @@ export function renameCandidate(
 }
 
 /** A title rename whose file name already fits still sets the title, when it is a new one. */
-function retitles(rename: VaultRenameRequest): boolean {
+function retitles(rename: VaultNoteRenameRequest): boolean {
 	return "newTitle" in rename && rename.oldTitle !== undefined && rename.oldTitle !== rename.newTitle;
 }
 
-function renameBody(rename: VaultRenameRequest, to: string): RenameBody {
+function renameBody(rename: VaultNoteRenameRequest, to: string): RenameBody {
 	const body: RenameBody = { from: rename.path, to, rewriteLinks: true };
 	if (!("newTitle" in rename)) return body;
 	return { ...body, title: rename.newTitle, oldTitle: rename.oldTitle };
 }
 
-function rewrittenCount(result: Record<string, unknown>): number {
+export function rewrittenCount(result: Record<string, unknown>): number {
 	return Array.isArray(result.rewritten) ? result.rewritten.length : 0;
 }
 
@@ -141,6 +153,7 @@ export async function renameNote(
 	rename: VaultRenameRequest,
 ): Promise<VaultRenameResult> {
 	assertVaultPath(rename.path);
+	if ("folderPath" in rename) return moveIntoFolder(request, rename);
 	const target = renameTarget(rename);
 	for (let attempt = 0; attempt < RENAME_ATTEMPTS; attempt++) {
 		const to = renameCandidate(target, attempt);
@@ -151,6 +164,30 @@ export async function renameNote(
 		return renamed(moved);
 	}
 	throw new RemoteError(409, `no free name for ${rename.path}`);
+}
+
+/** `folder/<file name>`, or the file name alone for the vault root. */
+function pathInFolder({ path, folderPath }: VaultNoteMoveRequest): string {
+	const filename = path.slice(path.lastIndexOf("/") + 1);
+	return folderPath ? `${folderPath}/${filename}` : filename;
+}
+
+/**
+ * Moves a note into another folder under its file name, as the desktop's
+ * `move_note_to_folder` does: the links to it are rewritten in the same commit, and a
+ * note of that name already in the folder stops the move.
+ */
+async function moveIntoFolder(
+	request: Request,
+	move: VaultNoteMoveRequest,
+): Promise<VaultRenameResult> {
+	const to = pathInFolder(move);
+	if (to === move.path) return renamed({ path: to, updatedFiles: 0 });
+	assertVaultPath(to);
+	const moved = await moveTo(request, { from: move.path, to, rewriteLinks: true });
+	if (!moved) throw new RemoteError(409, NAME_TAKEN);
+	moveOpenDocs({ from: move.path, to: moved.path });
+	return renamed(moved);
 }
 
 function renamed({ path, updatedFiles }: Moved): VaultRenameResult {

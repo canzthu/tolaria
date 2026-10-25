@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.6'
+export const PROTOCOL_VERSION = '1.7'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -15,6 +15,8 @@ export const ROUTES = {
   vault: `${API_PREFIX}/vault`,
   files: `${API_PREFIX}/files`,
   rename: `${API_PREFIX}/rename`,
+  /** Renames a folder: every file in it moves in one commit (since 1.7). */
+  folderRename: `${API_PREFIX}/folders/rename`,
   search: `${API_PREFIX}/search`,
   sync: `${API_PREFIX}/sync`,
   /** Vault index of all entries. Supports ETag and `since` parameter for delta updates. */
@@ -105,6 +107,7 @@ export const FILE_CAPABILITIES = [
   'changes.feed',
   'attachments.import',
   'files.rename.links',
+  'folders.rename',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
@@ -187,6 +190,25 @@ export interface RenameResult {
   pushed: boolean
   docId?: string
   /** Since 1.4, with `rewriteLinks`: the other notes whose wikilinks were rewritten. */
+  rewritten?: string[]
+}
+
+/** Body of `POST /v1/folders/rename` (since 1.7): `from` and `to` are folder paths. */
+export interface FolderRenameRequest {
+  from: string
+  to: string
+  /** Rewrite the wikilinks that reach a moved note by its path, in the rename's commit. */
+  rewriteLinks?: boolean
+}
+
+export interface FolderRenameResult {
+  from: string
+  path: string
+  commit: string
+  pushed: boolean
+  /** Every file that moved, where it was and where it is. */
+  moved: { from: string; to: string }[]
+  /** With `rewriteLinks`: the notes whose wikilinks were rewritten. */
   rewritten?: string[]
 }
 

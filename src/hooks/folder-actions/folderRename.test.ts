@@ -312,3 +312,52 @@ describe("useFolderRename", () => {
 		);
 	});
 });
+
+describe("useFolderRename on a Tolaria remote (TOL-227)", () => {
+	type RemoteWindow = { TOLARIA_REMOTE_URL?: string; TOLARIA_REMOTE_TOKEN?: string };
+
+	beforeEach(() => {
+		vi.mocked(mockInvoke).mockReset();
+		Object.assign(window as RemoteWindow, {
+			TOLARIA_REMOTE_URL: "https://remote.test",
+			TOLARIA_REMOTE_TOKEN: "web-token-0123456789",
+		});
+		return () => {
+			delete (window as RemoteWindow).TOLARIA_REMOTE_URL;
+			delete (window as RemoteWindow).TOLARIA_REMOTE_TOKEN;
+			vi.unstubAllGlobals();
+		};
+	});
+
+	function setupRemoteRename() {
+		const setup = setupRename({ kind: "entity", entry: entry("projects/sub/note.md") });
+		setup.options.activeTabPathRef.current = "projects/sub/note.md";
+		setup.options.reloadVault.mockResolvedValue([entry("work/sub/note.md")]);
+		return setup;
+	}
+
+	it("renames through the server and follows the vault-relative paths of its notes", async () => {
+		vi.stubGlobal("fetch", vi.fn(async () => Response.json({ from: "projects", path: "work", moved: [], rewritten: [] })));
+		const { result, options } = setupRemoteRename();
+
+		await act(async () => {
+			expect(await result.current.renameFolder("projects", "work")).toBe(true);
+		});
+
+		expect(mockInvoke).not.toHaveBeenCalled();
+		expect(options.setTabs.mock.calls[0][0]([tab("projects/sub/note.md")])).toEqual([tab("work/sub/note.md")]);
+		expect(options.handleSwitchTab).toHaveBeenCalledExactlyOnceWith("work/sub/note.md");
+		expect(options.setSelection).toHaveBeenCalledExactlyOnceWith({ kind: "entity", entry: entry("work/sub/note.md") });
+	});
+
+	it("shows the desktop's wording for a refused name", async () => {
+		vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 409 })));
+		const { result, options } = setupRemoteRename();
+
+		await act(async () => {
+			expect(await result.current.renameFolder("projects", "work")).toBe(false);
+		});
+
+		expect(options.setToastMessage).toHaveBeenCalledExactlyOnceWith("Failed to rename folder: Folder 'work' already exists");
+	});
+});

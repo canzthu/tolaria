@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { createVaultBackend } from '../../lib/vaultBackend'
 import { isTauri, mockInvoke } from '../../mock-tauri'
 import type { SidebarSelection, VaultEntry } from '../../types'
 
@@ -29,6 +30,11 @@ export function folderAbsolutePath(params: { vaultPath: string; folderPath: stri
   const normalizedVaultPath = trimTrailingSlash(params.vaultPath)
   const normalizedFolderPath = params.folderPath.replace(/^\/+/, '')
   return normalizedFolderPath ? `${normalizedVaultPath}/${normalizedFolderPath}` : normalizedVaultPath
+}
+
+/** Where a folder's notes live in entry paths: under the vault folder, or vault-relative on a remote (`vaultPath` ''). */
+function entryFolderPath(params: { vaultPath: string; folderPath: string }): string {
+  return params.vaultPath ? folderAbsolutePath(params) : params.folderPath
 }
 
 export function isWithinPrefix(params: { path: string; prefix: string }): boolean {
@@ -62,10 +68,9 @@ export async function invokeRenameFolder(params: {
   folderPath: string
   newName: string
 }): Promise<FolderRenameResult> {
-  if (isTauri()) {
-    return invoke<FolderRenameResult>('rename_vault_folder', params)
-  }
-  return mockInvoke<FolderRenameResult>('rename_vault_folder', params)
+  const { vaultPath, folderPath, newName } = params
+  const { oldPath, newPath } = await createVaultBackend(vaultPath).files.renameFolder({ folderPath, newName })
+  return { old_path: oldPath, new_path: newPath }
 }
 
 export async function invokeDeleteFolder(params: { vaultPath: string; folderPath: string }): Promise<string> {
@@ -105,13 +110,13 @@ export function updateSelectionAfterFolderRename(params: {
 
   if (selection.kind !== 'entity') return
 
-  const oldPrefix = folderAbsolutePath({ vaultPath, folderPath: renameResult.old_path })
+  const oldPrefix = entryFolderPath({ vaultPath, folderPath: renameResult.old_path })
   if (!isWithinPrefix({ path: selection.entry.path, prefix: oldPrefix })) return
 
   const renamedPath = replaceFolderPrefix({
     path: selection.entry.path,
     oldPrefix,
-    newPrefix: folderAbsolutePath({ vaultPath, folderPath: renameResult.new_path }),
+    newPrefix: entryFolderPath({ vaultPath, folderPath: renameResult.new_path }),
   })
   const refreshedEntry = refreshedEntries.find((entry) => entry.path === renamedPath)
   setSelection(refreshedEntry ? { kind: 'entity', entry: refreshedEntry } : DEFAULT_SELECTION)
@@ -133,8 +138,8 @@ export function updateTabsAfterFolderRename(params: {
     setTabs,
     vaultPath,
   } = params
-  const oldPrefix = folderAbsolutePath({ vaultPath, folderPath: renameResult.old_path })
-  const newPrefix = folderAbsolutePath({ vaultPath, folderPath: renameResult.new_path })
+  const oldPrefix = entryFolderPath({ vaultPath, folderPath: renameResult.old_path })
+  const newPrefix = entryFolderPath({ vaultPath, folderPath: renameResult.new_path })
 
   setTabs((currentTabs) => currentTabs.map((tab) => {
     if (!isWithinPrefix({ path: tab.entry.path, prefix: oldPrefix })) return tab

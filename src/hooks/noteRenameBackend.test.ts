@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { performFilenameRename, performRename } from './useNoteRename'
+import { invokeRenameFolder } from './folder-actions/folderActionUtils'
+import { performFilenameRename, performMoveNoteToFolder, performRename } from './useNoteRename'
 
 /**
  * Title and filename renames pick their backend through createVaultBackend (TOL-22). Native
@@ -52,6 +53,61 @@ describe('renames on the desktop', () => {
     expect(tauriInvoke.mock.calls[1][0]).toBe('rename_note_filename')
     expect(sentArgs(1)).toEqual({ args: { vaultPath: '/vault', oldPath: '/vault/weekly.md', newFilenameStem: 'x' } })
     expect(result).toEqual({ new_path: '/vault/x.md', updated_files: 0, failed_updates: 0 })
+  })
+})
+
+describe('moves and folder renames on the desktop (TOL-227)', () => {
+  it('sends move_note_to_folder with the vault, the old path and the folder', async () => {
+    setTauriRuntime(true)
+    tauriInvoke.mockResolvedValue({ new_path: '/vault/archive/weekly.md', updated_files: 1 })
+
+    const result = await performMoveNoteToFolder({ path: '/vault/weekly.md', folderPath: 'archive', vaultPath: '/vault' })
+
+    expect(tauriInvoke.mock.calls[0][0]).toBe('move_note_to_folder')
+    expect(sentArgs()).toEqual({ args: { vaultPath: '/vault', oldPath: '/vault/weekly.md', folderPath: 'archive' } })
+    expect(result).toEqual({ new_path: '/vault/archive/weekly.md', updated_files: 1, failed_updates: 0 })
+  })
+
+  it('sends rename_vault_folder with the vault, the folder and the new name', async () => {
+    setTauriRuntime(true)
+    tauriInvoke.mockResolvedValue({ old_path: 'projects', new_path: 'work' })
+
+    const result = await invokeRenameFolder({ vaultPath: '/vault', folderPath: 'projects', newName: 'work' })
+
+    expect(tauriInvoke.mock.calls[0][0]).toBe('rename_vault_folder')
+    expect(sentArgs()).toEqual({ vaultPath: '/vault', folderPath: 'projects', newName: 'work' })
+    expect(result).toEqual({ old_path: 'projects', new_path: 'work' })
+  })
+})
+
+describe('moves and folder renames on the web with a Tolaria remote (TOL-227)', () => {
+  function serveRemote(answer: unknown) {
+    Object.assign(window as RemoteWindow, { TOLARIA_REMOTE_URL: 'https://remote.test', TOLARIA_REMOTE_TOKEN: 'web-token-0123456789' })
+    const fetchMock = vi.fn(async () => Response.json(answer))
+    vi.stubGlobal('fetch', fetchMock)
+    return () => {
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+      return { url, body: JSON.parse(String(init.body)) }
+    }
+  }
+
+  it('moves a note through the server rename with the links rewritten', async () => {
+    const sent = serveRemote({ from: 'weekly.md', path: 'archive/weekly.md', rewritten: ['index.md'] })
+
+    const result = await performMoveNoteToFolder({ path: 'weekly.md', folderPath: 'archive', vaultPath: '' })
+
+    expect(sent()).toEqual({ url: 'https://remote.test/v1/rename', body: { from: 'weekly.md', to: 'archive/weekly.md', rewriteLinks: true } })
+    expect(result).toEqual({ new_path: 'archive/weekly.md', updated_files: 1, failed_updates: 0 })
+    expect(tauriInvoke).not.toHaveBeenCalled()
+  })
+
+  it('renames a folder through the server folder rename', async () => {
+    const sent = serveRemote({ from: 'projects', path: 'work', moved: [], rewritten: [] })
+
+    const result = await invokeRenameFolder({ vaultPath: '', folderPath: 'projects', newName: 'work' })
+
+    expect(sent()).toEqual({ url: 'https://remote.test/v1/folders/rename', body: { from: 'projects', to: 'work', rewriteLinks: true } })
+    expect(result).toEqual({ old_path: 'projects', new_path: 'work' })
   })
 })
 
