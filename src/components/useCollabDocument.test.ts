@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
 import type { VaultBackend, VaultCollabDoc } from "../lib/vaultBackend/types";
 import { getActiveCollabDocument } from "../lib/activeCollabDocument";
+import * as vaultAccess from "../lib/sharing/vaultAccess";
 import { useCollabDocument } from "./useCollabDocument";
 
 describe("useCollabDocument", () => {
@@ -78,7 +79,7 @@ describe("useCollabDocument", () => {
 			expect(result.current.error).toBeNull();
 		});
 
-		expect(mockVaultBackend.collab?.openDoc).toHaveBeenCalledWith("test.md");
+		expect(mockVaultBackend.collab?.openDoc).toHaveBeenCalledWith("test.md", { readOnly: false });
 	});
 
 	it("closes document on unmount", async () => {
@@ -240,7 +241,9 @@ describe("useCollabDocument", () => {
 		rerender({ path: "other.md" });
 		expect(result.current.doc).toBeNull();
 		expect(mockDoc.close).toHaveBeenCalledTimes(1);
-		expect(mockVaultBackend.collab?.openDoc).toHaveBeenLastCalledWith("other.md");
+		expect(mockVaultBackend.collab?.openDoc).toHaveBeenLastCalledWith("other.md", {
+			readOnly: false,
+		});
 
 		unmount();
 		await waitFor(() => expect(mockDoc.close).toHaveBeenCalledTimes(2));
@@ -260,5 +263,44 @@ describe("useCollabDocument", () => {
 	it("publishes nothing without a note to open", () => {
 		renderCollab({ path: null });
 		expect(getActiveCollabDocument()).toBeNull();
+	});
+
+	it("joins a note shared to view with a read ticket, and reopens it when the role changes (TOL-237)", async () => {
+		const { result, rerender } = renderHook(
+			({ readOnly }) =>
+				useCollabDocument({ vaultBackend: mockVaultBackend, path: "test.md", enabled: true, readOnly }),
+			{ initialProps: { readOnly: true } },
+		);
+		await waitFor(() => expect(result.current.synced).toBe(true));
+		expect(mockVaultBackend.collab?.openDoc).toHaveBeenCalledWith("test.md", { readOnly: true });
+
+		rerender({ readOnly: false });
+		expect(result.current.doc).toBeNull();
+		expect(mockDoc.close).toHaveBeenCalledTimes(1);
+		expect(mockVaultBackend.collab?.openDoc).toHaveBeenLastCalledWith("test.md", { readOnly: false });
+		await waitFor(() => expect(result.current.synced).toBe(true));
+	});
+
+	it("rechecks the access when the server closes the document on its own (TOL-237)", async () => {
+		const reportSpy = vi.spyOn(vaultAccess, "reportAccessDenied").mockImplementation(() => {});
+		let statusListener: ((status: string) => void) | null = null;
+		mockDoc.provider = {
+			onStatus: (listener: (status: string) => void) => {
+				statusListener = listener;
+				return () => {};
+			},
+		} as unknown as RemoteBindings["provider"];
+		const { result, unmount } = renderCollab();
+		await waitFor(() => expect(result.current.synced).toBe(true));
+
+		statusListener?.("synced");
+		expect(reportSpy).not.toHaveBeenCalled();
+		statusListener?.("closed");
+		expect(reportSpy).toHaveBeenCalledTimes(1);
+
+		unmount();
+		statusListener?.("closed");
+		expect(reportSpy).toHaveBeenCalledTimes(1);
+		reportSpy.mockRestore();
 	});
 });

@@ -37,11 +37,15 @@ import {
   scheduleOfflineServiceWorkerRegistration,
 } from './lib/offline/offlineMode'
 import { prefetchCache } from '../packages/collab-client/src/entriesCachePrefetch'
+import { entriesCacheKey } from '../packages/collab-client/src/entriesCache'
+import { applySharedVaultBase, remoteVaultConfig } from './lib/vaultBackend/remoteConfig'
 import { installTouchInput } from './lib/touchInput'
 
 markStartupPhase('renderer_module_loaded')
-// Web only (TOL-206): the cached note list is read while the rest of the shell loads.
-if (hasOfflineRead()) prefetchCache()
+// Web only (TOL-206): the cached note list is read while the rest of the shell loads; a
+// shared vault (TOL-237) is served under its own prefix and has a list of its own.
+applySharedVaultBase()
+if (hasOfflineRead()) prefetchCache(entriesCacheKey(remoteVaultConfig()?.baseUrl ?? ''))
 
 const TLDRAW_CONTEXT_MENU_SELECTOR = '.tldraw-whiteboard'
 const MACOS_FULLSCREEN_CHROME_CLASS = 'mac-chrome-fullscreen'

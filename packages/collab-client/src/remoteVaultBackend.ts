@@ -40,7 +40,11 @@ import {
 	listFolders,
 	renameFolder,
 } from "./remoteFolders.ts";
-import { writeCache } from "./entriesCache.ts";
+import {
+	DEFAULT_CACHE_KEY,
+	entriesCacheKey,
+	writeCache,
+} from "./entriesCache.ts";
 import { takeCache } from "./entriesCachePrefetch.ts";
 import {
 	assertVaultPath,
@@ -190,14 +194,15 @@ function mapProtocolSearchResult(
 	};
 }
 
-// Module-level cache state for web-only cache-first loading
+// Module-level cache state for web-only cache-first loading; one vault per page, under its key.
+let cacheKey = DEFAULT_CACHE_KEY;
 let cachedEntries: Map<string, AppVaultEntry> = new Map();
 let revalidating = false;
 // Startup lists the vault more than once at the same time: they share one cache read.
 let pendingCacheList: Promise<AppVaultEntry[] | null> | null = null;
 
 async function listFromCache(request: Request): Promise<AppVaultEntry[] | null> {
-	const cached = await takeCache();
+	const cached = await takeCache(cacheKey);
 	if (!cached) return null;
 	cachedEntries = new Map(
 		cached.entries.map((e) => [e.path, mapProtocolEntryToApp(e)]),
@@ -231,7 +236,7 @@ async function listEntries(request: Request): Promise<AppVaultEntry[]> {
 	// Update cache for next time (web only)
 	if (typeof indexedDB !== "undefined") {
 		cachedEntries = new Map(entries.map((e) => [e.path, e]));
-		writeCache(body.head, body.entries).catch(() => {
+		writeCache(body.head, body.entries, cacheKey).catch(() => {
 			// Cache write failures are silent
 		});
 	}
@@ -294,7 +299,7 @@ async function revalidateInBackground(
 		const protocolEntries = Array.from(cachedEntries.values()).map(
 			mapAppEntryToProtocol,
 		);
-		await writeCache(delta.head, protocolEntries);
+		await writeCache(delta.head, protocolEntries, cacheKey);
 	} catch {
 		// Revalidation failures are silent; the cached data remains valid
 	} finally {
@@ -413,7 +418,7 @@ async function reloadEntries(request: Request): Promise<AppVaultEntry[]> {
 	// Update cache (web only)
 	if (typeof indexedDB !== "undefined") {
 		cachedEntries = new Map(entries.map((e) => [e.path, e]));
-		writeCache(body.head, body.entries).catch(() => {
+		writeCache(body.head, body.entries, cacheKey).catch(() => {
 			// Cache write failures are silent
 		});
 	}
@@ -446,8 +451,12 @@ function chromeOps(request: Request): VaultChromeOps {
 	};
 }
 
+/** The server's origin: a ticket's `path` already carries any prefix the vault is served under. */
 function socketOrigin(baseUrl: string): string {
-	return (baseUrl || globalThis.location.origin).replace(/^http/u, "ws");
+	return new URL(baseUrl || globalThis.location.origin).origin.replace(
+		/^http/u,
+		"ws",
+	);
 }
 
 async function docIdOf(request: Request, path: string): Promise<string> {
@@ -533,6 +542,7 @@ export function createRemoteVaultBackend(
 	options: RemoteOptions,
 ): VaultBackend<RemoteBindings> {
 	const request = requester(options);
+	cacheKey = entriesCacheKey(options.baseUrl);
 	return {
 		kind: "remote",
 		interfaceVersion: VAULT_BACKEND_INTERFACE_VERSION,

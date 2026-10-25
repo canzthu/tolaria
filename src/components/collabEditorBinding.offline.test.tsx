@@ -92,7 +92,7 @@ describe("useCollabEditorBinding offline on the web (TOL-198)", () => {
 
 		setNetwork(true);
 		await waitFor(() => expect(result.current.kind).toBe("bound"));
-		expect(openDoc).toHaveBeenCalledWith("a.md");
+		expect(openDoc).toHaveBeenCalledWith("a.md", { readOnly: false });
 	});
 
 	it("keeps the bound note's document when the network drops, and opens no other", async () => {

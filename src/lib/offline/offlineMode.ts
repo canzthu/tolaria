@@ -1,5 +1,6 @@
 import { clearCache as clearEntriesSnapshot } from '../../../packages/collab-client/src/entriesCache'
 import { resolveBrowserBackendKind, resolvePlatformCapabilities } from '../platformCapabilities'
+import { assertSharedVaultWritable } from '../sharing/vaultAccess'
 import { CACHE_LOADED_URLS_MESSAGE, CLEAR_OFFLINE_DATA_MESSAGE, deleteTolariaCaches } from './offlineCachePolicy'
 
 /**
@@ -33,9 +34,13 @@ export function isOfflineReadOnly(): boolean {
   return hasOfflineRead() && typeof navigator !== 'undefined' && navigator.onLine === false
 }
 
-/** Refuses a vault write while offline instead of keeping it somewhere to send later. */
+/**
+ * Refuses a vault write while offline instead of keeping it somewhere to send later, and in a
+ * vault shared with the user to view only (TOL-237).
+ */
 export function assertVaultWritable(action: string): void {
   if (isOfflineReadOnly()) throw new OfflineReadOnlyError(action)
+  assertSharedVaultWritable(action)
 }
 
 export interface OfflineRegistrationEnvironment {

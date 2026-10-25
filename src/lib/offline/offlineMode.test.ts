@@ -15,6 +15,7 @@ import {
   shouldRegisterOfflineServiceWorker,
 } from './offlineMode'
 import { FakeCacheStorage } from './fakeCacheStorage.testUtils'
+import { resetVaultAccessForTests, ViewOnlyAccessError } from '../sharing/vaultAccess'
 
 vi.mock('../../../packages/collab-client/src/entriesCache', () => ({ clearCache: vi.fn(async () => {}) }))
 
@@ -101,6 +102,17 @@ describe('offline read-only gate', () => {
     setOnline(true)
     expect(hasOfflineRead()).toBe(true)
     expect(() => assertVaultWritable('saving changes')).not.toThrow()
+  })
+
+  it('blocks vault writes in a vault shared with the user to view (TOL-237)', () => {
+    useRemoteServer()
+    setOnline(true)
+    resetVaultAccessForTests({ kind: 'shared', access: { subject: 'u_1', grants: [{ scope: '*', role: 'viewer' }] } })
+    expect(() => assertVaultWritable('creating a note')).toThrow(ViewOnlyAccessError)
+
+    resetVaultAccessForTests({ kind: 'shared', access: { subject: 'u_1', grants: [{ scope: 'a.md', role: 'editor' }] } })
+    expect(() => assertVaultWritable('editing properties')).not.toThrow()
+    resetVaultAccessForTests()
   })
 })
 

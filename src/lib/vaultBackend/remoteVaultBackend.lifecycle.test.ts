@@ -9,7 +9,8 @@ import type { VaultEntry as ProtocolEntry } from '../../../packages/protocol/src
  * that move open documents, and the collaboration ticket it trusts.
  */
 
-vi.mock('../../../packages/collab-client/src/entriesCache', () => ({
+vi.mock('../../../packages/collab-client/src/entriesCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../packages/collab-client/src/entriesCache')>()),
   readCache: vi.fn(),
   writeCache: vi.fn(async () => {}),
 }))

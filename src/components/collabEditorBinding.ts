@@ -3,6 +3,11 @@ import { useLiveNoteDocument } from "../lib/liveNoteDocuments";
 import { reportLiveNoteTitle } from "../lib/liveNoteTitle";
 import type { RemoteBindings } from "../../packages/collab-client/src/remoteVaultBackend";
 import { useOfflineReadOnly } from "../hooks/useOfflineReadOnly";
+import { useVaultAccess } from "../hooks/useVaultAccess";
+import {
+	canWritePath,
+	type VaultAccessState,
+} from "../lib/sharing/vaultAccess";
 import type { PlatformCapabilities } from "../lib/platformCapabilities";
 import type { VaultBackend, VaultCollabDoc } from "../lib/vaultBackend/types";
 import type { VaultEntry } from "../types";
@@ -86,6 +91,17 @@ export function offlineCollabPath(
 }
 
 /**
+ * The live document to open in a shared vault (TOL-237): none until the access is known, or
+ * once it is revoked, so a viewer never asks for an edit ticket.
+ */
+export function accessCollabPath(
+	path: string | null,
+	access: VaultAccessState,
+): string | null {
+	return access.kind === "checking" || access.kind === "revoked" ? null : path;
+}
+
+/**
  * Opens the active note's live document when the platform edits notes collaboratively, and
  * registers it while bound so property edits go into it.
  */
@@ -93,12 +109,17 @@ export function useCollabEditorBinding(
 	options: CollabEditorBindingOptions,
 ): CollabEditorBinding {
 	const offline = useOfflineReadOnly();
+	const access = useVaultAccess();
 	const [boundPath, setBoundPath] = useState<string | null>(null);
-	const path = offlineCollabPath(collabNotePath(options), offline, boundPath);
+	const path = accessCollabPath(
+		offlineCollabPath(collabNotePath(options), offline, boundPath),
+		access,
+	);
 	const state = useCollabDocument({
 		vaultBackend: options.vaultBackend ?? null,
 		path,
 		enabled: path !== null,
+		readOnly: path !== null && !canWritePath(access, path),
 	});
 	useLocalPresence(state.doc);
 	const binding = resolveCollabEditorBinding(path, state);

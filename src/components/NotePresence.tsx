@@ -11,6 +11,7 @@ import {
 	subscribeActiveCollabDocument,
 } from "../lib/activeCollabDocument";
 import { type AppLocale, translate } from "../lib/i18n";
+import { ShareNoteButton } from "./sharing/ShareNoteButton";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -131,17 +132,21 @@ function PresenceStrip({
 }
 
 /**
- * The others in the open live note, as avatars in the note's bar. Nothing on the desktop,
- * where no note is a live document, and nothing while the viewer is alone.
+ * The others in the open live note, as avatars in the note's bar, and its Share button
+ * (TOL-237). Nothing on the desktop, where no note is a live document; no avatars while the
+ * viewer is alone.
  */
 export function NotePresence({ locale = "en" }: NotePresenceProps) {
 	const active = useActiveCollabDocument();
 	if (active === null || active === "opening") return null;
 	return (
-		<PresenceStrip
-			key={active.awareness.clientID}
-			awareness={active.awareness}
-			locale={locale}
-		/>
+		<>
+			<PresenceStrip
+				key={active.awareness.clientID}
+				awareness={active.awareness}
+				locale={locale}
+			/>
+			<ShareNoteButton notePath={active.path} locale={locale} />
+		</>
 	);
 }

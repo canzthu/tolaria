@@ -114,7 +114,7 @@ describe("Editor collaboration binding", () => {
 		renderWebEditor(remoteBackend(openDoc));
 		await flushEditorSwapWork();
 
-		expect(openDoc).toHaveBeenCalledWith(mockTab.entry.path);
+		expect(openDoc).toHaveBeenCalledWith(mockTab.entry.path, { readOnly: false });
 		expect(latestCollaboration()).toBeUndefined();
 		expect(screen.queryByTestId("blocknote-view")).not.toBeInTheDocument();
 		expect(mockEditor.replaceBlocks).not.toHaveBeenCalled();

@@ -1321,3 +1321,44 @@ files:
     phone.action.notes: f4c6f851b00d5518bf888815de279aba
     phone.action.backToNotes: 6bb45b1cc12f68ac668f5bc8036e2aa4
     noteList.conflictCopyBadge: 6c3971119ba0316e6a21bd347295f463
+    sharing.share.button: 5a95a425f74314a96f13a2f136992178
+    sharing.dialog.title: 5a95a425f74314a96f13a2f136992178
+    sharing.dialog.descriptionNote: 090010d63c3cd4b7a400ec0792968477
+    sharing.dialog.descriptionVault: 25f355a57c98c67d727caf636c6c137e
+    sharing.scope.label: a4d4c94f776760a37ec9d1d358b6e78a
+    sharing.scope.note: 0c0270c6c947785502ef5ca584259222
+    sharing.scope.vault: e79f139a98f3d977fc341db8d9abb358
+    sharing.invitee.label: db59712fecdee9c61feadb0c48950f65
+    sharing.invitee.placeholder: 7dd84003c51e33b899696af1ca62a0b1
+    sharing.role.label: bbbabdbe1b262f75d99d62880b953be1
+    sharing.role.editor: 02bde09c886a1ba339ef4768df372281
+    sharing.role.viewer: 0b19e616a6f965a1fee427de877c3fd7
+    sharing.invite.submit: c6a00f137b92ad22c007677fb2113a9f
+    sharing.invite.sent: 6b7ad30230cf2c9870400c1cd453acee
+    sharing.error.invalidInvitee: 05ce36361e61f00be49c5e709e6d3532
+    sharing.error.userNotFound: 7cac98287de1d93e7d90dc1a1714fe6d
+    sharing.error.invalidRequest: f2aebcda0730fbb3134ee6807fbe5c2e
+    sharing.error.shareLimit: b1849ebddb28c9ee9ef171f2465c8335
+    sharing.error.rateLimited: fda4e72287123c9decaf8ed1fad76d4b
+    sharing.error.unavailable: 18cd277e95409c395903270ecf7cb462
+    sharing.error.failed: 52ba852a11bcaf0cb097cdf8c52c8454
+    sharing.people.title: 68b6754aeccbaf9a409a151845344cd1
+    sharing.people.empty: a8883ffe61db48609a50ac1bee6e0691
+    sharing.people.remove: 98dad3659ede0251418d7a22a1df0fdb
+    sharing.people.removeLabel: cc77a2227f753cab2203f0b49add838f
+    sharing.people.roleLabel: 849ee5bf231f2fec7432219a226b2a52
+    sharing.people.scopeVault: e79f139a98f3d977fc341db8d9abb358
+    sharing.sharedWithMe.button: f07e75296c2154ca9a5a5083d0158b85
+    sharing.sharedWithMe.title: f07e75296c2154ca9a5a5083d0158b85
+    sharing.sharedWithMe.description: 9d50390822a23b9c6c1457475ba1967b
+    sharing.sharedWithMe.empty: 8bbe4b2382cdd0be9204f0c3ae7f8d93
+    sharing.sharedWithMe.from: 6a61dc216de63af463bbf564ebc12bb0
+    sharing.sharedWithMe.open: c3bf447eabe632720a3aa1a7ce401274
+    sharing.sharedWithMe.openLabel: a64c86443dd775087f080bc37105a756
+    sharing.sharedWithMe.myVault: 117180f2563a5c458ec0553c94aea3e5
+    sharing.sharedWithMe.shareVault: 92e32720a91f3ac8579e7b15fb168a09
+    sharing.status.editor: 570b51e7fa0bcf20c95a1c2d12b46f9a
+    sharing.status.viewer: ca27716a9affad2ae56052e5e2470099
+    sharing.readOnly.banner: 375ea827f2615ccd503376bfe4123367
+    sharing.revoked.title: a701366b384b7c3f2ee9fecd6d80ae7e
+    sharing.revoked.description: f49060d7f6f4c8292b73e0f2279aeeff

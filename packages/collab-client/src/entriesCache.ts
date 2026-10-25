@@ -9,6 +9,17 @@ import type { VaultEntry as ProtocolVaultEntry } from "../../protocol/src/index.
 const DB_NAME = "tolaria-entries";
 const DB_VERSION = 1;
 const STORE_NAME = "entries";
+/** The key of the page's own vault; a shared vault (TOL-237) is cached under a key of its own. */
+export const DEFAULT_CACHE_KEY = "snapshot";
+
+/**
+ * The cache key of the vault served under `baseUrl`: the page's own vault at the origin keeps
+ * the key it always had, a vault under a path prefix (`/vaults/<id>`) gets one of its own.
+ */
+export function entriesCacheKey(baseUrl: string): string {
+	const prefix = baseUrl ? new URL(baseUrl, "http://localhost").pathname : "/";
+	return prefix === "/" ? DEFAULT_CACHE_KEY : `${DEFAULT_CACHE_KEY}:${prefix}`;
+}
 
 export interface CachedEntries {
 	head: string;
@@ -46,7 +57,9 @@ async function openDB(): Promise<IDBDatabase | null> {
  * Reads the cached entries from IndexedDB. Returns null when the cache is empty
  * or unavailable.
  */
-export async function readCache(): Promise<CachedEntries | null> {
+export async function readCache(
+	key: string = DEFAULT_CACHE_KEY,
+): Promise<CachedEntries | null> {
 	const db = await openDB();
 	if (!db) return null;
 
@@ -54,7 +67,7 @@ export async function readCache(): Promise<CachedEntries | null> {
 		return await new Promise<CachedEntries | null>((resolve, reject) => {
 			const tx = db.transaction(STORE_NAME, "readonly");
 			const store = tx.objectStore(STORE_NAME);
-			const request = store.get("snapshot");
+			const request = store.get(key);
 
 			request.onerror = () => reject(request.error);
 			request.onsuccess = () => {
@@ -76,6 +89,7 @@ export async function readCache(): Promise<CachedEntries | null> {
 export async function writeCache(
 	head: string,
 	entries: ProtocolVaultEntry[],
+	key: string = DEFAULT_CACHE_KEY,
 ): Promise<void> {
 	const db = await openDB();
 	if (!db) return;
@@ -89,7 +103,7 @@ export async function writeCache(
 				entries,
 				cachedAt: Date.now(),
 			};
-			const request = store.put(snapshot, "snapshot");
+			const request = store.put(snapshot, key);
 
 			request.onerror = () => reject(request.error);
 			tx.oncomplete = () => resolve();
@@ -103,7 +117,7 @@ export async function writeCache(
 }
 
 /**
- * Clears the cache. Used when switching vaults or when a cache becomes invalid.
+ * Clears the cache of every vault. Used when the account leaves or a cache becomes invalid.
  */
 export async function clearCache(): Promise<void> {
 	const db = await openDB();
@@ -113,7 +127,7 @@ export async function clearCache(): Promise<void> {
 		await new Promise<void>((resolve, reject) => {
 			const tx = db.transaction(STORE_NAME, "readwrite");
 			const store = tx.objectStore(STORE_NAME);
-			const request = store.delete("snapshot");
+			const request = store.clear();
 
 			request.onerror = () => reject(request.error);
 			tx.oncomplete = () => resolve();

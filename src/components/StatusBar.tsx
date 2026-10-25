@@ -11,6 +11,7 @@ import type { GitRepositoryOption } from '../utils/gitRepositories'
 import { StatusBarPrimarySection, StatusBarSecondarySection } from './status-bar/StatusBarSections'
 import { isRemoteBrowserShell } from './status-bar/syncPillState'
 import { WebSyncPill } from './status-bar/WebSyncPill'
+import { SharingStatusButton } from './sharing/SharingStatusButton'
 import type { VaultOption } from './status-bar/types'
 import { CONTRIBUTION_ANALYTICS_EVENT, TOLARIA_DISCORD_INVITE_URL } from '../constants/feedback'
 import { trackEvent } from '../lib/telemetry'
@@ -148,9 +149,11 @@ function StatusBarSecondaryFromFooter(options: StatusBarFooterProps) {
     locale = 'en',
     compact,
     stacked,
+    webSync,
   } = options
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: stacked ? '100%' : 'auto' }}>
+      {webSync && <SharingStatusButton locale={locale} />}
       <StatusBarSecondarySection
         noteCount={noteCount}
         zoomLevel={zoomLevel}

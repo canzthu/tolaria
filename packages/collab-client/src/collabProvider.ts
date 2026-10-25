@@ -1,6 +1,7 @@
 import { Awareness, removeAwarenessStates } from 'y-protocols/awareness'
 import type * as Y from 'yjs'
 import { awarenessMessage, receive, syncStep1, updateMessage } from '../../protocol/src/collabWire.ts'
+import { COLLAB_CLOSE } from '../../protocol/src/index.ts'
 import { AwarenessThrottle, keepPresenceFresh, type PresencePacing } from './awarenessPacing.ts'
 
 /**
@@ -18,7 +19,8 @@ export interface SocketLike {
   readyState: number
   onopen: (() => void) | null
   onmessage: ((event: { data: unknown }) => void) | null
-  onclose: (() => void) | null
+  /** The browser passes the close event; its code tells a revoked access from a dropped network. */
+  onclose: ((event?: { code?: number }) => void) | null
   onerror: (() => void) | null
   send(data: Uint8Array): void
   close(): void
@@ -48,6 +50,15 @@ type Stop = () => void
 const OPEN = 1
 const DEFAULT_RETRY_MS = 500
 const DEFAULT_MAX_RETRY_MS = 15_000
+
+/** Ticket answers that will not change by retrying: no credential, no permission, no such document. */
+const DENIED_STATUSES = new Set([401, 403, 404])
+
+/** A refused ticket request: the remote backend's errors carry the HTTP status. */
+function isDenial(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status
+  return typeof status === 'number' && DENIED_STATUSES.has(status)
+}
 
 /** A binary frame's bytes, or null for a frame that is not binary. */
 type Frame = Uint8Array | null
@@ -128,7 +139,10 @@ export class CollabProvider {
     this.options
       .openSocket()
       .then((socket) => this.attach(socket))
-      .catch(() => this.dropped(null))
+      .catch((error: unknown) => {
+        if (isDenial(error)) this.denied(null)
+        else this.dropped(null)
+      })
   }
 
   private attach(socket: SocketLike): void {
@@ -143,7 +157,10 @@ export class CollabProvider {
       const bytes = asBytes(event.data)
       if (bytes) this.received(socket, bytes)
     }
-    socket.onclose = () => this.dropped(socket)
+    socket.onclose = (event) => {
+      if (event?.code === COLLAB_CLOSE.revoked) this.denied(socket)
+      else this.dropped(socket)
+    }
     socket.onerror = () => socket.close()
     if (socket.readyState === OPEN) this.opened(socket)
   }
@@ -182,6 +199,16 @@ export class CollabProvider {
     const { retryMs = DEFAULT_RETRY_MS, maxRetryMs = DEFAULT_MAX_RETRY_MS } = this.options
     const delay = Math.min(retryMs * 2 ** this.attempts++, maxRetryMs)
     this.retry = setTimeout(() => this.connect(), delay)
+  }
+
+  /**
+   * The server withdrew access to the document (TOL-237): the socket closed with `4403`, or a
+   * new ticket was refused. The provider closes for good instead of retrying; whoever opened
+   * it sees `closed` without having left.
+   */
+  private denied(socket: SocketLike | null): void {
+    if (socket !== this.socket || this.current === 'closed') return
+    this.destroy()
   }
 
   private readonly sendUpdate = (update: Uint8Array, origin: unknown): void => {

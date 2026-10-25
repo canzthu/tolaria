@@ -8,6 +8,8 @@ B3-3 (TOL-24) adapts the shell to touch. It reuses the existing context menus, `
 
 B3-2 (TOL-194) gives the shell a tablet layout and browser-safe shortcuts. It reuses the sidebar, its collapse and expand controls, the note list, editor and tokens unchanged; the departures are the first rows of the table. ADR 0287.
 
+B5-3 (TOL-237) adds sharing, the second web-only surface after login. It reuses the shadcn `Dialog`, `Input`, `Select`, `Button` and `Badge`, Phosphor icons, the note bar's icon buttons, the archived-note banner's style and the status bar's ghost buttons; the departures are the first rows of the table. ADR 0298.
+
 B3-1 (TOL-193) gives the shell a phone layout. It reuses the note list, editor, status bar, `Button`, Phosphor icons and tokens unchanged; the departures are the first rows of the table. ADR 0286.
 
 Spike S4 (TOL-8) adds the first web-only surface, the collaborative note page. It reuses the editor, its theme, the shadcn components and the design tokens; the departures are in the table.
@@ -18,6 +20,11 @@ Spike S1 (TOL-3, TOL-4) builds the existing shell as a static web bundle without
 
 | Date | What changed | Why | Where |
 |---|---|---|---|
+| 25 Oct 2026 | A Share button (Phosphor `ShareNetwork`) in the note bar, next to the presence avatars, outside the overflow menu; it opens a Share dialog: this note or the whole vault, an email or GitHub username, "Can edit" or "Can view", and the people with access with their role and a remove button | Sharing is web-only (accounts live in the hosted service); the note bar is the one place every layout shows, phone included | `src/components/sharing/ShareNoteButton.tsx`, `ShareDialog.tsx`, `ShareInviteForm.tsx`, `SharePeopleList.tsx` |
+| 25 Oct 2026 | A "Shared with me" entry in the web status bar (an icon in the own vault; "Shared · Can edit" or "Shared · View only" in a shared one) that lists what others shared and opens it; in the own vault it also offers "Share my vault" | The phone layout hides the sidebar, and the status bar is visible in every layout | `src/components/sharing/SharingStatusButton.tsx`, `SharedWithMeDialog.tsx` |
+| 25 Oct 2026 | A vault shared with the user opens as its own page at `/vaults/<id>/` (a full navigation), not in the desktop's vault switcher | Each vault has its own backend, cache and live documents; the switcher manages local folders the web does not have | `src/lib/sharing/sharedVaultLocation.ts`, `src/lib/vaultBackend/remoteConfig.ts` |
+| 25 Oct 2026 | A viewer's note shows a "View only" banner above a read-only editor, in the archived-note banner's style | The desktop has no notion of a note someone else may only read | `src/components/sharing/SharedReadOnlyBanner.tsx` |
+| 25 Oct 2026 | When the owner revokes a share that is open, a dialog that cannot be dismissed says "Access removed" and offers "Shared with me" or "Go to my vault"; the page stops reconnecting | The note is gone for this user; a reconnect loop or an empty editor would not say why | `src/components/sharing/AccessRevokedDialog.tsx` |
 | 24 Oct 2026 | With a finger (`pointer: coarse`), a long press (500 ms) on a note, a type, a view or a folder opens the menu a right click opens; the lifted finger does not also open the note. A mouse keeps the right click | iOS Safari sends no right click for a long press and touch has no hover; the desktop's menus are the only way to rename, archive, delete or customize | `src/lib/touchInput.ts` (installed in `src/main.tsx`) |
 | 24 Oct 2026 | With a finger, the note list header controls, the sidebar's icon buttons and rows, the phone back button and context menu items are at least 44 × 44 px; the header's icons lose their gaps, which the hit areas now provide | Apple and Google ask for 44 px targets; 14–24 px icons are missed by a finger | `src/App.css` (`html[data-touch-input]`) |
 | 24 Oct 2026 | With a finger, the sidebar and note list do not select text or show the iOS callout on a long press; text fields still do | The long press belongs to the menu | `src/App.css` |

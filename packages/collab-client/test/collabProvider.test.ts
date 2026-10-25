@@ -223,4 +223,59 @@ describe('CollabProvider', () => {
 
     expect(closed).toBe(1)
   })
+
+  describe('when access is withdrawn (TOL-237)', () => {
+    function refused(status: number): Error & { status: number } {
+      return Object.assign(new Error(`refused ${status}`), { status })
+    }
+
+    it('closes for good when the socket closes with 4403', async () => {
+      const socket = openSocket()
+      const openSocketFn = vi.fn(async () => socket)
+      provider = new CollabProvider({ doc: new Y.Doc(), openSocket: openSocketFn, retryMs: 1 })
+      await vi.waitFor(() => expect(socket.onclose).not.toBeNull())
+      const seen: CollabStatus[] = []
+      provider.onStatus((status) => seen.push(status))
+
+      socket.onclose?.({ code: 4403 })
+      await wait(20)
+
+      expect(seen.at(-1)).toBe('closed')
+      expect(openSocketFn).toHaveBeenCalledTimes(1)
+    })
+
+    it.each([401, 403, 404])('closes when a new ticket is refused with %i', async (status) => {
+      const openSocketFn = vi.fn(async (): Promise<SocketLike> => {
+        throw refused(status)
+      })
+      provider = new CollabProvider({ doc: new Y.Doc(), openSocket: openSocketFn, retryMs: 1 })
+      await vi.waitFor(() => expect(provider?.status).toBe('closed'))
+      await wait(20)
+
+      expect(openSocketFn).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps retrying a dropped network or a failing server', async () => {
+      const openSocketFn = vi.fn(async (): Promise<SocketLike> => {
+        throw refused(503)
+      })
+      provider = new CollabProvider({ doc: new Y.Doc(), openSocket: openSocketFn, retryMs: 1, maxRetryMs: 2 })
+      await vi.waitFor(() => expect(openSocketFn.mock.calls.length).toBeGreaterThan(2))
+
+      expect(provider.status).toBe('offline')
+    })
+
+    it('treats an ordinary close as a drop', async () => {
+      const sockets = [openSocket(), openSocket()]
+      const openSocketFn = vi.fn(async () => sockets[openSocketFn.mock.calls.length - 1] ?? deadSocket())
+      provider = new CollabProvider({ doc: new Y.Doc(), openSocket: openSocketFn, retryMs: 1 })
+      await vi.waitFor(() => expect(sockets[0].onclose).not.toBeNull())
+
+      sockets[0].onclose?.({ code: 1006 })
+      await vi.waitFor(() => expect(openSocketFn).toHaveBeenCalledTimes(2))
+
+      expect(provider.status).not.toBe('closed')
+    })
+  })
 })
+

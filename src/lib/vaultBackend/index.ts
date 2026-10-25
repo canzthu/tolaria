@@ -6,6 +6,7 @@ import {
 } from "../../../packages/collab-client/src/remoteVaultBackend";
 import { isTauri, mockInvoke } from "../../mock-tauri";
 import { createCommandVaultBackend } from "./commandVaultBackend";
+import { type RemoteVaultConfig, remoteVaultConfig } from "./remoteConfig";
 import type { VaultBackend } from "./types";
 
 export type {
@@ -16,32 +17,17 @@ export type {
 export { createCommandVaultBackend } from "./commandVaultBackend";
 export { contentRevision } from "./contentRevision";
 export * from "./types";
-
-interface RemoteVaultConfig {
-	serverUrl: string;
-	token: string;
-}
-
-function getRemoteVaultConfig(): RemoteVaultConfig | null {
-	if (typeof window === "undefined") return null;
-	const { TOLARIA_REMOTE_URL: serverUrl, TOLARIA_REMOTE_TOKEN: token } =
-		window as { TOLARIA_REMOTE_URL?: string; TOLARIA_REMOTE_TOKEN?: string };
-	return serverUrl && token ? { serverUrl, token } : null;
-}
+export { type RemoteVaultConfig, remoteVaultConfig };
 
 /** True in the web build when a Tolaria remote serves the vault. */
 export function hasRemoteVault(): boolean {
-	return !isTauri() && getRemoteVaultConfig() !== null;
+	return !isTauri() && remoteVaultConfig() !== null;
 }
 
 /** Image uploads, reads and imports of the configured remote; null without one. */
 export function createRemoteAttachmentClient(): RemoteAttachments | null {
-	const remoteConfig = hasRemoteVault() ? getRemoteVaultConfig() : null;
-	if (!remoteConfig) return null;
-	return createRemoteAttachments({
-		baseUrl: remoteConfig.serverUrl,
-		token: remoteConfig.token,
-	});
+	const remoteConfig = hasRemoteVault() ? remoteVaultConfig() : null;
+	return remoteConfig ? createRemoteAttachments(remoteConfig) : null;
 }
 
 /** The desktop path: Tauri commands backed by the Rust vault crate. */
@@ -66,13 +52,8 @@ export function createMockVaultBackend(vaultPath?: string): VaultBackend {
 export function createVaultBackend(vaultPath?: string): VaultBackend {
 	if (isTauri()) return createTauriVaultBackend(vaultPath);
 
-	const remoteConfig = getRemoteVaultConfig();
-	if (remoteConfig) {
-		return createRemoteVaultBackend({
-			baseUrl: remoteConfig.serverUrl,
-			token: remoteConfig.token,
-		});
-	}
+	const remoteConfig = remoteVaultConfig();
+	if (remoteConfig) return createRemoteVaultBackend(remoteConfig);
 
 	return createMockVaultBackend(vaultPath);
 }

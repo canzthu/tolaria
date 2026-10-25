@@ -1474,6 +1474,22 @@ Offline read on the web (ADR 0282) adds, in `src/lib/offline`: `routeOfflineRequ
 
 URL routing on the web (ADR 0284) adds `src/utils/webRoute.ts` (`WebRoute`, `parseWebRoute`, `webRouteSearch`, `webRouteForState`, `routeNotePath` for local absolute and remote relative entry paths, `findRouteEntry`, `routeVaultSlug` with the `tolaria://` deep-link slug), `useWebRouting` (History API sync and `popstate`), and `useActiveNoteLocation`, which App calls in place of `useLastActiveNote`: it feeds the opening URL's note to `useLastActiveNote` as `preferredEntry` and starts routing once `useLastActiveNote` reports the restore finished. Routing is on only when `VITE_TOLARIA_WEB_BUILD` is `true`.
 
+Sharing on the web (ADR 0298, TOL-237) adds:
+
+- **`src/lib/sharing`:**
+  - `sharedVaultLocation`: `sharedVaultIdFromPath`, `vaultBasePath` and `sharedVaultHref` for the `/vaults/<id>/` page of a shared vault.
+  - `vaultAccess`: `VaultAccessState` (`owner`, `checking`, `shared`, `revoked`), `roleOn`, `canWritePath`, `canChangeVault`, `isViewOnly`, `sharedRoleOf`; `checkVaultAccess`, `reportAccessDenied` and `assertSharedVaultWritable`, called by `assertVaultWritable`.
+  - `sharesApi`: `OutgoingShare`, `IncomingShare`, `parseInvitee`, `createShare`, `changeShareRole`, `revokeShare`, `ShareApiError` codes.
+  - `sharingStore`: whether sharing is offered, the own vault's shares and "Shared with me".
+  - `sharingAnalytics`.
+- **Remote config:** `src/lib/vaultBackend/remoteConfig.ts` (`remoteVaultConfig`) and `createConfiguredRemoteBackend`.
+- **Hooks:** `useVaultAccess`, `useSharedReadOnly` and `useSharing`.
+- **Components** (`src/components/sharing`): `ShareNoteButton`, `ShareDialog`, `ShareInviteForm`, `SharePeopleList`, `RoleSelect`, `SharingStatusButton`, `SharedWithMeDialog`, `AccessRevokedDialog`, `SharedReadOnlyBanner`.
+- **`packages/collab-client`:**
+  - `CollabProvider`'s `onDenied`, for a `4403` close or a 401/403/404 ticket, after which it stays closed.
+  - `RemoteOptions.onAccessDenied`.
+  - `entriesCacheKey`, so each vault keeps its own snapshot.
+
 The phone layout on the web (ADR 0286) adds `usePhoneLayout` (`PHONE_LAYOUT_QUERY`), `usePhoneNoteStack` (`PhoneNoteStack`: `active`, `pane`, `backToList`, `showNote`; `NoteListPane` for `useWebRouting`; `BACK_TO_NOTE_LIST_STATE_KEY` in `history.state`; `PHONE_PANE_ATTRIBUTE` on `<html>`), which `useActiveNoteLocation` now returns, `phoneNoteStackStore` (`publishPhoneNoteStack`, `usePhoneNoteStackControls`, `usePhoneNoteOpener`), `useKeyboardAwareViewport` (`--tolaria-visual-viewport-height` / `-top`, `keepCaretAboveKeyboard`), and `src/components/phone/PhoneNoteBackBar.tsx`, the in-app back control rendered by `LazyEditor`.
 
 The tablet layout on the web (ADR 0287) adds `useMediaQueryMatch` (which `usePhoneLayout` now uses), `useTabletSidebar` (`TABLET_LAYOUT_QUERY`, `TABLET_LAYOUT_ATTRIBUTE` on `<html>`; `TabletSidebar`: `sidebarVisible`, `followViewMode`, `collapse`), called by `useAppWindowControls`, `webShortcuts` (`BROWSER_OWNED_SHORTCUT_COMMANDS`, `findWebShortcutCommand`, `webSafeDesktopCommand`, `webShortcutDisplay`), which `appCommandCatalog` consults in the web build, and `isWebBuild` in `src/utils/webBuild.ts`.

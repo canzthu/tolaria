@@ -10,6 +10,7 @@ import {
 	type ActiveCollabDocument,
 	publishActiveCollabDocument,
 } from "../lib/activeCollabDocument";
+import { reportAccessDenied } from "../lib/sharing/vaultAccess";
 import type {
 	VaultBackend,
 	VaultCollabChannel,
@@ -26,6 +27,14 @@ interface UseCollabDocumentOptions {
 	vaultBackend: VaultBackend<RemoteBindings> | null;
 	path: string | null;
 	enabled: boolean;
+	/** Join without the ability to edit (TOL-237): a note shared with the user to view. */
+	readOnly?: boolean;
+}
+
+/** The document to keep open: a note, joined to edit or only to read. */
+interface DocumentTarget {
+	path: string;
+	readOnly: boolean;
 }
 
 /** The state of one opened document, with the session that opened it. */
@@ -52,18 +61,33 @@ interface DocumentSession {
 	collab: VaultCollabChannel<RemoteBindings>;
 	/** The note the document belongs to: the backend moves `doc.path` on a rename from this page. */
 	path(): string;
+	readOnly: boolean;
 	leave(): void;
+}
+
+/**
+ * The provider closes on its own only when the server refused the document (TOL-237: a share
+ * revoked or reduced); the page then rechecks what it may still do. Leaving closes it too.
+ */
+function reportWhenRefused(
+	doc: VaultCollabDoc<RemoteBindings>,
+	hasLeft: () => boolean,
+): void {
+	doc.provider?.onStatus?.((status) => {
+		if (status === "closed" && !hasLeft()) reportAccessDenied();
+	});
 }
 
 function openCollabDocument(
 	collab: VaultCollabChannel<RemoteBindings>,
-	path: string,
+	{ path, readOnly }: DocumentTarget,
 	report: (state: OpenedDocument) => void,
 ): DocumentSession {
 	let left = false;
 	let opened: VaultCollabDoc<RemoteBindings> | null = null;
 	const session: DocumentSession = {
 		collab,
+		readOnly,
 		path: () => opened?.path ?? path,
 		leave: () => {
 			left = true;
@@ -75,10 +99,11 @@ function openCollabDocument(
 	};
 
 	collab
-		.openDoc(path)
+		.openDoc(path, { readOnly })
 		.then((doc) => {
 			if (left) return doc.close();
 			opened = doc;
+			reportWhenRefused(doc, () => left);
 			update({ doc, synced: false, error: null });
 			return doc.synced.then(
 				() => update({ doc, synced: true, error: null }),
@@ -93,12 +118,21 @@ function openCollabDocument(
 	return session;
 }
 
+/** One string per target: a note joined to read is another document session than the same note to edit. */
+function targetKey(target: DocumentTarget | null): string | null {
+	return target && `${target.readOnly ? "read" : "write"}:${target.path}`;
+}
+
+function sessionKey(session: DocumentSession): string {
+	return targetKey({ path: session.path(), readOnly: session.readOnly }) ?? "";
+}
+
 function isOpenAt(
 	session: DocumentSession | undefined | null,
 	collab: VaultCollabChannel<RemoteBindings> | null,
-	target: string | null,
+	target: DocumentTarget | null,
 ): boolean {
-	return session?.collab === collab && session.path() === target;
+	return session?.collab === collab && sessionKey(session) === targetKey(target);
 }
 
 /**
@@ -107,18 +141,20 @@ function isOpenAt(
  */
 function useDocumentSession(
 	collab: VaultCollabChannel<RemoteBindings> | null,
-	target: string | null,
+	path: string | null,
+	readOnly: boolean,
 	setOpened: Dispatch<SetStateAction<OpenedDocument | null>>,
 ): void {
 	const sessionRef = useRef<DocumentSession | null>(null);
 
 	useEffect(() => {
+		const target = path === null ? null : { path, readOnly };
 		if (isOpenAt(sessionRef.current, collab, target)) return;
 		sessionRef.current?.leave();
 		setOpened(null);
 		sessionRef.current =
 			collab && target ? openCollabDocument(collab, target, setOpened) : null;
-	}, [collab, target, setOpened]);
+	}, [collab, path, readOnly, setOpened]);
 
 	useEffect(() => () => sessionRef.current?.leave(), []);
 }
@@ -149,13 +185,15 @@ export function useCollabDocument({
 	vaultBackend,
 	path,
 	enabled,
+	readOnly = false,
 }: UseCollabDocumentOptions): CollabDocumentState {
 	const [opened, setOpened] = useState<OpenedDocument | null>(null);
 	const collab = enabled ? collabChannel(vaultBackend) : null;
 	const target = collab ? path : null;
-	useDocumentSession(collab, target, setOpened);
+	useDocumentSession(collab, target, readOnly, setOpened);
+	const current = target === null ? null : { path: target, readOnly };
 	const state =
-		opened && isOpenAt(opened.session, collab, target) ? opened : NO_DOCUMENT;
+		opened && isOpenAt(opened.session, collab, current) ? opened : NO_DOCUMENT;
 	usePublishedDocument(activeDocumentOf(target, state));
 	return state;
 }
