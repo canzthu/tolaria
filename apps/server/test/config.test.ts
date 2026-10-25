@@ -54,6 +54,21 @@ describe('loadConfig', () => {
   })
 })
 
+describe('background fetch (TOL-234)', () => {
+  const fetchEvery = (value?: string) =>
+    loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN, TOLARIA_VAULT_FETCH_INTERVAL_MS: value }).fetchIntervalMs
+
+  it('leaves the vault default unless set, and switches it off with 0', () => {
+    expect(fetchEvery()).toBeUndefined()
+    expect(fetchEvery('5000')).toBe(5000)
+    expect(fetchEvery('0')).toBe(0)
+  })
+
+  it.each(['abc', '-1', '2.5'])('rejects the interval %j', (value) => {
+    expect(() => fetchEvery(value)).toThrowError(/TOLARIA_VAULT_FETCH_INTERVAL_MS must be an integer/)
+  })
+})
+
 describe('private R2 endpoints (TOL-207)', () => {
   it('are refused by default and allowed by the development flag in development', () => {
     expect(loadConfig({ TOLARIA_SERVER_TOKEN: TOKEN }).allowPrivateR2Endpoint).toBe(false)

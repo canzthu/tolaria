@@ -24,6 +24,7 @@ Use `pnpm run server`: bare `pnpm server` is a pnpm built-in command.
 | `TOLARIA_SERVER_TOKEN` | none, required | Bearer token for every route except `/healthz`. At least 16 characters. The server does not start without it |
 | `TOLARIA_VAULT_REMOTE_URL` | none | Git URL of the vault. Required until the working clone exists |
 | `TOLARIA_VAULT_BRANCH` | the remote's default | Branch to serve |
+| `TOLARIA_VAULT_FETCH_INTERVAL_MS` | `30000` | Pull from the remote this often, so desktop pushes reach open documents. `0` pulls only before a write or on `POST /v1/sync` |
 | `TOLARIA_SERVER_DATA_DIR` | `./data` | Holds `vault/` (the clone) and `state/` (doc index) |
 | `TOLARIA_BLOBSTORE` | `local` | Blob store for doc index and Yjs snapshots: `local` (disk under `state/`) or `r2` (S3-compatible) |
 | `TOLARIA_R2_BUCKET` | none | R2 bucket name (required when `TOLARIA_BLOBSTORE=r2` or `TOLARIA_INDEX_SNAPSHOTS=r2`) |

@@ -68,6 +68,9 @@ export default defineConfig({
         TOLARIA_SERVER_DATA_DIR: `${remoteDir}/data`,
         TOLARIA_VAULT_REMOTE_URL: `${remoteDir}/remote.git`,
         TOLARIA_COLLAB_IDLE_MS: '500',
+        // No pull on a timer (TOL-234): remote-conflict-copy.spec.ts needs the server to see
+        // a desktop push only when it writes the web edit, as a 30 s fetch could pull it first.
+        TOLARIA_VAULT_FETCH_INTERVAL_MS: '0',
       },
     },
     {

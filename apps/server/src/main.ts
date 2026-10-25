@@ -54,6 +54,7 @@ async function main(): Promise<void> {
     dir: config.vaultDir,
     remoteUrl: config.remoteUrl,
     branch: config.branch,
+    fetchIntervalMs: config.fetchIntervalMs,
     log,
     onVaultEvent: (event) => {
       changes.emit(event)

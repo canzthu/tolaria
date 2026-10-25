@@ -15,6 +15,8 @@ export interface ServerConfig {
   /** Git URL of the vault's remote. Optional once the working clone exists. */
   remoteUrl?: string
   branch?: string
+  /** How often the vault pulls from its remote unasked, in ms: 0 never, unset the vault default. */
+  fetchIntervalMs?: number
   /** Directory of the server's working clone of the vault. */
   vaultDir: string
   /** Directory of server state that is not in git (doc index, later Y.Doc snapshots). */
@@ -107,6 +109,13 @@ function maxMessageBytes(env: Env): { maxMessageBytes?: number } {
   return { maxMessageBytes: positiveInteger(env, 'TOLARIA_COLLAB_MAX_MESSAGE_BYTES', 1, COLLAB_MAX_MESSAGE_BYTES) }
 }
 
+/** `TOLARIA_VAULT_FETCH_INTERVAL_MS=0` leaves pulls to writes and syncs. */
+function fetchIntervalMs(env: Env): number | undefined {
+  const name = 'TOLARIA_VAULT_FETCH_INTERVAL_MS'
+  if (setting(env, name) === '0') return 0
+  return setting(env, name) === undefined ? undefined : positiveInteger(env, name, 0, MAX_DELAY_MS)
+}
+
 function collabSettings(env: Env): ServerConfig['collab'] {
   if (setting(env, 'TOLARIA_COLLAB') === '0') return null
   const { idleMs, maxWaitMs } = DEFAULT_FLUSH_POLICY
@@ -191,6 +200,7 @@ export function loadConfig(env: Env): ServerConfig {
     port: positiveInteger(env, 'TOLARIA_SERVER_PORT', DEFAULT_PORT, 65_535),
     remoteUrl: setting(env, 'TOLARIA_VAULT_REMOTE_URL'),
     branch: setting(env, 'TOLARIA_VAULT_BRANCH'),
+    fetchIntervalMs: fetchIntervalMs(env),
     vaultDir: join(dataDir, 'vault'),
     stateDir,
     maxBodyBytes: positiveInteger(env, 'TOLARIA_SERVER_MAX_BODY_BYTES', DEFAULT_MAX_BODY_BYTES, 2 ** 31),
