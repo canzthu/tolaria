@@ -49,3 +49,32 @@ for (const key of ["Status", "status"]) {
 		}
 	});
 }
+
+test("structured MCP creation matches the desktop Type fixture", async () => {
+	const fixturePath = new URL(
+		"../src/utils/typeInstanceDefaults.fixtures.json",
+		import.meta.url,
+	);
+	const fixture = JSON.parse(await fs.readFile(fixturePath, "utf8"));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "tolaria-parity-"));
+	try {
+		const fields = fixture.fields
+			.map(([key, value]) => `${JSON.stringify(key)}: ${JSON.stringify(value)}`)
+			.join("\n");
+		await fs.writeFile(
+			path.join(root, "project.md"),
+			`---\ntype: Type\n${fields}\n---\n# Project\n`,
+		);
+		const service = tools.createMcpToolService({
+			resolveVaultPaths: () => [root],
+		});
+		await service.createNote({ path: "project-instance.md", type: "Project" });
+		const actual = await vault.getNote(root, "project-instance.md");
+		assert.deepEqual(
+			Object.entries(actual.frontmatter).filter(([key]) => key !== "type"),
+			fixture.expected,
+		);
+	} finally {
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
