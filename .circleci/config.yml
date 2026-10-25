@@ -842,6 +842,36 @@ jobs:
       - mark_validated:
           scope: web-gates
 
+  web-bench:
+    executor: browser
+    # TOL-225: the 6,000-note big-vault bench (docs/PERFORMANCE.md), in parallel with
+    # web-gates. Fails when a measurement is over its budget; the table is in the step log
+    # and the web-bench artifact.
+    steps:
+      - checkout
+      - skip_unless_changed:
+          scope: web-bench
+          paths: "^(apps/web/|apps/server/|packages/|src/|public/|index\\.html|vite\\.config\\.ts|tsconfig|package\\.json|pnpm-lock\\.yaml)"
+      - install_frontend_dependencies
+      - restore_cache:
+          keys:
+            - playwright-v1-{{ checksum "pnpm-lock.yaml" }}
+            - playwright-v1-
+      - run:
+          name: Install Playwright Chromium
+          command: pnpm exec playwright install --with-deps chromium
+      - run:
+          name: Build web bundle
+          command: pnpm build:web
+      - run:
+          name: Big-vault web bench (6,000 notes)
+          command: pnpm bench:web
+      - store_artifacts:
+          path: test-results/web-bench
+          destination: web-bench
+      - mark_validated:
+          scope: web-bench
+
   linux-build-verification:
     machine:
       image: ubuntu-2204:current
@@ -1797,6 +1827,12 @@ workflows:
       - web-gates-report:
           requires:
             - web-gates
+          filters:
+            branches:
+              ignore: gh-pages
+            tags:
+              ignore: /.*/
+      - web-bench:
           filters:
             branches:
               ignore: gh-pages

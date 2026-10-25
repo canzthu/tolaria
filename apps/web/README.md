@@ -9,13 +9,15 @@ This directory holds build and test configuration only. It does not copy `src/`;
 | `pnpm build:web` | Builds the shell into `apps/web/dist` |
 | `pnpm preview:web` | Serves `apps/web/dist` on `127.0.0.1:4173` |
 | `pnpm playwright:web` | Checks the bundle in Chromium, WebKit, iPhone 15 and iPad emulation (build first) |
-| `pnpm test:web-config` | Unit tests for the preview options |
+| `pnpm bench:web` | Big-vault bench: a 6,000-note vault against its budgets (build first; see `docs/PERFORMANCE.md`) |
+| `pnpm test:web-config` | Unit tests for the preview options and the bench budgets |
 
 | File | Purpose |
 |---|---|
 | `vite.config.ts` | Web build and preview config, layered on the root `vite.config.ts` |
 | `previewOptions.ts` | Host, port and allowed-host resolution from `TOLARIA_WEB_*` |
 | `playwright.config.ts`, `tests/` | Browser checks for the static bundle |
+| `playwright.bench.config.ts`, `bench/`, `bigVaultBudgets.ts` | Big-vault performance bench and its budgets |
 
 Today the bundle runs on demo data from `src/mock-tauri/`. The remote backend that replaces it plugs in through `VaultBackend` (`src/lib/vaultBackend/`).
 
