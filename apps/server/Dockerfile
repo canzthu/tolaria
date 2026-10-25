@@ -1,9 +1,9 @@
 # Build stage: prepare dependencies and build
 FROM node:22-bookworm-slim AS build
 
-# Install git (required for vault operations)
+# Install git (required for vault operations) and CA certs (required for https git remotes)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git && \
+    apt-get install -y --no-install-recommends git ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -20,9 +20,9 @@ RUN corepack enable && \
 # Production stage: minimal runtime image
 FROM node:22-bookworm-slim
 
-# Install git (required for vault operations)
+# Install git (required for vault operations) and CA certs (required for https git remotes)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git && \
+    apt-get install -y --no-install-recommends git ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Run as the image's built-in non-root `node` user (UID 1000); adding another UID 1000 user fails
