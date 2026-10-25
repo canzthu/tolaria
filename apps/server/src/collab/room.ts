@@ -1,10 +1,13 @@
 import { Awareness, removeAwarenessStates } from 'y-protocols/awareness'
 import * as Y from 'yjs'
 import { awarenessMessage, receive, syncStep1, updateMessage } from '../../../../packages/protocol/src/collabWire.ts'
+import type { CoAuthor } from '../coAuthors.ts'
 
 /** One websocket of one client, as far as a room is concerned. */
 export interface Peer {
   readOnly: boolean
+  /** Who the commits of this peer's edits name besides the owner (ADR 0297); none for the owner. */
+  coAuthors?: readonly CoAuthor[]
   send(data: Uint8Array): void
 }
 

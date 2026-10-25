@@ -6,6 +6,7 @@ import {
   type AccessRole,
   type VaultAccess,
 } from '../../../packages/protocol/src/index.ts'
+import type { CoAuthor } from './coAuthors.ts'
 import { notFound, VaultError } from './errors.ts'
 
 /**
@@ -32,12 +33,24 @@ export class Access {
   readonly issuedAt: number
   /** The token, or `owner` on the whole vault. */
   readonly isOwner: boolean
+  /** Who the subject is in git, when the ticket says (since 1.10). */
+  readonly author: CoAuthor | null
 
-  constructor(subject: string | null, grants: readonly AccessGrant[], issuedAt: number) {
+  constructor(subject: string | null, grants: readonly AccessGrant[], issuedAt: number, author: CoAuthor | null = null) {
     this.subject = subject
     this.grants = grants
     this.issuedAt = issuedAt
+    this.author = author
     this.isOwner = subject === null || this.rankOn(ACCESS_VAULT_SCOPE) >= OWNER
+  }
+
+  /**
+   * Who the commits this access causes name besides the owner, who makes them: nobody for the
+   * owner, so the owner's commits stay exactly as they were (ADR 0297).
+   */
+  coAuthors(): CoAuthor[] {
+    if (this.isOwner || !this.author) return []
+    return [this.author]
   }
 
   /** The strongest role any grant gives on `path`, or null. */

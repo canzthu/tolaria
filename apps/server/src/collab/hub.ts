@@ -2,6 +2,7 @@ import { NoteCodec } from '../../../../packages/markdown-yjs/src/index.ts'
 import { RejectedChange } from '../../../../packages/protocol/src/collabWire.ts'
 import { COLLAB_CLOSE, type CollabAccess } from '../../../../packages/protocol/src/index.ts'
 import type { DocId, DocIndex } from '../docIndex.ts'
+import type { CoAuthor } from '../coAuthors.ts'
 import type { VaultChange } from '../gitSync.ts'
 import type { VaultPath } from '../paths.ts'
 import type { LinkRewrites } from '../renameLinks.ts'
@@ -61,11 +62,14 @@ export class CollabHub {
     options.vault.onChange((changes) => this.fileChanges(changes))
   }
 
-  /** Puts a websocket into the room of a document. Null when there is no such document, or the hub has closed. */
-  async connect(docId: DocId, socket: Socket, access: CollabAccess): Promise<Connection | null> {
+  /**
+   * Puts a websocket into the room of a document; the commits of its edits name `coAuthors`.
+   * Null when there is no such document, or the hub has closed.
+   */
+  async connect(docId: DocId, socket: Socket, access: CollabAccess, coAuthors: readonly CoAuthor[] = []): Promise<Connection | null> {
     const entry = await this.entry(docId)
     if (!entry) return null
-    const peer: Peer = { readOnly: access === 'read', send: (data) => socket.send(data) }
+    const peer: Peer = { readOnly: access === 'read', coAuthors, send: (data) => socket.send(data) }
     if (entry.closing) clearTimeout(entry.closing)
     entry.closing = null
     entry.sockets.add(socket)
@@ -183,7 +187,8 @@ export class CollabHub {
     await this.snapshots.delete(docId)
     if (!unwritten) return
     // Queued behind the operation that reported the deletion: the vault lock is held right now.
-    const restore = vault.write(session.path, Buffer.from(unwritten.markdown), { kind: 'match', etag: unwritten.revision })
+    const precondition = { kind: 'match', etag: unwritten.revision } as const
+    const restore = vault.write(session.path, Buffer.from(unwritten.markdown), precondition, session.takeCoAuthors())
     restore.catch((error: unknown) => log(`collab: restoring ${session.path} failed: ${String(error)}`))
   }
 

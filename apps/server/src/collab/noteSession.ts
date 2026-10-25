@@ -1,13 +1,14 @@
 import * as Y from 'yjs'
 import { type NoteCodec, type NoteVersion, reconcile, setRevision } from '../../../../packages/markdown-yjs/src/index.ts'
 import { DOC_FORMAT, DOC_META, DOC_META_MAP } from '../../../../packages/protocol/src/index.ts'
+import { type CoAuthor, CoAuthors } from '../coAuthors.ts'
 import type { DocId } from '../docIndex.ts'
 import { blobEtag, type VaultPath } from '../paths.ts'
 import { type LinkRewrites, rewriteLinks } from '../renameLinks.ts'
 import type { StoredFile, Vault } from '../vault.ts'
 import { type FlushPolicy, FlushScheduler, type Timers } from './flush.ts'
 import { patchLiveLinks } from './liveLinks.ts'
-import { Room } from './room.ts'
+import { type Peer, Room } from './room.ts'
 import type { SnapshotStore } from './snapshots.ts'
 
 /** Origin of the changes the server itself makes to a document; they are not user edits. */
@@ -55,6 +56,8 @@ export class NoteSession {
   private writing: string | null = null
   /** Path of the conflict copy of the last fork, as announced in `meta`. */
   private conflictCopy: string | null = null
+  /** Who edited the document since it was last written: the next commit names them. */
+  private readonly editors = new CoAuthors()
   private work: Promise<unknown> = Promise.resolve()
 
   private constructor({ docId, path }: SessionTarget, services: SessionServices) {
@@ -102,10 +105,23 @@ export class NoteSession {
   async flush(): Promise<FlushOutcome> {
     this.scheduler.reset()
     const plan: { written: Base | null } = { written: null }
-    const result = await this.services.vault.update(this.path, async (current) => {
-      plan.written = await this.fileContent(current)
-      return plan.written ? Buffer.from(plan.written.markdown) : null
-    })
+    // Filled once the document is read, so whoever edits after that is named by the next write.
+    const coAuthors: CoAuthor[] = []
+    const result = await this.services.vault
+      .update(
+        this.path,
+        async (current) => {
+          plan.written = await this.fileContent(current)
+          // With the file there, the document is either written now or says what the file says.
+          if (current) coAuthors.push(...this.editors.take())
+          return plan.written ? Buffer.from(plan.written.markdown) : null
+        },
+        coAuthors,
+      )
+      .catch((error: unknown) => {
+        this.editors.add(coAuthors)
+        throw error
+      })
     this.writing = null
     if (!result || !plan.written) return 'skipped'
     // A commit that landed mid-write took the path; the file change it caused was reconciled.
@@ -160,6 +176,11 @@ export class NoteSession {
     return { markdown: (await codec.fileContent(versions)).markdown, revision: this.base.revision }
   }
 
+  /** Who edited the document since it was last written, forgotten here: for writing it elsewhere. */
+  takeCoAuthors(): CoAuthor[] {
+    return this.editors.take()
+  }
+
   /** Resolves when background work (scheduled flushes, conflict copies) has finished. */
   async settled(): Promise<void> {
     await this.work
@@ -201,8 +222,11 @@ export class NoteSession {
     }, SERVER_ORIGIN)
   }
 
+  /** Changes come from the server itself or from a peer, which is then their origin. */
   private edited(origin: unknown): void {
-    if (origin !== SERVER_ORIGIN) this.scheduler.touch()
+    if (origin === SERVER_ORIGIN) return
+    this.scheduler.touch()
+    this.editors.add((origin as Peer | null)?.coAuthors ?? [])
   }
 
   /** Computed after the pull, with nothing but microtasks between reading the document and returning. */

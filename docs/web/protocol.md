@@ -2,7 +2,7 @@
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change. Version 1.7 added folder renames (`POST /v1/folders/rename`, capability `folders.rename`); nothing else changed. Version 1.8 added creating and deleting folders (`POST /v1/folders`, capability `folders.create`; `POST /v1/folders/delete`, capability `folders.delete`); nothing else changed. Version 1.9 added access tickets (capability `access.tickets`, see "Access tickets"): a front end that holds the token gives other users a role on the vault or on single notes, the `forbidden` error code, `POST /v1/access/revocations`, the `4403` close code, and `access` in `GET /v1/vault`; a client with the token sees no change.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change. Version 1.7 added folder renames (`POST /v1/folders/rename`, capability `folders.rename`); nothing else changed. Version 1.8 added creating and deleting folders (`POST /v1/folders`, capability `folders.create`; `POST /v1/folders/delete`, capability `folders.delete`); nothing else changed. Version 1.9 added access tickets (capability `access.tickets`, see "Access tickets"): a front end that holds the token gives other users a role on the vault or on single notes, the `forbidden` error code, `POST /v1/access/revocations`, the `4403` close code, and `access` in `GET /v1/vault`; a client with the token sees no change. Version 1.10 added the optional `author` of an access ticket (capability `access.authors`): the commits a subject's changes cause name it in a `Co-authored-by` trailer; a ticket without it, and the token, see no change.
 
 ## Design rules
 
@@ -42,6 +42,7 @@ Capabilities:
 | `collab.yjs`, `collab.awareness` | The collaboration channel is served (since 1.1). |
 | `collab.tickets` | `POST /v1/collab/tickets` issues websocket tickets (since 1.1). |
 | `access.tickets` | Access tickets are accepted as the bearer credential and `POST /v1/access/revocations` is served (since 1.9). |
+| `access.authors` | The `author` of an access ticket is named in the commits its subject's changes cause (since 1.10). |
 
 ## Authentication and transport
 
@@ -66,6 +67,7 @@ Format: `ta1.<payload>.<signature>`. `<payload>` is the base64url (no padding) o
 | `sub` | The user the ticket was minted for: 1 to 200 characters, stable. Rate limits and websocket limits count per subject. |
 | `grants` | 1 to 100 `{ scope, role }`. `scope` is `*` (the whole vault) or the path of one file (the rules of "Paths"). `role` is `viewer`, `editor` or `owner`; `owner` only with scope `*`. |
 | `iat`, `exp` | Milliseconds since the epoch on the minting clock. Refused once `exp` has passed, when `exp - iat` exceeds 10 minutes, or when `iat` is more than 60 s ahead of the server's clock. |
+| `author` | Optional (since 1.10): `{ "name", "email" }`, who the subject is in git. `name` is 1 to 100 characters, `email` at most 254 with one `@` and no whitespace; neither has control characters, `<`, `>` or surrounding spaces. A malformed `author` spoils the ticket. |
 
 Unknown fields are ignored, so later minor versions can add some. A ticket that fails any rule, or was issued at or before a revocation of its subject, gets `401 unauthorized`.
 
@@ -82,6 +84,18 @@ What a subject may do is the strongest role any of its grants gives on the path 
 | `POST /v1/access/revocations` | `owner` on `*`, or the token. |
 
 A readable path the subject may not change gets `403 forbidden`. A stale write by an editor still becomes a conflict copy next to the note, which the editor of only that note cannot read.
+
+### Attribution in git (since 1.10)
+
+The server commits every change as the vault's git identity, as before. A commit caused by a subject that is not `owner` and whose ticket has an `author` ends with a trailer paragraph naming them:
+
+```text
+Update projects/alpha.md
+
+Co-authored-by: ana <ana@example.com>
+```
+
+This covers file writes, imports, renames, deletes and folder changes, and the writes of a live document, which name everyone with an `author` who edited it since it was last written (each address once). When the server replays unpushed commits onto a moved upstream, the replay commit keeps their trailers. The token, `owner` tickets and tickets without `author` add nothing: their commit messages are exactly those of 1.9.
 
 ### `POST /v1/access/revocations`
 

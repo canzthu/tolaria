@@ -12,6 +12,7 @@ import type {
   WriteOutcome,
   WriteResult,
 } from '../../../packages/protocol/src/index.ts'
+import type { CoAuthor } from './coAuthors.ts'
 import { notFound, stale, VaultError } from './errors.ts'
 import { GitRepo, REMOTE, type RepoOptions } from './gitRepo.ts'
 import { GitSync, type VaultChange } from './gitSync.ts'
@@ -70,12 +71,19 @@ interface PendingWrite {
   path: VaultPath
   bytes: Uint8Array
   precondition: WritePrecondition
+  coAuthors: readonly CoAuthor[]
 }
 
 interface PullClock {
   started: number
   pulled: number
 }
+
+/**
+ * Who a change was made with, besides the owner who commits it (ADR 0297). Empty for the owner,
+ * whose commits stay as they were. Read when the commit is made, so a `FileProducer` may add to it.
+ */
+export type CommitCoAuthors = readonly CoAuthor[]
 
 /** Called with the vault lock held, for every change to the vault's files. */
 export type ChangeListener = (changes: VaultChange[]) => Promise<void>
@@ -208,11 +216,11 @@ export class Vault {
     return { bytes, etag: blobEtag(bytes) }
   }
 
-  write(path: VaultPath, bytes: Uint8Array, precondition: WritePrecondition): Promise<TimedWriteResult> {
+  write(path: VaultPath, bytes: Uint8Array, precondition: WritePrecondition, coAuthors: CommitCoAuthors = []): Promise<TimedWriteResult> {
     return this.locked(async () => {
       const started = performance.now()
       await this.sync.pull()
-      return this.storeAndPush({ path, bytes, precondition }, { started, pulled: performance.now() })
+      return this.storeAndPush({ path, bytes, precondition, coAuthors }, { started, pulled: performance.now() })
     })
   }
 
@@ -221,7 +229,7 @@ export class Vault {
    * lock and after the pull, so what it is given is what the write replaces: a change from
    * the git remote cannot slip in between. Returning null leaves the file alone.
    */
-  update(path: VaultPath, produce: FileProducer): Promise<TimedWriteResult | null> {
+  update(path: VaultPath, produce: FileProducer, coAuthors: CommitCoAuthors = []): Promise<TimedWriteResult | null> {
     return this.locked(async () => {
       const started = performance.now()
       await this.sync.pull()
@@ -230,12 +238,13 @@ export class Vault {
       const bytes = await produce(current ? { bytes: current, etag: blobEtag(current) } : null)
       if (!bytes) return null
       const precondition: WritePrecondition = current ? { kind: 'match', etag: blobEtag(current) } : { kind: 'absent' }
-      return this.storeAndPush({ path, bytes, precondition }, { started, pulled })
+      return this.storeAndPush({ path, bytes, precondition, coAuthors }, { started, pulled })
     })
   }
 
-  private async storeAndPush({ path, bytes, precondition }: PendingWrite, clock: PullClock): Promise<TimedWriteResult> {
-    const stored = await this.store(path, bytes, precondition)
+  private async storeAndPush(pending: PendingWrite, clock: PullClock): Promise<TimedWriteResult> {
+    const { path, bytes } = pending
+    const stored = await this.store(pending)
     const committed = performance.now()
 
     const head = await this.repo.head()
@@ -277,12 +286,12 @@ export class Vault {
    * Moves a note in one commit; with `rewriteLinks`, the wikilinks to it in every other note
    * are rewritten in that same commit (see `RenameTransaction`).
    */
-  rename(from: VaultPath, to: VaultPath, options: RenameOptions = {}): Promise<RenameResult> {
+  rename(from: VaultPath, to: VaultPath, options: RenameOptions = {}, coAuthors: CommitCoAuthors = []): Promise<RenameResult> {
     return this.locked(async () => {
       await this.sync.pull()
       const { files } = await this.list()
       const staged = await new RenameTransaction(this.repo, { ...options, from, to }).stage(files.map((file) => file.path as VaultPath))
-      await this.repo.commitStaged(staged.message)
+      await this.repo.commitStaged(staged.message, coAuthors)
       await this.emit(staged.changes)
       const head = await this.repo.head()
       this.onVaultEvent?.({ type: 'commit', head, paths: [from, to, ...staged.rewritten] })
@@ -297,34 +306,40 @@ export class Vault {
    * Moves every file of a folder in one commit; with `rewriteLinks`, the wikilinks that reach
    * a moved note by its path are rewritten in that same commit (see `FolderRenameTransaction`).
    */
-  async renameFolder(from: VaultPath, to: VaultPath, options: { rewriteLinks?: boolean } = {}): Promise<FolderRenameResult> {
+  async renameFolder(
+    from: VaultPath,
+    to: VaultPath,
+    options: { rewriteLinks?: boolean } = {},
+    coAuthors: CommitCoAuthors = [],
+  ): Promise<FolderRenameResult> {
     const transaction = new FolderRenameTransaction(this.repo, { ...options, from, to })
-    const { staged, commit, pushed } = await this.commitFolderChange((files) => transaction.stage(files))
+    const { staged, commit, pushed } = await this.commitFolderChange((files) => transaction.stage(files), coAuthors)
     const result: FolderRenameResult = { from, path: to, commit, pushed, moved: staged.moved }
     return options.rewriteLinks ? { ...result, rewritten: staged.rewritten } : result
   }
 
   /** Creates an empty folder in one commit: git keeps it through its `.keep` file. */
-  async createFolder(path: VaultPath): Promise<FolderCreateResult> {
-    const { commit, pushed } = await this.commitFolderChange((files) => stageFolderCreate(this.repo, files, path))
+  async createFolder(path: VaultPath, coAuthors: CommitCoAuthors = []): Promise<FolderCreateResult> {
+    const { commit, pushed } = await this.commitFolderChange((files) => stageFolderCreate(this.repo, files, path), coAuthors)
     return { path, commit, pushed }
   }
 
   /** Deletes every file of a folder in one commit; live documents of its notes close. */
-  async deleteFolder(path: VaultPath): Promise<FolderDeleteResult> {
-    const { staged, commit, pushed } = await this.commitFolderChange((files) => stageFolderDelete(this.repo, files, path))
+  async deleteFolder(path: VaultPath, coAuthors: CommitCoAuthors = []): Promise<FolderDeleteResult> {
+    const { staged, commit, pushed } = await this.commitFolderChange((files) => stageFolderDelete(this.repo, files, path), coAuthors)
     return { path, commit, pushed, deleted: staged.deleted }
   }
 
   /** Stages a folder change from the tracked files after the pull, commits it once and pushes it. */
   private commitFolderChange<T extends StagedFolderChange>(
     stage: (files: VaultPath[]) => Promise<T>,
+    coAuthors: CommitCoAuthors,
   ): Promise<{ staged: T; commit: string; pushed: boolean }> {
     return this.locked(async () => {
       await this.sync.pull()
       const { files } = await this.list()
       const staged = await stage(files.map((file) => file.path as VaultPath))
-      await this.repo.commitStaged(staged.message)
+      await this.repo.commitStaged(staged.message, coAuthors)
       await this.emit(staged.changes)
       const head = await this.repo.head()
       this.onVaultEvent?.({ type: 'commit', head, paths: staged.changes.flatMap(changedPaths) })
@@ -346,12 +361,12 @@ export class Vault {
     return pushed
   }
 
-  remove(path: VaultPath, ifMatch: Etag): Promise<DeleteResult> {
+  remove(path: VaultPath, ifMatch: Etag, coAuthors: CommitCoAuthors = []): Promise<DeleteResult> {
     return this.locked(async () => {
       await this.sync.pull()
       await this.currentEtag(path, ifMatch)
       await this.repo.run(['rm', '-q', '--', path])
-      await this.repo.run(['commit', '-q', '-m', `Delete ${path}`])
+      await this.repo.commitStaged(`Delete ${path}`, coAuthors)
       await this.emit([{ kind: 'delete', path }])
       
       const head = await this.repo.head()
@@ -500,17 +515,13 @@ export class Vault {
   }
 
   /** Writes and commits the bytes where the precondition allows: the path or a conflict copy. */
-  private async store(
-    path: VaultPath,
-    bytes: Uint8Array,
-    precondition: WritePrecondition,
-  ): Promise<Placement> {
+  private async store({ path, bytes, precondition, coAuthors }: PendingWrite): Promise<Placement> {
     const current = await this.repo.readIfExists(path)
     if (!current && this.repo.exists(path)) throw new VaultError(409, 'destination_exists', `${path} is a folder`)
     const outcome = writeOutcome(current ? blobEtag(current) : null, blobEtag(bytes), precondition)
     if (outcome === 'unchanged') return { outcome, path }
     const target = outcome === 'conflict' ? this.conflictPath(path) : path
-    await this.repo.commitFile(target, bytes, commitMessage(outcome, path))
+    await this.repo.commitFile(target, bytes, commitMessage(outcome, path), coAuthors)
     await this.emit([{ kind: 'upsert', path: target }])
     return { outcome, path: target }
   }

@@ -225,7 +225,7 @@ function serve(ws: WebSocket, admission: Admission, options: UpgradeOptions): vo
   ws.on('error', (error) => log(`collab: websocket error: ${error.message}`))
   const socket = { send: (data: Uint8Array) => ws.send(data), close: (code: number, reason: string) => ws.close(code, reason) }
   hub
-    .connect(docId, socket, access)
+    .connect(docId, socket, access, admission.holder?.coAuthors())
     .then((joined) => arrival.joined(joined))
     .catch((error: unknown) => {
       log(`collab: opening document ${docId} failed: ${error instanceof Error ? error.message : String(error)}`)

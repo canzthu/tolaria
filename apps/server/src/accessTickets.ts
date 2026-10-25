@@ -12,6 +12,7 @@ import {
   type AccessTicketPayload,
 } from '../../../packages/protocol/src/index.ts'
 import { Access } from './access.ts'
+import { type CoAuthor, isCoAuthor } from './coAuthors.ts'
 import { vaultPath } from './paths.ts'
 
 /**
@@ -92,6 +93,12 @@ function validTimes(iat: unknown, exp: unknown, now: number): boolean {
   return issued <= now + CLOCK_SKEW_MS && expires > now && expires - issued <= ACCESS_TICKET_MAX_LIFETIME_MS
 }
 
+/** The optional author (since 1.10): null when absent, undefined when malformed, which spoils the ticket. */
+function authorOf(value: unknown): CoAuthor | null | undefined {
+  if (value === undefined) return null
+  return isCoAuthor(value) ? value : undefined
+}
+
 /** The access a ticket gives, or null when it is not authentic, not current or not well-formed. */
 export function readAccessTicket(ticket: string, key: Buffer, now: number): Access | null {
   const signed = signedPart(ticket, key)
@@ -99,7 +106,9 @@ export function readAccessTicket(ticket: string, key: Buffer, now: number): Acce
   if (!isRecord(payload) || payload.v !== ACCESS_TICKET_VERSION) return null
   const { sub, grants, iat, exp } = payload
   if (!validSubject(sub) || !validGrants(grants) || !validTimes(iat, exp, now)) return null
-  return new Access(sub, grants, iat as number)
+  const author = authorOf(payload.author)
+  if (author === undefined) return null
+  return new Access(sub, grants, iat as number, author)
 }
 
 /** Grants from a request body, validated like a ticket's. */

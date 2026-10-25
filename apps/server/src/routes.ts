@@ -145,7 +145,7 @@ function writeReply({ timings, ...result }: TimedWriteResult, docs: DocIndex): R
 async function writeFile(request: ApiRequest, { vault, docs }: Services, path: VaultPath): Promise<Reply> {
   request.access.requireWrite(path)
   const precondition = writePrecondition(request.headers)
-  return writeReply(await vault.write(path, await request.body(), precondition), docs)
+  return writeReply(await vault.write(path, await request.body(), precondition, request.access.coAuthors()), docs)
 }
 
 async function deleteFile({ headers, access }: ApiRequest, { vault }: Services, path: VaultPath): Promise<Reply> {
@@ -154,7 +154,7 @@ async function deleteFile({ headers, access }: ApiRequest, { vault }: Services, 
   if (!ifMatch || ifMatch === '*') {
     throw new VaultError(428, 'precondition_required', 'send If-Match with the etag of the file to delete')
   }
-  return { status: 200, body: await vault.remove(path, ifMatch) }
+  return { status: 200, body: await vault.remove(path, ifMatch, access.coAuthors()) }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -196,7 +196,7 @@ function renameOptions(body: Record<string, unknown>): RenameOptions {
 async function renameFile(request: ApiRequest, { vault, docs }: Services): Promise<Reply> {
   request.access.requireVaultWrite()
   const body = jsonObject(await request.body())
-  const result = await vault.rename(vaultPath(body.from), vaultPath(body.to), renameOptions(body))
+  const result = await vault.rename(vaultPath(body.from), vaultPath(body.to), renameOptions(body), request.access.coAuthors())
   return { status: 200, body: withDocId(result, docs) }
 }
 
@@ -204,7 +204,7 @@ async function renameFolder(request: ApiRequest, { vault }: Services): Promise<R
   request.access.requireVaultWrite()
   const body = jsonObject(await request.body())
   const rewriteLinks = optionalFlag(body.rewriteLinks, 'rewriteLinks')
-  const result = await vault.renameFolder(vaultPath(body.from), vaultPath(body.to), { rewriteLinks })
+  const result = await vault.renameFolder(vaultPath(body.from), vaultPath(body.to), { rewriteLinks }, request.access.coAuthors())
   return { status: 200, body: result }
 }
 
@@ -214,11 +214,11 @@ async function folderPath(request: ApiRequest): Promise<VaultPath> {
 }
 
 async function createFolder(request: ApiRequest, { vault }: Services): Promise<Reply> {
-  return { status: 201, body: await vault.createFolder(await folderPath(request)) }
+  return { status: 201, body: await vault.createFolder(await folderPath(request), request.access.coAuthors()) }
 }
 
 async function deleteFolder(request: ApiRequest, { vault }: Services): Promise<Reply> {
-  return { status: 200, body: await vault.deleteFolder(await folderPath(request)) }
+  return { status: 200, body: await vault.deleteFolder(await folderPath(request), request.access.coAuthors()) }
 }
 
 function searchLimit(raw: string | null): number {
@@ -328,7 +328,7 @@ async function importAttachment(request: ApiRequest, { vault, docs, remoteImages
   const url = optionalString(jsonObject(await request.body()).url, 'url')
   if (!url) throw invalidRequest('url is required')
   const image = await (remoteImages ?? publicRemoteImages)(url)
-  return writeReply(await vault.write(vaultPath(image.path), image.bytes, { kind: 'absent' }), docs)
+  return writeReply(await vault.write(vaultPath(image.path), image.bytes, { kind: 'absent' }, request.access.coAuthors()), docs)
 }
 
 async function changeFeed(request: ApiRequest, { changes, revocations }: Services): Promise<Reply> {

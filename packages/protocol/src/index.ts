@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.9'
+export const PROTOCOL_VERSION = '1.10'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -127,6 +127,19 @@ export interface AccessGrant {
   role: AccessRole
 }
 
+/** Longest `author.name` and `author.email` of an access ticket (since 1.10). */
+export const ACCESS_AUTHOR_MAX_NAME_LENGTH = 100
+export const ACCESS_AUTHOR_MAX_EMAIL_LENGTH = 254
+
+/**
+ * Who the subject is in git (since 1.10): the commits the subject's changes cause name it in a
+ * `Co-authored-by: <name> <<email>>` trailer. One line each, no control characters or angle brackets.
+ */
+export interface AccessTicketAuthor {
+  name: string
+  email: string
+}
+
 /** The signed payload of an access ticket. Unknown fields are ignored. */
 export interface AccessTicketPayload {
   v: typeof ACCESS_TICKET_VERSION
@@ -136,6 +149,8 @@ export interface AccessTicketPayload {
   /** Milliseconds since the epoch, on the minting front end's clock. */
   iat: number
   exp: number
+  /** Optional (since 1.10); a ticket without it changes files without naming the subject. */
+  author?: AccessTicketAuthor
 }
 
 /** What the caller of `GET /v1/vault` may do: `subject` is null for the bearer token (the owner). */
@@ -175,6 +190,7 @@ export const FILE_CAPABILITIES = [
   'folders.create',
   'folders.delete',
   'access.tickets',
+  'access.authors',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
