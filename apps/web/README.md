@@ -10,7 +10,8 @@ This directory holds build and test configuration only. It does not copy `src/`;
 | `pnpm preview:web` | Serves `apps/web/dist` on `127.0.0.1:4173` |
 | `pnpm playwright:web` | Checks the bundle in Chromium, WebKit, iPhone 15 and iPad emulation (build first) |
 | `pnpm bench:web` | Big-vault bench: a 6,000-note vault against its budgets (build first; see `docs/PERFORMANCE.md`) |
-| `pnpm test:web-config` | Unit tests for the preview options and the bench budgets |
+| `pnpm test:web-config` | Unit tests for the preview options, the bench budgets and the Sentry build helpers |
+| `pnpm upload:web-sourcemaps` | Uploads the hidden source maps of the last build to Sentry; skipped without `SENTRY_AUTH_TOKEN` ([telemetry](../../docs/web/telemetry.md)) |
 
 | File | Purpose |
 |---|---|
@@ -18,6 +19,7 @@ This directory holds build and test configuration only. It does not copy `src/`;
 | `previewOptions.ts` | Host, port and allowed-host resolution from `TOLARIA_WEB_*` |
 | `playwright.config.ts`, `tests/` | Browser checks for the static bundle |
 | `playwright.bench.config.ts`, `bench/`, `bigVaultBudgets.ts` | Big-vault performance bench and its budgets |
+| `sentryWebBuild.ts`, `sourcemapUpload.ts`, `scripts/upload-sourcemaps.ts` | Web error telemetry: the build's own Sentry DSN and release, hidden source maps in `sourcemaps/` (never in `dist`), and their upload ([docs/web/telemetry.md](../../docs/web/telemetry.md)) |
 
 Today the bundle runs on demo data from `src/mock-tauri/`. The remote backend that replaces it plugs in through `VaultBackend` (`src/lib/vaultBackend/`).
 

@@ -113,3 +113,6 @@ videos/node_modules/
 videos/output/
 videos/dist/
 videos/.remotion/
+
+# Hidden source maps of the web build, uploaded to Sentry by the deploy (TOL-232)
+apps/web/sourcemaps/

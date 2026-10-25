@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig, mergeConfig, type Plugin, type UserConfig } from 'vite'
 import desktopConfig from '../../vite.config'
+import { appShellPreload } from './appShellPreload'
+import { phosphorStaticIconChunk } from './phosphorIconChunk'
 import {
   isApiRequestPath,
   webPreviewAllowedHosts,
@@ -8,9 +10,8 @@ import {
   webPreviewPort,
   webPreviewProxy,
 } from './previewOptions'
-import { phosphorStaticIconChunk } from './phosphorIconChunk'
+import { currentCommit, hiddenSourceMaps, webRelease, webSentryDefine } from './sentryWebBuild'
 import { tolariaServiceWorker } from './serviceWorkerPlugin'
-import { appShellPreload } from './appShellPreload'
 
 // Tolaria Web: static build of the shared shell (no Tauri runtime).
 //
@@ -22,6 +23,9 @@ import { appShellPreload } from './appShellPreload'
 
 const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const WEB_OUT_DIR = fileURLToPath(new URL('./dist', import.meta.url))
+// Hidden source maps for the Sentry upload (TOL-232); outside WEB_OUT_DIR, so never served.
+const WEB_SOURCEMAP_DIR = fileURLToPath(new URL('./sourcemaps', import.meta.url))
+const WEB_RELEASE = webRelease(process.env, currentCommit(REPO_ROOT))
 // The shell, plus the collaborative note page of spike S4 (TOL-8), which only this build has.
 const WEB_PAGES = {
   main: fileURLToPath(new URL('../../index.html', import.meta.url)),
@@ -59,9 +63,19 @@ const staticIcons = phosphorStaticIconChunk()
 
 export default defineConfig(mergeConfig(sharedShellConfig(), {
   root: REPO_ROOT,
-  plugins: [staticWebApiGuard(), staticIcons.plugin, tolariaServiceWorker(), appShellPreload()],
-  // Read by src/main.tsx: only this build ships service-worker.js (TOL-198).
-  define: { 'import.meta.env.VITE_TOLARIA_WEB_BUILD': JSON.stringify('true') },
+  plugins: [
+    staticWebApiGuard(),
+    staticIcons.plugin,
+    tolariaServiceWorker(),
+    appShellPreload(),
+    hiddenSourceMaps({ dir: WEB_SOURCEMAP_DIR, release: WEB_RELEASE }),
+  ],
+  define: {
+    // Read by src/main.tsx: only this build ships service-worker.js (TOL-198).
+    'import.meta.env.VITE_TOLARIA_WEB_BUILD': JSON.stringify('true'),
+    // The web build's own Sentry DSN and release (TOL-232), never the desktop ones.
+    ...webSentryDefine(process.env, WEB_RELEASE),
+  },
   build: {
     rollupOptions: { input: WEB_PAGES, output: { manualChunks: staticIcons.manualChunks } },
     outDir: WEB_OUT_DIR,
@@ -69,7 +83,7 @@ export default defineConfig(mergeConfig(sharedShellConfig(), {
     // Mobile Safari is the acceptance target; the desktop config follows TAURI_* env.
     target: 'safari15',
     minify: 'esbuild',
-    sourcemap: false,
+    sourcemap: 'hidden',
   },
   preview: {
     host: webPreviewHost(process.env),
