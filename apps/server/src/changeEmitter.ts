@@ -1,9 +1,16 @@
 import type { ServerResponse } from 'node:http'
 import type { ChangeEvent } from '../../../packages/protocol/src/index.ts'
 
+/** Which paths a connection may hear about; every path when left out. */
+export interface PathFilter {
+  readonly isOwner: boolean
+  canRead(path: string): boolean
+}
+
 interface Connection {
   response: ServerResponse
   id: number
+  filter?: PathFilter
 }
 
 let nextId = 1
@@ -20,9 +27,9 @@ export class ChangeEmitter {
     this.log = log ?? (() => {})
   }
 
-  /** Register a new SSE connection. */
-  connect(response: ServerResponse): void {
-    const connection: Connection = { response, id: nextId++ }
+  /** Registers a new SSE connection; the returned function ends it. */
+  connect(response: ServerResponse, filter?: PathFilter): () => void {
+    const connection: Connection = { response, id: nextId++, filter }
     this.connections.add(connection)
 
     response.writeHead(200, {
@@ -37,6 +44,10 @@ export class ChangeEmitter {
 
     // Send initial connected event
     this.sendEvent(connection, { type: 'commit', head: 'connected' })
+    return () => {
+      this.connections.delete(connection)
+      response.end()
+    }
   }
 
   /** Emit an event to all connected clients. */
@@ -67,7 +78,16 @@ export class ChangeEmitter {
   }
 
   private sendEvent(connection: Connection, event: ChangeEvent): void {
-    const data = JSON.stringify(event)
+    const visible = visibleTo(connection.filter, event)
+    if (!visible) return
+    const data = JSON.stringify(visible)
     connection.response.write(`data: ${data}\n\n`)
   }
+}
+
+/** The event as a connection may see it: a commit that touched none of its paths is not sent. */
+function visibleTo(filter: PathFilter | undefined, event: ChangeEvent): ChangeEvent | null {
+  if (!filter || filter.isOwner || !event.paths) return event
+  const paths = event.paths.filter((path) => filter.canRead(path))
+  return paths.length > 0 ? { ...event, paths } : null
 }

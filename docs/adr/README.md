@@ -291,3 +291,4 @@ proposed → active → superseded
 | [0293](0293-folder-create-and-delete-on-the-server.md) | Folders created on the server hold a .keep file; folder deletes take every file in one commit | active |
 | [0294](0294-web-build-error-telemetry-and-hidden-source-maps.md) | Web build error telemetry: build-time DSN, commit releases and hidden source maps | active |
 | [0295](0295-mobile-note-reads-during-linked-folder-sync.md) | Mobile note reads during linked-folder sync | active |
+| [0296](0296-sharing-enforced-in-the-server-with-signed-access-tickets.md) | Sharing is enforced in the open server with signed, short-lived access tickets; share records stay with the front end | active |

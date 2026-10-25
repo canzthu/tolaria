@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders, ServerResponse } from 'node:http'
 import {
+  type AccessRevocationResult,
   COLLAB_CAPABILITIES,
   type CollabAccess,
   DOC_BLOCKS_FRAGMENT,
@@ -15,6 +16,9 @@ import {
   type VaultResponse,
   type WriteResult,
 } from '../../../packages/protocol/src/index.ts'
+import { Access } from './access.ts'
+import type { Revocations } from './accessRevocations.ts'
+import { grantsFrom } from './accessTickets.ts'
 import type { ChangeEmitter } from './changeEmitter.ts'
 import type { TicketBook } from './collab/tickets.ts'
 import type { DocIndex } from './docIndex.ts'
@@ -38,6 +42,8 @@ export interface Services {
   tickets?: TicketBook
   /** SSE emitter for change feed. */
   changes: ChangeEmitter
+  /** Revoked access tickets and the open connections admitted on access tickets. */
+  revocations: Revocations
   /** Downloads images for `POST /v1/attachments/imports`; public hosts only unless a test swaps it. */
   remoteImages?: RemoteImageFetcher
 }
@@ -49,6 +55,8 @@ export interface ApiRequest {
   body(): Promise<Buffer>
   /** Present for SSE requests. */
   response?: ServerResponse
+  /** What the request's credential allows: the owner for the bearer token. */
+  access: Access
 }
 
 type Handler = (request: ApiRequest, services: Services, path: VaultPath) => Promise<Reply>
@@ -72,7 +80,7 @@ function withDocId<T extends { path: string }>(result: T, docs: DocIndex): T & {
   return docId ? { ...result, docId } : result
 }
 
-async function describeVault(_request: ApiRequest, { vault, collab }: Services): Promise<Reply> {
+async function describeVault({ access }: ApiRequest, { vault, collab }: Services): Promise<Reply> {
   const body: VaultResponse = {
     protocolVersion: PROTOCOL_VERSION,
     capabilities: collab ? [...FILE_CAPABILITIES, ...COLLAB_CAPABILITIES] : [...FILE_CAPABILITIES],
@@ -85,16 +93,18 @@ async function describeVault(_request: ApiRequest, { vault, collab }: Services):
       frontmatterField: DOC_FRONTMATTER_FIELD,
       metaMap: DOC_META_MAP,
     },
+    access: access.describe(),
   }
   return { status: 200, body }
 }
 
-async function listFiles({ url }: ApiRequest, { vault, docs }: Services): Promise<Reply> {
+async function listFiles({ url, access }: ApiRequest, { vault, docs }: Services): Promise<Reply> {
   const { head, files } = await vault.list(url.searchParams.get('prefix') ?? '')
-  return { status: 200, body: { head, files: docs.withDocIds(files) } }
+  return { status: 200, body: { head, files: docs.withDocIds(access.visible(files, (file) => file.path)) } }
 }
 
-async function readFile({ headers }: ApiRequest, { vault, docs }: Services, path: VaultPath): Promise<Reply> {
+async function readFile({ headers, access }: ApiRequest, { vault, docs }: Services, path: VaultPath): Promise<Reply> {
+  access.requireRead(path)
   const { bytes, etag } = await vault.read(path)
   const replyHeaders: Record<string, string> = {
     etag: quoted(etag),
@@ -133,11 +143,13 @@ function writeReply({ timings, ...result }: TimedWriteResult, docs: DocIndex): R
 }
 
 async function writeFile(request: ApiRequest, { vault, docs }: Services, path: VaultPath): Promise<Reply> {
+  request.access.requireWrite(path)
   const precondition = writePrecondition(request.headers)
   return writeReply(await vault.write(path, await request.body(), precondition), docs)
 }
 
-async function deleteFile({ headers }: ApiRequest, { vault }: Services, path: VaultPath): Promise<Reply> {
+async function deleteFile({ headers, access }: ApiRequest, { vault }: Services, path: VaultPath): Promise<Reply> {
+  access.requireVaultWrite()
   const ifMatch = entityTag(singleHeader(headers, 'if-match'))
   if (!ifMatch || ifMatch === '*') {
     throw new VaultError(428, 'precondition_required', 'send If-Match with the etag of the file to delete')
@@ -182,12 +194,14 @@ function renameOptions(body: Record<string, unknown>): RenameOptions {
 }
 
 async function renameFile(request: ApiRequest, { vault, docs }: Services): Promise<Reply> {
+  request.access.requireVaultWrite()
   const body = jsonObject(await request.body())
   const result = await vault.rename(vaultPath(body.from), vaultPath(body.to), renameOptions(body))
   return { status: 200, body: withDocId(result, docs) }
 }
 
 async function renameFolder(request: ApiRequest, { vault }: Services): Promise<Reply> {
+  request.access.requireVaultWrite()
   const body = jsonObject(await request.body())
   const rewriteLinks = optionalFlag(body.rewriteLinks, 'rewriteLinks')
   const result = await vault.renameFolder(vaultPath(body.from), vaultPath(body.to), { rewriteLinks })
@@ -195,6 +209,7 @@ async function renameFolder(request: ApiRequest, { vault }: Services): Promise<R
 }
 
 async function folderPath(request: ApiRequest): Promise<VaultPath> {
+  request.access.requireVaultWrite()
   return vaultPath(jsonObject(await request.body()).path)
 }
 
@@ -219,32 +234,41 @@ function searchQuery(query: string): string {
   throw invalidRequest(`q must be one line of 1 to ${MAX_QUERY_CHARS} characters`)
 }
 
-async function search({ url }: ApiRequest, { search }: Services): Promise<Reply> {
+async function search({ url, access }: ApiRequest, { search }: Services): Promise<Reply> {
   const query = searchQuery(url.searchParams.get('q') ?? '')
-  return { status: 200, body: await search.search(query, searchLimit(url.searchParams.get('limit'))) }
+  const found = await search.search(query, searchLimit(url.searchParams.get('limit')))
+  return { status: 200, body: { ...found, results: access.visible(found.results, (result) => result.path) } }
 }
 
-async function sync(_request: ApiRequest, { vault }: Services): Promise<Reply> {
+async function sync({ access }: ApiRequest, { vault }: Services): Promise<Reply> {
+  access.requireSomeWrite()
   return { status: 200, body: await vault.syncNow() }
 }
 
-async function listEntries({ url, headers }: ApiRequest, { index }: Services): Promise<Reply> {
+/** Entries of the vault this access may read; the entity tag tells apart what different accesses see. */
+async function listEntries({ url, headers, access }: ApiRequest, { index }: Services): Promise<Reply> {
   const since = url.searchParams.get('since')
-  
+  const byPath = (entry: { path: string }) => entry.path
+
   if (since) {
     const delta = await index.getDelta(since)
-    const body: EntriesDeltaResponse = delta
-    return { status: 200, headers: { etag: quoted(delta.head) }, body }
+    const body: EntriesDeltaResponse = {
+      ...delta,
+      changed: access.visible(delta.changed, byPath),
+      deleted: access.visible(delta.deleted, (path) => path),
+    }
+    return { status: 200, headers: { etag: quoted(delta.head + access.viewTag()) }, body }
   }
-  
+
   const { head, entries } = index.getAll()
-  const body: EntriesResponse = { head, entries }
-  const replyHeaders: Record<string, string> = { etag: quoted(head) }
-  
-  if (entityTag(singleHeader(headers, 'if-none-match')) === head) {
+  const body: EntriesResponse = { head, entries: access.visible(entries, byPath) }
+  const tag = head + access.viewTag()
+  const replyHeaders: Record<string, string> = { etag: quoted(tag) }
+
+  if (entityTag(singleHeader(headers, 'if-none-match')) === tag) {
     return { status: 304, headers: replyHeaders }
   }
-  
+
   return { status: 200, headers: replyHeaders, body }
 }
 
@@ -269,23 +293,52 @@ async function issueTicket(request: ApiRequest, { docs, tickets }: Services): Pr
   if (!tickets) throw collabNotServed()
   const body = jsonObject(await request.body())
   const docId = optionalString(body.docId, 'docId') ?? ''
-  if (!docs.pathOf(docId)) throw new VaultError(404, 'not_found', 'no such document')
-  return { status: 201, body: tickets.issue({ docId, access: collabAccess(body.access) }) }
+  const path = docs.pathOf(docId)
+  if (!path || !request.access.canRead(path)) throw new VaultError(404, 'not_found', 'no such document')
+  const access = collabAccess(body.access)
+  if (access === 'write') request.access.requireWrite(path)
+  const holder = request.access.subject === null ? undefined : request.access
+  return { status: 201, body: tickets.issue({ docId, access, holder }) }
+}
+
+function revocationTime(value: unknown): number {
+  if (value === undefined || value === null) return Date.now()
+  if (Number.isSafeInteger(value)) return value as number
+  throw invalidRequest('before must be a time in milliseconds')
+}
+
+/** Withdraws what a subject's tickets gave: older tickets stop working, uncovered connections close. */
+async function revokeAccess(request: ApiRequest, { revocations }: Services): Promise<Reply> {
+  request.access.requireOwner()
+  const body = jsonObject(await request.body())
+  const subject = optionalString(body.subject, 'subject')
+  if (!subject) throw invalidRequest('subject is required')
+  const grants = grantsFrom(body.grants)
+  if (!grants) throw invalidRequest('grants must be a list of { scope, role } grants')
+  const remaining = new Access(subject, grants, 0)
+  const result: AccessRevocationResult = { closed: revocations.revoke(subject, { remaining, before: revocationTime(body.before) }) }
+  return { status: 200, body: result }
 }
 
 const publicRemoteImages = remoteImageFetcher()
 
 /** Stores a public image under `attachments/`, never over an existing file. */
 async function importAttachment(request: ApiRequest, { vault, docs, remoteImages }: Services): Promise<Reply> {
+  request.access.requireVaultWrite()
   const url = optionalString(jsonObject(await request.body()).url, 'url')
   if (!url) throw invalidRequest('url is required')
   const image = await (remoteImages ?? publicRemoteImages)(url)
   return writeReply(await vault.write(vaultPath(image.path), image.bytes, { kind: 'absent' }), docs)
 }
 
-async function changeFeed(request: ApiRequest, { changes }: Services): Promise<Reply> {
+async function changeFeed(request: ApiRequest, { changes, revocations }: Services): Promise<Reply> {
   if (!request.response) throw new VaultError(500, 'internal', 'SSE response not available')
-  changes.connect(request.response)
+  const { access } = request
+  const close = changes.connect(request.response, access)
+  if (access.subject !== null) {
+    const forget = revocations.track(access.subject, { allowedBy: (remaining) => access.coveredBy(remaining), close })
+    request.response.once('close', forget)
+  }
   // Return a special marker that tells the server not to send anything
   return { status: 200, sse: true }
 }
@@ -309,6 +362,7 @@ const EXACT_ROUTES = new Map<string, Methods>([
   [ROUTES.changes, new Map([['GET', changeFeed]])],
   [ROUTES.collabTickets, new Map([['POST', issueTicket]])],
   [ROUTES.attachmentImports, new Map([['POST', importAttachment]])],
+  [ROUTES.accessRevocations, new Map([['POST', revokeAccess]])],
 ])
 
 function decodedPath(encoded: string): VaultPath {

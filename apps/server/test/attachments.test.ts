@@ -2,6 +2,7 @@ import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { Access } from '../src/access.ts'
 import { ChangeEmitter } from '../src/changeEmitter.ts'
 import { DocIndex } from '../src/docIndex.ts'
 import { route, type Services } from '../src/routes.ts'
@@ -138,6 +139,7 @@ describe('importing a remote image', () => {
         url: new URL('http://vault.invalid/v1/attachments/imports'),
         headers: {},
         body: async () => Buffer.from(JSON.stringify({ url: 'https://images.example/cat.png' })),
+        access: Access.OWNER,
       },
       services,
     )

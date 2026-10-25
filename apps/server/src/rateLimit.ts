@@ -1,10 +1,10 @@
 import { VaultError } from './errors.ts'
-import { isAuthorized } from './httpIo.ts'
 
 /**
  * Request rate limits, so one client cannot exhaust the vault container. One bearer token is
- * one account (docs/web/protocol.md, "Authentication and transport"); callers without it share
- * an anonymous bucket, so a flood of bad credentials never slows the account down.
+ * one account (docs/web/protocol.md, "Authentication and transport"), and so is each subject of
+ * access tickets (`credentials.ts`); callers without valid credentials share an anonymous bucket,
+ * so a flood of bad credentials never slows an account down.
  */
 
 export interface RateLimit {
@@ -18,11 +18,6 @@ export const DEFAULT_RATE_LIMIT: RateLimit = { perSecond: 50, burst: 500 }
 
 export const ACCOUNT = 'account'
 export const ANONYMOUS = 'anonymous'
-
-/** The bucket a request is charged to. */
-export function accountOf(authorization: string | undefined, token: string): string {
-  return isAuthorized(authorization, token) ? ACCOUNT : ANONYMOUS
-}
 
 class TokenBucket {
   private readonly limit: RateLimit

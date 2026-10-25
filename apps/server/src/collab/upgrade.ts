@@ -1,10 +1,19 @@
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { type RawData, type WebSocket, WebSocketServer } from 'ws'
-import { COLLAB_MAX_MESSAGE_BYTES, COLLAB_TICKET_PARAM, type CollabAccess, ROUTES } from '../../../../packages/protocol/src/index.ts'
+import {
+  COLLAB_CLOSE,
+  COLLAB_MAX_MESSAGE_BYTES,
+  COLLAB_TICKET_PARAM,
+  type CollabAccess,
+  ROUTES,
+} from '../../../../packages/protocol/src/index.ts'
+import type { Access } from '../access.ts'
+import type { Revocations } from '../accessRevocations.ts'
+import { type Credential, type Credentials, subjectAccount } from '../credentials.ts'
 import type { DocId, DocIndex } from '../docIndex.ts'
-import { isAuthorized, singleHeader } from '../httpIo.ts'
-import { ACCOUNT, accountOf, type RateLimiter, retryAfterSeconds } from '../rateLimit.ts'
+import { singleHeader } from '../httpIo.ts'
+import { ACCOUNT, ANONYMOUS, type RateLimiter, retryAfterSeconds } from '../rateLimit.ts'
 import { type ConnectionCounter, watchIdle } from './connectionLimits.ts'
 import type { CollabHub, Connection } from './hub.ts'
 import type { TicketBook } from './tickets.ts'
@@ -13,7 +22,10 @@ export interface UpgradeOptions {
   hub: CollabHub
   tickets: TicketBook
   docs: DocIndex
-  token: string
+  /** The bearer token or an access ticket, on upgrades that can send headers. */
+  credentials: Credentials
+  /** Closes sockets admitted on access tickets when their access is revoked. */
+  revocations: Revocations
   maxMessageBytes: number
   /** Every upgrade is charged: an admitted one to the account, a refused one like an HTTP request. */
   limiter: RateLimiter
@@ -25,6 +37,8 @@ export interface UpgradeOptions {
 interface Admission {
   docId: DocId
   access: CollabAccess
+  /** Set when the socket was admitted on an access ticket, directly or through a collab ticket. */
+  holder?: Access
 }
 
 const DOC_PREFIX = `${ROUTES.collabDocs}/`
@@ -54,15 +68,35 @@ function bytes(data: RawData): Uint8Array {
   return data instanceof ArrayBuffer ? new Uint8Array(data) : data
 }
 
-/** Who may open which document: the bearer token, or a ticket issued for this document. */
-function admit(request: IncomingMessage, { token, tickets, docs }: UpgradeOptions): Admission {
+function credentialOf(request: IncomingMessage, { credentials }: UpgradeOptions): Credential | null {
+  return credentials.of(singleHeader(request.headers, 'authorization'))
+}
+
+/** Header credentials open a document with the most they allow on it; one that allows nothing finds no document. */
+function admitCredential(docId: DocId, path: string, { access }: Credential): Admission {
+  if (!access.canRead(path)) throw new Refusal(404)
+  return { docId, access: access.canWrite(path) ? 'write' : 'read', holder: access.subject === null ? undefined : access }
+}
+
+/** A collab ticket asked for on an access ticket stops working once that access is revoked. */
+function admitTicket(url: URL, docId: DocId, { tickets, revocations }: UpgradeOptions): Admission {
+  const grant = tickets.redeem(url.searchParams.get(COLLAB_TICKET_PARAM) ?? '', docId)
+  if (!grant || isRevoked(grant.holder, revocations)) throw new Refusal(401)
+  return { docId, access: grant.access, holder: grant.holder }
+}
+
+function isRevoked(holder: Access | undefined, revocations: Revocations): boolean {
+  return holder !== undefined && revocations.refuses(holder)
+}
+
+/** Who may open which document: the bearer token or an access ticket, or a ticket issued for this document. */
+function admit(request: IncomingMessage, options: UpgradeOptions): Admission {
   const url = new URL(request.url ?? '/', 'http://vault.invalid')
   const docId = url.pathname.startsWith(DOC_PREFIX) ? url.pathname.slice(DOC_PREFIX.length) : ''
-  if (!docs.pathOf(docId)) throw new Refusal(404)
-  if (isAuthorized(singleHeader(request.headers, 'authorization'), token)) return { docId, access: 'write' }
-  const access = tickets.redeem(url.searchParams.get(COLLAB_TICKET_PARAM) ?? '', docId)
-  if (!access) throw new Refusal(401)
-  return { docId, access }
+  const path = options.docs.pathOf(docId)
+  if (!path) throw new Refusal(404)
+  const credential = credentialOf(request, options)
+  return credential ? admitCredential(docId, path, credential) : admitTicket(url, docId, options)
 }
 
 /** Charges one upgrade to `account`'s request bucket; a `429` refusal once it is empty. */
@@ -79,19 +113,20 @@ function admitCharged(request: IncomingMessage, options: UpgradeOptions): Admiss
   try {
     return admit(request, options)
   } catch (refusal) {
-    charge(accountOf(singleHeader(request.headers, 'authorization'), options.token), options.limiter)
+    charge(credentialOf(request, options)?.account ?? ANONYMOUS, options.limiter)
     throw refusal
   }
 }
 
 /**
  * Takes the account's place for one more websocket on this document, freed when its TCP socket
- * closes, however the upgrade ends. The account is the token's, whichever credential was used:
- * only the token holder gets tickets.
+ * closes, however the upgrade ends. The account is the token's, or the subject's when the socket
+ * was admitted on an access ticket.
  */
-function reserve(socket: Duplex, { docId }: Admission, { limiter, connections }: UpgradeOptions): void {
-  charge(ACCOUNT, limiter)
-  const release = connections.admit(ACCOUNT, docId)
+function reserve(socket: Duplex, { docId, holder }: Admission, { limiter, connections }: UpgradeOptions): void {
+  const account = holder?.subject ? subjectAccount(holder.subject) : ACCOUNT
+  charge(account, limiter)
+  const release = connections.admit(account, docId)
   if (!release) throw new Refusal(429)
   socket.once('close', release)
 }
@@ -166,9 +201,24 @@ class Arrival {
   }
 }
 
+/** A socket admitted on an access ticket closes when a revocation leaves its subject without what it opened. */
+function followRevocations(ws: WebSocket, { docId, access, holder }: Admission, { docs, revocations }: UpgradeOptions): void {
+  if (!holder?.subject) return
+  const allowedBy = (remaining: Access): boolean => {
+    const path = docs.pathOf(docId) ?? ''
+    return access === 'read' ? remaining.canRead(path) : remaining.canWrite(path)
+  }
+  const close = (): void => ws.close(COLLAB_CLOSE.revoked, 'access to this document was revoked')
+  const forget = revocations.track(holder.subject, { allowedBy, close })
+  ws.on('close', forget)
+}
+
 /** Joins a websocket to its document. Messages that arrive while the document opens wait. */
-function serve(ws: WebSocket, { docId, access }: Admission, { hub, log, maxMessageBytes, idleTimeoutMs }: UpgradeOptions): void {
+function serve(ws: WebSocket, admission: Admission, options: UpgradeOptions): void {
+  const { docId, access } = admission
+  const { hub, log, maxMessageBytes, idleTimeoutMs } = options
   const arrival = new Arrival(ws, maxMessageBytes)
+  followRevocations(ws, admission, options)
   watchIdle(ws, idleTimeoutMs)
   ws.on('message', (data) => arrival.message(bytes(data)))
   ws.on('close', () => arrival.close())

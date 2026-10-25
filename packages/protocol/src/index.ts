@@ -2,7 +2,7 @@
 // No runtime dependencies and no Node or DOM APIs: the server and the web client import it as-is.
 
 /** `major.minor`. Minor versions only add; a different major is a different protocol. */
-export const PROTOCOL_VERSION = '1.8'
+export const PROTOCOL_VERSION = '1.9'
 export const PROTOCOL_MAJOR = 1
 /** Sent by the server on every response; clients may send it to assert the major they speak. */
 export const PROTOCOL_HEADER = 'tolaria-protocol-version'
@@ -33,6 +33,8 @@ export const ROUTES = {
   collabTickets: `${API_PREFIX}/collab/tickets`,
   /** Downloads a public image into `attachments/` on the server's side (since 1.3). */
   attachmentImports: `${API_PREFIX}/attachments/imports`,
+  /** Withdraws access a subject's access tickets gave, open connections included; owner only (since 1.9). */
+  accessRevocations: `${API_PREFIX}/access/revocations`,
 } as const
 
 /**
@@ -78,6 +80,8 @@ export const COLLAB_CLOSE = {
   gone: 4410,
   /** A change the connection sent is not a valid change to this kind of document. */
   rejectedChange: 4422,
+  /** The access this connection was opened with was revoked or reduced (since 1.9). */
+  revoked: 4403,
 } as const
 
 export type CollabAccess = 'read' | 'write'
@@ -97,6 +101,62 @@ export interface CollabTicketResponse {
   access: CollabAccess
 }
 
+/**
+ * Access tickets (since 1.9): a front end that holds the bearer token signs a ticket that gives
+ * one subject (a user) a role on the whole vault or on single notes, and sends it as the bearer
+ * credential instead of the token. `ta1.<base64url payload JSON>.<base64url HMAC-SHA256>`; the
+ * HMAC covers `ta1.<payload>` and its key is HMAC-SHA256(server token, `ACCESS_TICKET_KEY_LABEL`).
+ */
+export const ACCESS_TICKET_PREFIX = 'ta1.'
+export const ACCESS_TICKET_VERSION = 1
+export const ACCESS_TICKET_KEY_LABEL = 'tolaria access ticket v1'
+/** Longest a ticket may live (`exp - iat`). */
+export const ACCESS_TICKET_MAX_LIFETIME_MS = 10 * 60 * 1000
+export const ACCESS_TICKET_MAX_GRANTS = 100
+/** Longest accepted ticket, in characters. */
+export const ACCESS_TICKET_MAX_LENGTH = 16 * 1024
+/** The scope of a grant on the whole vault; any other scope is the path of one note. */
+export const ACCESS_VAULT_SCOPE = '*'
+/** Weakest first. `owner` is only valid on the vault scope. */
+export const ACCESS_ROLES = ['viewer', 'editor', 'owner'] as const
+export type AccessRole = (typeof ACCESS_ROLES)[number]
+
+export interface AccessGrant {
+  /** `*` for the whole vault, or a note path. */
+  scope: string
+  role: AccessRole
+}
+
+/** The signed payload of an access ticket. Unknown fields are ignored. */
+export interface AccessTicketPayload {
+  v: typeof ACCESS_TICKET_VERSION
+  /** Stable id of the user the ticket was minted for. */
+  sub: string
+  grants: AccessGrant[]
+  /** Milliseconds since the epoch, on the minting front end's clock. */
+  iat: number
+  exp: number
+}
+
+/** What the caller of `GET /v1/vault` may do: `subject` is null for the bearer token (the owner). */
+export interface VaultAccess {
+  subject: string | null
+  grants: AccessGrant[]
+}
+
+export interface AccessRevocationRequest {
+  subject: string
+  /** What the subject still holds; open connections these do not cover are closed. Default none. */
+  grants?: AccessGrant[]
+  /** Tickets of the subject issued at or before this time (ms, minting clock) are refused. Default now. */
+  before?: number
+}
+
+export interface AccessRevocationResult {
+  /** Websockets and change feeds that were closed. */
+  closed: number
+}
+
 export const FILE_CAPABILITIES = [
   'files.read',
   'files.write',
@@ -114,6 +174,7 @@ export const FILE_CAPABILITIES = [
   'folders.rename',
   'folders.create',
   'folders.delete',
+  'access.tickets',
 ] as const
 /** Advertised only by servers that serve the collaboration channel. */
 export const COLLAB_CAPABILITIES = ['collab.yjs', 'collab.awareness', 'collab.tickets'] as const
@@ -138,6 +199,8 @@ export interface VaultResponse {
   capabilities: Capability[]
   vault: { name: string; branch: string; head: string }
   collab: CollabInfo
+  /** What this caller may do (since 1.9). */
+  access?: VaultAccess
 }
 
 export interface FileEntry {
@@ -318,6 +381,8 @@ export const ERROR_CODES = [
   'remote_unavailable',
   /** Too many requests for this account; `Retry-After` says when to try again (since 1.6). */
   'rate_limited',
+  /** The access ticket does not allow this (since 1.9). */
+  'forbidden',
   'internal',
 ] as const
 

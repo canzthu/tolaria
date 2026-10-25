@@ -52,6 +52,8 @@ Use `pnpm run server`: bare `pnpm server` is a pnpm built-in command.
 
 The limits (ADR 0292, "Limits" in the protocol) are sized so the web app, collaborative editing and the e2e suites stay far below them; a test that needs others sets these variables, or `rateLimit` and `collab.limits` of `createVaultServer`. Edge rate limits in front of the container are configured elsewhere.
 
+Other users get access through access tickets (protocol 1.9, ADR 0296): a front end that holds the token signs, per request, a short-lived ticket giving one user `viewer`, `editor` or `owner` on the vault or `viewer`/`editor` on single notes, and sends it as the bearer credential. The server verifies the HMAC with a key derived from `TOLARIA_SERVER_TOKEN`, so no other setting is needed; it enforces the ticket on every route and on the websocket, and `POST /v1/access/revocations` (owner only) refuses a user's older tickets and closes the connections their remaining grants no longer cover. `signAccessTicket` in `src/accessTickets.ts` mints one for a self-hosted proxy or a test.
+
 Git credentials for a private remote come from the environment the server runs in (SSH agent or a credential helper), never from the URL.
 
 ## Try it against a throwaway vault

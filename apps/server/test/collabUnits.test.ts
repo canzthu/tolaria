@@ -86,7 +86,7 @@ describe('tickets', () => {
     const book = new TicketBook()
     const { ticket } = book.issue(grant)
 
-    expect([book.redeem(ticket, 'doc-1'), book.redeem(ticket, 'doc-1')]).toEqual(['write', null])
+    expect([book.redeem(ticket, 'doc-1')?.access, book.redeem(ticket, 'doc-1')]).toEqual(['write', null])
   })
 
   it('does not open another document, and is spent by the attempt', () => {
@@ -105,7 +105,7 @@ describe('tickets', () => {
     now += TICKET_LIFETIME_MS
     const second = book.issue({ docId: 'doc-1', access: 'read' })
 
-    expect([book.redeem(first.ticket, 'doc-1'), book.redeem(second.ticket, 'doc-1')]).toEqual([null, 'read'])
+    expect([book.redeem(first.ticket, 'doc-1'), book.redeem(second.ticket, 'doc-1')?.access]).toEqual([null, 'read'])
   })
 
   it('issues tickets that cannot be guessed from one another', () => {

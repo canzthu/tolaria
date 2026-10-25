@@ -1,8 +1,8 @@
-# Tolaria remote protocol, version 1.8
+# Tolaria remote protocol, version 1.9
 
 The HTTP protocol between a Tolaria client and a server that hosts one vault as a git repository. It is written so that anyone can implement a compatible server (self-hosting) or client. The reference implementation is `apps/server`; the wire types are in `packages/protocol/src/index.ts` and are the source of truth when this document and the code disagree.
 
-Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change. Version 1.7 added folder renames (`POST /v1/folders/rename`, capability `folders.rename`); nothing else changed. Version 1.8 added creating and deleting folders (`POST /v1/folders`, capability `folders.create`; `POST /v1/folders/delete`, capability `folders.delete`); nothing else changed.
+Status: spikes S3 (TOL-5) and S4 (TOL-8). The file API and the collaboration channel below are implemented and tested. Version 1.1 added the collaboration channel; it changed nothing in the file API of 1.0. Version 1.2 added the change feed (`GET /v1/changes`); it changed nothing in 1.1's file or collaboration API. Version 1.3 added remote image import (`POST /v1/attachments/imports`) and the `remote_unavailable` error code; it changed nothing else. Version 1.4 added the wikilink rewrite of `POST /v1/rename` (`rewriteLinks`, `title`, `oldTitle`); a rename without them works as in 1.0. Version 1.5 changed which side of a collaboration fork becomes the conflict copy: the live document keeps its edits and `meta.conflictCopy` names the copy of the incoming file (see "What the server does with a document"); nothing else changed. Version 1.6 added rate limits and websocket limits: the `rate_limited` error code with `Retry-After`, the `429` refusal of a websocket upgrade, and the `4408` close code of an idle connection (see "Limits"); a client within the limits sees no change. Version 1.7 added folder renames (`POST /v1/folders/rename`, capability `folders.rename`); nothing else changed. Version 1.8 added creating and deleting folders (`POST /v1/folders`, capability `folders.create`; `POST /v1/folders/delete`, capability `folders.delete`); nothing else changed. Version 1.9 added access tickets (capability `access.tickets`, see "Access tickets"): a front end that holds the token gives other users a role on the vault or on single notes, the `forbidden` error code, `POST /v1/access/revocations`, the `4403` close code, and `access` in `GET /v1/vault`; a client with the token sees no change.
 
 ## Design rules
 
@@ -41,17 +41,59 @@ Capabilities:
 | `folders.delete` | `POST /v1/folders/delete` deletes every file of a folder in one commit (since 1.8). |
 | `collab.yjs`, `collab.awareness` | The collaboration channel is served (since 1.1). |
 | `collab.tickets` | `POST /v1/collab/tickets` issues websocket tickets (since 1.1). |
+| `access.tickets` | Access tickets are accepted as the bearer credential and `POST /v1/access/revocations` is served (since 1.9). |
 
 ## Authentication and transport
 
 - Every route except `GET /healthz` requires `Authorization: Bearer <token>`. A missing or wrong token gets `401 unauthorized` with `WWW-Authenticate: Bearer`.
 - The reference server reads the token from `TOLARIA_SERVER_TOKEN` and does not start without it. It speaks plain HTTP and binds `127.0.0.1`; anything else needs an explicit opt-in and a TLS-terminating proxy in front.
-- One token gives full access to the one vault. Accounts, per-user identity and permissions are outside this protocol version.
+- One token gives full access to the one vault: it is the owner's credential. Accounts and their records are outside this protocol; since 1.9 a front end that holds the token can give other users limited access with access tickets (below).
 - `GET /healthz` answers `200 {"status":"ok"}` and reveals nothing about the vault.
+
+## Access tickets (since 1.9)
+
+An access ticket is sent instead of the token, as `Authorization: Bearer <ticket>`. A front end that authenticates its users (the hosted service, or a self-hosted proxy) mints one per request for the user making it; the server only verifies. A server older than 1.9 answers a ticket with `401`, so a front end that sends them fails closed against it.
+
+Format: `ta1.<payload>.<signature>`. `<payload>` is the base64url (no padding) of a JSON object, `<signature>` the base64url of HMAC-SHA256 over the text `ta1.<payload>`, keyed with HMAC-SHA256(key = the server token, message = `tolaria access ticket v1`). The prefix and `v` carry the ticket version; a new version gets a new prefix, and a server keeps accepting the versions it knows. At most 16 KiB.
+
+```json
+{ "v": 1, "sub": "u_8f3…", "grants": [{ "scope": "*", "role": "viewer" }, { "scope": "projects/alpha.md", "role": "editor" }], "iat": 1761400000000, "exp": 1761400060000 }
+```
+
+| Field | Rule |
+|---|---|
+| `v` | `1`. |
+| `sub` | The user the ticket was minted for: 1 to 200 characters, stable. Rate limits and websocket limits count per subject. |
+| `grants` | 1 to 100 `{ scope, role }`. `scope` is `*` (the whole vault) or the path of one file (the rules of "Paths"). `role` is `viewer`, `editor` or `owner`; `owner` only with scope `*`. |
+| `iat`, `exp` | Milliseconds since the epoch on the minting clock. Refused once `exp` has passed, when `exp - iat` exceeds 10 minutes, or when `iat` is more than 60 s ahead of the server's clock. |
+
+Unknown fields are ignored, so later minor versions can add some. A ticket that fails any rule, or was issued at or before a revocation of its subject, gets `401 unauthorized`.
+
+What a subject may do is the strongest role any of its grants gives on the path concerned:
+
+| Request | Needs |
+|---|---|
+| `GET /v1/vault`, `GET /v1/changes` | Any ticket. `GET /v1/vault` has `access: { subject, grants }` (subject `null` and `owner` on `*` for the token). The change feed leaves out commits that touched none of the subject's paths, and the paths it may not read. |
+| `GET /v1/files`, `/v1/entries` (and `?since=`), `/v1/search` | Any ticket; only readable paths are listed. The `ETag` of `/v1/entries` differs per subject and grants. |
+| `GET /v1/files/<path>`, a `read` collab ticket, opening the websocket | `viewer` on the path. Anything outside every grant is answered `404 not_found`, as if it did not exist. |
+| `PUT /v1/files/<path>`, a `write` collab ticket | `editor` on the path. |
+| `DELETE /v1/files/<path>`, `POST /v1/rename`, the folder routes, `POST /v1/attachments/imports` | `editor` on `*`: only a vault editor adds, moves or deletes files. |
+| `POST /v1/sync` | `editor` on any scope. |
+| `POST /v1/access/revocations` | `owner` on `*`, or the token. |
+
+A readable path the subject may not change gets `403 forbidden`. A stale write by an editor still becomes a conflict copy next to the note, which the editor of only that note cannot read.
+
+### `POST /v1/access/revocations`
+
+```json
+{ "subject": "u_8f3…", "grants": [{ "scope": "projects/alpha.md", "role": "viewer" }], "before": 1761400061000 }
+```
+
+`grants` is what the subject still holds (default none) and `before` a time on the minting clock (default the server's now). From then on the subject's tickets with `iat <= before` and the collab tickets issued for them are refused, and each of its open websockets and change feeds that `grants` no longer covers is closed (websockets with `4403`): a write socket of a subject that keeps only `viewer` closes, its read sockets stay. Answer, `200`: `{ "closed": <count> }`. The front end calls this after it removes or reduces a share, then mints new tickets from its records; a client that reconnects gets what the subject still holds.
 
 ## Limits
 
-Since 1.6 the server limits what one account (one token) may use, so one client cannot exhaust the vault's container. Front-line limits at the edge are separate and not part of this protocol.
+Since 1.6 the server limits what one account (one token) may use, so one client cannot exhaust the vault's container. Since 1.9 each subject of access tickets is an account of its own, so a shared user cannot use up the owner's budget. Front-line limits at the edge are separate and not part of this protocol.
 
 | Limit | Default | When exceeded |
 |---|---|---|
@@ -87,7 +129,8 @@ Every error has the same JSON body. `code` is stable; `message` is for people.
 | 400 | `invalid_path` | The path breaks the rules above or is not valid percent-encoding. |
 | 400 | `invalid_request` | A malformed body or query parameter. |
 | 400 | `unsupported_protocol_version` | The client asked for another major version. |
-| 401 | `unauthorized` | Missing or wrong bearer token. |
+| 401 | `unauthorized` | Missing or wrong bearer token, or an access ticket that is invalid, expired or revoked. |
+| 403 | `forbidden` | The access ticket does not allow this change (since 1.9). |
 | 404 | `not_found` | No such file, or no such route. |
 | 405 | `method_not_allowed` | The route exists but not for this method. `Allow` lists the supported ones. |
 | 409 | `destination_exists` | A rename target exists, or the path runs through a file or names a folder. |
@@ -108,10 +151,11 @@ A write that ends in a conflict copy is not an error body: see `PUT` below.
 
 ```json
 {
-  "protocolVersion": "1.8",
-  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "files.rename.links", "folders.rename", "folders.create", "folders.delete", "collab.yjs", "collab.awareness", "collab.tickets"],
+  "protocolVersion": "1.9",
+  "capabilities": ["files.read", "files.write", "files.rename", "files.delete", "files.conflict-copy", "search.text", "sync.git", "docs.ids", "entries.index", "entries.delta", "changes.feed", "attachments.import", "files.rename.links", "folders.rename", "folders.create", "folders.delete", "access.tickets", "collab.yjs", "collab.awareness", "collab.tickets"],
   "vault": { "name": "my-vault", "branch": "main", "head": "eea2db93a391d110c4707fa1f6c6078c2f39c1ca" },
-  "collab": { "available": true, "path": "/v1/collab/docs", "docFormat": "tolaria.blocknote/1", "blocksFragment": "blocks", "frontmatterField": "frontmatter", "metaMap": "meta" }
+  "collab": { "available": true, "path": "/v1/collab/docs", "docFormat": "tolaria.blocknote/1", "blocksFragment": "blocks", "frontmatterField": "frontmatter", "metaMap": "meta" },
+  "access": { "subject": null, "grants": [{ "scope": "*", "role": "owner" }] }
 }
 ```
 
@@ -387,7 +431,7 @@ A ticket opens one websocket, for that document only, and expires after 60 secon
 Authentication, one of:
 
 - `?ticket=<ticket>` from the route above;
-- `Authorization: Bearer <token>` on the upgrade request, for clients that can send headers. It gives `write` access.
+- `Authorization: Bearer <token>` on the upgrade request, for clients that can send headers. It gives `write` access; an access ticket there gives `write` when it allows changing the note and `read` otherwise (since 1.9).
 
 The upgrade is refused with `401` without valid credentials, with `404` for an unknown document and, since 1.6, with `429` beyond a limit (see "Limits"). A request without an upgrade gets `426 upgrade_required`.
 
@@ -399,7 +443,7 @@ Messages are binary and framed as y-websocket frames them, so stock Yjs provider
 | `1` awareness | y-protocols awareness update | Presence. Clients publish `{ "user": { "name": "…", "color": "#rrggbb" } }` and BlockNote adds the cursor. The server relays it and withdraws a client's presence when its socket closes. The web client sends caret moves at most every 100 ms and renews its state about every 1.2 s, and drops a peer not renewed for 3.5 s (ADR 0291); receivers take only a `#rrggbb` colour and the first 64 characters of a name. The server applies and relays a connection's awareness entries only for client ids that no other connection has announced and that are not the server's own; entries for other ids are dropped, so one client cannot publish or withdraw another's presence. Neither changes the wire format. |
 | `3` awareness query | none | The server answers with the awareness of everyone present. |
 
-Unknown message types are ignored. A message larger than 16 MiB (or the server's lower limit) closes the connection with `1009`; so does sending more than one message's worth before the document has opened. Bytes that are not a message close it with `4400`. When the note is deleted the server closes the room with `4410`. A connection that answers no ping for the idle timeout is closed with `4408` (since 1.6).
+Unknown message types are ignored. A message larger than 16 MiB (or the server's lower limit) closes the connection with `1009`; so does sending more than one message's worth before the document has opened. Bytes that are not a message close it with `4400`. When the note is deleted the server closes the room with `4410`. When the access a connection was opened with is revoked, it is closed with `4403` (since 1.9). A connection that answers no ping for the idle timeout is closed with `4408` (since 1.6).
 
 The server tries every change on a copy of the document before applying it. A change that would add a shared type other than the three of the format, a node type or attribute the editor schema does not have, or an unknown mark, is not applied, and the connection that sent it is closed with `4422`. A change that builds on something the server has not received yet (for example another tab's edit that has not reached the server) cannot be checked: it is not applied and the connection stays open, and the server sends that client a sync step 1 (once, until a change from that client is applied). The client's sync step 2 carries the change together with what it builds on and is checked as a whole. So content the server has not checked never enters the document, and no client is closed because of another client's change. The `meta` map is written by the server only; a client's change to it is reverted.
 
